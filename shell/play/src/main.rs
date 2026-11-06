@@ -3,7 +3,7 @@
 // ffmpeg, аппаратное декодирование, субтитры, дорожки, потоки по ссылке. Помнит, где остановился.
 //
 //   yami-play [ФАЙЛ|ПАПКА|URL…]
-//   yami-play shot [-o ПАПКА] [--lang en]    снимки окна в PNG без Wayland и без mpv
+//   yami-play shot [-o ПАПКА] [--lang en|ru|pt-BR]    снимки окна в PNG без Wayland и без mpv
 
 mod app;
 mod i18n;
@@ -22,7 +22,7 @@ fn main() {
             return;
         }
         Some("-h") | Some("--help") => {
-            println!("yami-play [FILE|DIR|URL…] | shot [-o DIR] [--lang en]\n\nkeys: space pause · ←/→ 5 s (shift 1 s, ctrl 30 s) · ↑/↓ volume · f fullscreen · m mute\n      n/p next/previous · [ ] speed · a audio · s subtitles · l repeat · x pixel scaling\n      c save frame · , . frame step · 1…9 jump to 10…90 % · i details · q quit");
+            println!("yami-play [FILE|DIR|URL…] | shot [-o DIR] [--lang en|ru|pt-BR]\n\nkeys: space pause · ←/→ 5 s (shift 1 s, ctrl 30 s) · ↑/↓ volume · f fullscreen · m mute\n      n/p next/previous · [ ] speed · a audio · s subtitles · l repeat · x pixel scaling\n      c save frame · , . frame step · 1…9 jump to 10…90 % · i details · q quit");
             return;
         }
         Some("shot") => std::process::exit(shot(&args[1..])),
@@ -78,7 +78,7 @@ fn shot(args: &[String]) -> i32 {
         look.lang = lang.clone();
     }
     i18n::set(&look.lang);
-    i18n::audit(lang == "en");
+    i18n::audit(crate::i18n::translated());
     let _ = std::fs::create_dir_all(&out);
     let mut fonts = font::Fonts::with(look.font("view"));
     let mut ic = icons::Icons::new("");
@@ -138,7 +138,7 @@ fn shot(args: &[String]) -> i32 {
         let path = out.join(format!("{target}.png"));
         let _ = image::save_buffer(&path, &rgba, w as u32, h as u32, image::ColorType::Rgba8);
         println!("{}", path.display());
-        if lang == "en" {
+        if crate::i18n::translated() {
             for m in i18n::take_missed() {
                 println!("  untranslated [{target}]: {m}");
                 bad = 1;

@@ -1,7 +1,7 @@
 // Снимки панелей без Wayland: рисует в память и пишет PNG. Чтобы проверить вид и перевод,
 // не трогая экран пользователя (и не открывая ничего поверх его игры).
 //
-//   yami-shell shot [ЦЕЛЬ…] [--lang ru|en] [--theme dark|light] [--defaults] [--transparent] [--frame PNG] [-o ПАПКА]
+//   yami-shell shot [ЦЕЛЬ…] [--lang ru|en|pt-BR] [--theme dark|light] [--defaults] [--transparent] [--frame PNG] [-o ПАПКА]
 //
 // Без цели — все панели. При --lang en печатает надписи, оставшиеся русскими, и выходит с 1.
 // Окна, программы и уведомление — мок-овые (снимок не зависит от машины), датчики — настоящие.
@@ -134,7 +134,7 @@ pub fn run(args: &[String]) -> i32 {
                 let _ = FRAME.set(it.next().map(PathBuf::from).unwrap_or_default());
             }
             "-h" | "--help" | "list" => {
-                println!("yami-shell shot [TARGET…] [--lang ru|en] [--defaults] [--transparent] [--frame PNG] [-o DIR]\ntargets: {}", TARGETS.join(" "));
+                println!("yami-shell shot [TARGET…] [--lang ru|en|pt-BR] [--defaults] [--transparent] [--frame PNG] [-o DIR]\ntargets: {}", TARGETS.join(" "));
                 return 0;
             }
             t if TARGETS.contains(&t) => targets.push(t.to_string()),
@@ -166,7 +166,7 @@ pub fn run(args: &[String]) -> i32 {
         eprintln!("shot: cannot create {}", out.display());
         return 2;
     }
-    crate::i18n::audit(crate::i18n::en());
+    crate::i18n::audit(crate::i18n::translated());
     let mut bad = 0;
     for t in &targets {
         let path = out.join(format!("{}.png", t.replace(':', "-")));
@@ -259,7 +259,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             if st.color_page == 1 {
                 let card = |name: &str, accent: u32, light: bool, wall: bool| crate::bundle::Card { name: name.into(), accent, light, wall };
                 st.themes = vec![card("ash-dark", 0xa8a29c, false, false), card("sakura evening", 0xd9577c, false, true), card("paper", 0x3a9fd0, true, false), card("amber-light", 0xd98e1f, true, true), card("venom", 0x5fae34, false, false)];
-                st.theme_note = crate::tf!("сохранена: {}", "saved: {}", "ash-dark");
+                st.theme_note = crate::tf!("сохранена: {}", "saved: {}", "salvo: {}", "ash-dark");
             }
             // обои с skwd-wall: он стоит и включён, выбрано видео (здесь — его кадр)
             st.skwd_here = arg == "wall-skwd";
@@ -422,7 +422,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
         }
         "menu" => {
             let w = Widget::new(900, "graph");
-            st.menu = Some(crate::menu::MenuState::new("", 0, 0, &crate::tf!("виджет: {}", "widget: {}", crate::i18n::tr("график")), crate::widgets::widget_menu(&w)));
+            st.menu = Some(crate::menu::MenuState::new("", 0, 0, &crate::tf!("виджет: {}", "widget: {}", "widget: {}", crate::i18n::tr("график")), crate::widgets::widget_menu(&w)));
             crate::menu::size(st.menu.as_ref().unwrap(), &mut res.fonts)
         }
         "widget" => {

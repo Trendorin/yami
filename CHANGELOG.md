@@ -9,6 +9,7 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+- Brazilian Portuguese (`pt-BR`): the shell, file manager, image viewer, player, installer and login theme. Select it in settings or let the system locale choose it; `pt_BR.UTF-8` and `pt` are accepted too. Language choices survive settings sanitization and theme generation, and the checks now render every app in PT-BR.
 - Phones, cameras and drives mount by themselves when they are plugged in (settings → services → drives and phones, `automount`, `automountOpen`), like in GNOME and KDE: USB sticks, external disks, memory cards, CDs and DVDs, disk images, Android phones in file transfer mode (MTP), cameras and phones in PTP mode, iPhones and iPads. The shell listens to udev without polling (a netlink socket that the kernel filters down to `block` and `usb` events) and mounts what the volume itself asks to be mounted, once per plug (a phone that is still locked is tried again for half a minute): a card says what was mounted and opens it. Encrypted drives ask for their password in yami-files instead.
 - Fix: a phone with file transfer on did not show in yami-files until it was mounted by hand: phone and camera volumes have a USB device id that was taken for a disk's, so they were skipped. They show at once now, and a click mounts and opens them.
 - yami-files: encrypted drives (LUKS, BitLocker) show as «encrypted», a click asks for the password (handed to `gio` over a pipe, never stored); «eject» unmounts, locks and powers the drive off.

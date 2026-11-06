@@ -5,6 +5,7 @@
 pub mod font;
 pub mod gfx;
 pub mod icons;
+pub mod i18n;
 pub mod look;
 pub mod paths;
 pub mod theme;

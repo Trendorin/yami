@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Static i18n check for every crate (shell, files, view, play): every Russian string literal must be translatable.
 
-A literal passes when it is a key of PAIRS in i18n.rs, the Russian half of tf!("…", "…"),
+A literal passes when it is a key of PAIRS in i18n.rs, the Russian part of tf!("…", "…", "…"),
 or sits on a line marked `// i18n-ok` (text that is Russian on purpose). In a file marked
 `// i18n: inline pairs` (bilingual tables such as keys.rs) a Russian literal also passes when
 the next literal on the line is its English twin. Also catches
-duplicate keys and Cyrillic left in English values. The runtime half of the check is
-`yami-shell shot --lang en` (strings built at draw time). Exit 1 on any problem.
+duplicate keys, incomplete PT-BR catalogs and changed format placeholders. The runtime
+half is `yami-shell shot --lang en` and `--lang pt-BR`. Exit 1 on any problem.
 """
 import re
 import sys
@@ -17,6 +17,10 @@ CRATES = [ROOT / "src", ROOT / "files" / "src", ROOT / "view" / "src", ROOT / "p
 CYR = re.compile(r"[а-яА-ЯёЁ]")
 LIT = re.compile(r'"((?:[^"\\]|\\.)*)"')
 NATIVE = {"Русский"}
+PAIR = re.compile(r'^\s*\("((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)"\),', re.M)
+TEMPLATE = re.compile(r'tf!\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"')
+FIELDS = re.compile(r'(?<!\{)\{(?!\{)[^{}]*\}(?!\})')
+INLINE_PAIR = re.compile(r'(?="((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)")')
 
 
 def code_part(line: str) -> str:
@@ -34,7 +38,7 @@ def code_part(line: str) -> str:
 
 def check(SRC: Path) -> tuple:
     table = (SRC / "i18n.rs").read_text()
-    pairs = re.findall(r'^\s*\("((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)"\),', table, re.M)
+    pairs = PAIR.findall(table)
     problems = []
     seen = {}
     for ru, en in pairs:
@@ -44,8 +48,20 @@ def check(SRC: Path) -> tuple:
         seen[ru] = en
         if CYR.search(en) and en not in NATIVE:
             problems.append(f"i18n.rs: English value of «{ru}» is Cyrillic: «{en}»")
+    portuguese = {}
+    for en, pt in PAIR.findall((SRC / "i18n_pt_br.rs").read_text()):
+        if en in portuguese:
+            problems.append(f"{SRC}/i18n_pt_br.rs: duplicate key «{en}»")
+        portuguese[en] = pt
+        if CYR.search(pt) and pt not in NATIVE:
+            problems.append(f"{SRC}/i18n_pt_br.rs: PT-BR value is Cyrillic: «{pt}»")
+        if FIELDS.findall(en) != FIELDS.findall(pt):
+            problems.append(f"{SRC}/i18n_pt_br.rs: changed format placeholders for «{en}»")
+    for en in seen.values():
+        if en not in portuguese:
+            problems.append(f"{SRC}/i18n_pt_br.rs: missing PT-BR translation for «{en}»")
     for f in sorted(SRC.glob("*.rs")):
-        if f.name == "i18n.rs":
+        if f.name in {"i18n.rs", "i18n_pt_br.rs"}:
             continue
         text = f.read_text()
         inline = "// i18n: inline pairs" in text
@@ -53,6 +69,16 @@ def check(SRC: Path) -> tuple:
             if "i18n-ok" in line:
                 continue
             code = code_part(line)
+            if inline:
+                for ru, en in INLINE_PAIR.findall(code):
+                    if CYR.search(ru) and not CYR.search(en) and en not in portuguese:
+                        problems.append(f"{f}:{n}: missing inline PT-BR translation for «{en}»")
+            for template in TEMPLATE.finditer(code):
+                _, en, pt = template.groups()
+                if FIELDS.findall(en) != FIELDS.findall(pt):
+                    problems.append(f"{f}:{n}: PT-BR format placeholders differ from English")
+                if CYR.search(pt) and pt not in NATIVE:
+                    problems.append(f"{f}:{n}: PT-BR format template is Cyrillic")
             lits = list(LIT.finditer(code))
             for j, m in enumerate(lits):
                 s = m.group(1)
@@ -77,7 +103,7 @@ def main() -> int:
         print(p)
     if problems:
         print(f"check-i18n: {len(problems)} problem(s). Add pairs to PAIRS in that crate's i18n.rs, "
-              "use tf!(ru, en, …), or mark intentional Russian with // i18n-ok", file=sys.stderr)
+              "use tf!(ru, en, pt, …), or mark intentional Russian with // i18n-ok", file=sys.stderr)
         return 1
     print(f"check-i18n: ok ({len(seen)} pairs)")
     return 0

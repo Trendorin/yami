@@ -34,13 +34,14 @@ Rectangle {
     })
     // светлая тема шелла: вуаль высветляет обои, текст тёмный
     readonly property bool light: cfg("mode", "dark") === "light"
-    readonly property bool en: {
-        var l = cfg("lang", "")
-        if (l === "en") return true
-        if (l === "ru") return false
-        return Qt.locale().name.indexOf("ru") !== 0
+    readonly property string language: {
+        var l = (cfg("lang", "") || Qt.locale().name).replace(/_/g, "-").toLowerCase()
+        if (l.indexOf("pt") === 0) return "pt-BR"
+        if (l.indexOf("ru") === 0) return "ru"
+        return "en"
     }
-    function tr(ru, en) { return root.en ? en : ru }
+    readonly property bool en: language === "en"
+    function tr(ru, en, pt) { return root.language === "pt-BR" ? pt : (root.en ? en : ru) }
 
     FontLoader { id: tiny; source: "fonts/Tiny5.ttf" }
     FontLoader { id: jp; source: "fonts/DotGothic16-Regular.ttf" }
@@ -62,7 +63,7 @@ Rectangle {
     function login() {
         if (busy || pass.text.length === 0) return
         busy = true
-        status = tr("проверяю…", "checking…")
+        status = tr("проверяю…", "checking…", "verificando…")
         sddm.login(userName, pass.text, sessionIdx)
     }
 
@@ -118,7 +119,7 @@ Rectangle {
             px: 24
             color: pal.textDim
             text: {
-                var s = Qt.locale(root.en ? "en_US" : "ru_RU").toString(content.now, "dddd, d MMMM")
+                var s = Qt.locale(root.language === "pt-BR" ? "pt_BR" : (root.en ? "en_US" : "ru_RU")).toString(content.now, root.language === "pt-BR" ? "dddd, d 'de' MMMM" : "dddd, d MMMM")
                 return root.en ? s : s.toLowerCase()
             }
         }
@@ -173,7 +174,7 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         x: 12
                         px: 16
-                        text: root.tr("пароль", "password")
+                        text: root.tr("пароль", "password", "senha")
                         color: pal.textFaint
                     }
                     Rectangle {
@@ -224,7 +225,7 @@ Rectangle {
                 y: fieldWrap.y + fieldWrap.height + 12
                 px: 16
                 readonly property bool caps: keyboard && keyboard.capsLock
-                text: root.status !== "" ? root.status : (caps ? "caps lock" : (root.fails > 0 ? root.tr("неверно ×", "wrong ×") + root.fails : root.tr("enter — войти", "enter — log in")))
+                text: root.status !== "" ? root.status : (caps ? "caps lock" : (root.fails > 0 ? root.tr("неверно ×", "wrong ×", "incorreta ×") + root.fails : root.tr("enter — войти", "enter — log in", "enter — entrar")))
                 color: caps || (root.fails > 0 && root.status === "") ? (caps ? pal.warn : pal.bright) : pal.textFaint
             }
         }
@@ -237,7 +238,7 @@ Rectangle {
             PxButton {
                 pal: root.pal
                 icon: "grid"
-                text: root.sessionName !== "" ? root.sessionName : root.tr("сеанс", "session")
+                text: root.sessionName !== "" ? root.sessionName : root.tr("сеанс", "session", "sessão")
                 visible: sessions.count > 0
                 onClicked: root.sessionIdx = (root.sessionIdx + 1) % Math.max(1, sessions.count)
             }
@@ -253,9 +254,9 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             y: root.height - 56
             spacing: 8
-            PxButton { pal: root.pal; ghost: true; icon: "moon"; text: root.tr("сон", "sleep"); visible: sddm.canSuspend; onClicked: sddm.suspend() }
-            PxButton { pal: root.pal; ghost: true; icon: "reboot"; text: root.tr("перезагрузка", "reboot"); visible: sddm.canReboot; onClicked: sddm.reboot() }
-            PxButton { pal: root.pal; ghost: true; icon: "power"; text: root.tr("выключить", "power off"); visible: sddm.canPowerOff; onClicked: sddm.powerOff() }
+            PxButton { pal: root.pal; ghost: true; icon: "moon"; text: root.tr("сон", "sleep", "suspender"); visible: sddm.canSuspend; onClicked: sddm.suspend() }
+            PxButton { pal: root.pal; ghost: true; icon: "reboot"; text: root.tr("перезагрузка", "reboot", "reiniciar"); visible: sddm.canReboot; onClicked: sddm.reboot() }
+            PxButton { pal: root.pal; ghost: true; icon: "power"; text: root.tr("выключить", "power off", "desligar"); visible: sddm.canPowerOff; onClicked: sddm.powerOff() }
         }
         Text {
             visible: cfg("kanji", "true") === "true"

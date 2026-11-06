@@ -96,7 +96,7 @@ impl crate::app::App {
 pub fn cli(y: &crate::cmd::Sty, args: &[&str]) -> i32 {
     let Some(n) = load() else {
         if !args.contains(&"--print") {
-            println!(" {} {}", y.ok("✓"), crate::tf!("всех пакетов хватает", "no packages missing"));
+            println!(" {} {}", y.ok("✓"), crate::tf!("всех пакетов хватает", "no packages missing", "nenhum pacote ausente"));
         }
         return 0;
     };
@@ -109,15 +109,15 @@ pub fn cli(y: &crate::cmd::Sty, args: &[&str]) -> i32 {
         let ok = std::process::Command::new(&a[0]).args(&a[1..]).status().map(|s| s.success()).unwrap_or(false);
         if ok {
             let _ = std::fs::remove_file(path());
-            println!(" {} {}", y.ok("✓"), crate::tf!("поставлено", "installed"));
+            println!(" {} {}", y.ok("✓"), crate::tf!("поставлено", "installed", "instalado"));
             return 0;
         }
-        eprintln!(" {} {}", y.bad("✕"), crate::tf!("не вышло — команда выше", "failed, see the command above"));
+        eprintln!(" {} {}", y.bad("✕"), crate::tf!("не вышло — команда выше", "failed, see the command above", "falhou; veja o comando acima"));
         return 1;
     }
-    y.section(&crate::tf!("не хватает пакетов", "missing packages"));
+    y.section(&crate::tf!("не хватает пакетов", "missing packages", "pacotes ausentes"));
     println!("   {}", n.pkgs.join(" "));
-    println!("\n   {}  {}", y.bold(&n.line()), y.dim(&crate::tf!("(или: yami update need --run)", "(or: yami update need --run)")));
+    println!("\n   {}  {}", y.bold(&n.line()), y.dim(&crate::tf!("(или: yami update need --run)", "(or: yami update need --run)", "(ou: yami update need --run)")));
     println!();
     0
 }

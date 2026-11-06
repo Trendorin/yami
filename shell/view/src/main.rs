@@ -2,7 +2,7 @@
 // пиксели при увеличении, поворот/отражение/кадрирование, сохранение через диалог yami-files.
 //
 //   yami-view [ФАЙЛ|ПАПКА…]
-//   yami-view shot [-o ПАПКА] [--lang en]    снимки окна в PNG без Wayland
+//   yami-view shot [-o ПАПКА] [--lang en|ru|pt-BR]    снимки окна в PNG без Wayland
 
 mod app;
 mod i18n;
@@ -21,7 +21,7 @@ fn main() {
             return;
         }
         Some("-h") | Some("--help") => {
-            println!("yami-view [FILE|DIR…] | shot [-o DIR] [--lang en]");
+            println!("yami-view [FILE|DIR…] | shot [-o DIR] [--lang en|ru|pt-BR]");
             return;
         }
         Some("shot") => std::process::exit(shot(&args[1..])),
@@ -73,7 +73,7 @@ fn shot(args: &[String]) -> i32 {
         look.lang = lang.clone();
     }
     i18n::set(&look.lang);
-    i18n::audit(lang == "en");
+    i18n::audit(crate::i18n::translated());
     let _ = std::fs::create_dir_all(&out);
     let dir = std::env::temp_dir().join(format!("yami-view-shot-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);
@@ -123,7 +123,7 @@ fn shot(args: &[String]) -> i32 {
         let path = out.join(format!("{target}.png"));
         let _ = image::save_buffer(&path, &rgba, w as u32, h as u32, image::ColorType::Rgba8);
         println!("{}", path.display());
-        if lang == "en" {
+        if crate::i18n::translated() {
             for m in i18n::take_missed() {
                 println!("  untranslated [{target}]: {m}");
                 bad = 1;

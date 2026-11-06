@@ -1,7 +1,7 @@
 // Снимки окна файлов без Wayland: собирает папку-образец во временном каталоге (по файлу
 // каждого типа, папки, картинка) и рисует нужное состояние в PNG. Как `yami-shell shot`.
 //
-//   yami-files shot [ЦЕЛЬ…] [--lang ru|en] [-o ПАПКА]
+//   yami-files shot [ЦЕЛЬ…] [--lang ru|en|pt-BR] [-o ПАПКА]
 
 use crate::act::Ui;
 use crate::fm::{Dlg, Fm, Mode};
@@ -64,7 +64,7 @@ pub fn run(args: &[String]) -> i32 {
             "-o" | "--out" => out = it.next().map(PathBuf::from).unwrap_or(out),
             "--theme" => mode = it.next().map(|m| m == "light"),
             "-h" | "--help" | "list" => {
-                println!("yami-files shot [TARGET…] [--lang ru|en] [--theme dark|light] [-o DIR]\ntargets: {}", TARGETS.join(" "));
+                println!("yami-files shot [TARGET…] [--lang ru|en|pt-BR] [--theme dark|light] [-o DIR]\ntargets: {}", TARGETS.join(" "));
                 return 0;
             }
             t if TARGETS.contains(&t) => targets.push(t.to_string()),
@@ -83,7 +83,7 @@ pub fn run(args: &[String]) -> i32 {
     }
     look.animations = false;
     crate::i18n::set(&look.lang);
-    crate::i18n::audit(lang == "en");
+    crate::i18n::audit(crate::i18n::translated());
     let root = std::env::temp_dir().join(format!("yami-files-shot-{}", std::process::id()));
     fixture(&root);
     let _ = std::fs::create_dir_all(&out);
@@ -247,7 +247,7 @@ pub fn run(args: &[String]) -> i32 {
         let path = out.join(format!("{t}.png"));
         save_png(&buf, w, h, &path);
         println!("{}", path.display());
-        if lang == "en" {
+        if crate::i18n::translated() {
             let missed = crate::i18n::take_missed();
             for m in &missed {
                 println!("  untranslated [{t}]: {m}");

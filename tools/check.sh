@@ -65,6 +65,15 @@ if [[ -x $PLAY ]]; then
   "$PLAY" shot --lang en -o "$TMP/pen" | grep untranslated
   [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-play shot --lang en: no Russian left" || bad "yami-play shot --lang en"
 fi
+for name in shell files view play; do
+  exe="$ROOT/shell/target/release/yami-$name"
+  [[ -x $exe ]] || continue
+  shot_args=(shot --lang pt-BR -o "$TMP/pt-$name")
+  [[ $name == shell ]] && shot_args+=(--defaults)
+  "$exe" "${shot_args[@]}" | grep untranslated
+  [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-$name shot --lang pt-BR" || bad "yami-$name shot --lang pt-BR"
+done
+
 step "unit tests"
 cargo test --release --locked --workspace --quiet --manifest-path "$ROOT/shell/Cargo.toml" >"$TMP/test.log" 2>&1 && ok "cargo test" || { tail -20 "$TMP/test.log"; bad "cargo test"; }
 
@@ -105,15 +114,17 @@ else
 fi
 
 if ((!FAST)); then
-  step "installer dry run (throwaway HOME)"
-  mkdir -p "$TMP/home"
-  if HOME="$TMP/home" NIRI_SOCKET='' XDG_CONFIG_HOME='' XDG_CACHE_HOME='' XDG_STATE_HOME='' XDG_DATA_HOME='' \
-    timeout 60 "$ROOT/install.sh" --yes --dry-run --no-anim --no-sudo --lang en >"$TMP/dry.log" 2>&1; then
-    ok "install.sh --dry-run"
-  else
-    tail -20 "$TMP/dry.log"
-    bad "install.sh --dry-run"
-  fi
+  step "installer dry run (isolated XDG directories)"
+  for lang in en ru pt-BR pt_BR.UTF-8; do
+    if NIRI_SOCKET='' XDG_CONFIG_HOME="$TMP/install/config" XDG_CACHE_HOME="$TMP/install/cache" \
+      XDG_STATE_HOME="$TMP/install/state" XDG_DATA_HOME="$TMP/install/data" \
+      timeout 60 "$ROOT/install.sh" --yes --dry-run --no-anim --no-sudo --lang "$lang" >"$TMP/dry-$lang.log" 2>&1; then
+      ok "install.sh --dry-run --lang $lang"
+    else
+      tail -20 "$TMP/dry-$lang.log"
+      bad "install.sh --dry-run --lang $lang"
+    fi
+  done
 fi
 
 echo

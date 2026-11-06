@@ -10,7 +10,7 @@
 //                                      org.freedesktop.FileManager1 («показать в папке»)
 //   yami-files --props ФАЙЛ…           свойства файлов
 //   yami-files --unlock /dev/…         пароль зашифрованного диска (карточка автоподключения шелла)
-//   yami-files shot [ЦЕЛЬ…] [--lang en] [-o ПАПКА]   снимки окна в PNG без Wayland
+//   yami-files shot [ЦЕЛЬ…] [--lang en|ru|pt-BR] [-o ПАПКА]   снимки окна в PNG без Wayland
 
 mod act;
 mod app;
@@ -101,7 +101,7 @@ fn main() {
             return;
         }
         Some("-h") | Some("--help") => {
-            println!("yami-files [DIR…] | --unlock /dev/… | --pick open|save|dir [--multiple] [--title T] [--accept T] [--name N] [--folder DIR] [--filter 'Name|*.ext;mime/type']… | --portal | --portal-reload | shot [TARGET…] [--lang en] [-o DIR]");
+            println!("yami-files [DIR…] | --unlock /dev/… | --pick open|save|dir [--multiple] [--title T] [--accept T] [--name N] [--folder DIR] [--filter 'Name|*.ext;mime/type']… | --portal | --portal-reload | shot [TARGET…] [--lang en|ru|pt-BR] [-o DIR]");
             return;
         }
         Some("shot") => std::process::exit(shot::run(&args[2..])),

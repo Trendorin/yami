@@ -8,7 +8,7 @@
 #
 #   ./install.sh                  interactive: language, components, palette, fonts, summary
 #   ./install.sh --yes            no questions, sensible defaults
-#   ./install.sh --lang en|ru     interface language (installer, shell, key hints)
+#   ./install.sh --lang en|ru|pt-BR     interface language (installer, shell, key hints)
 #   ./install.sh --palette ash    blood ash sakura amber venom ice dusk
 #   ./install.sh --look light     panel transparency: matte glass light solid
 #   ./install.sh --theme light    dark (default) or light: the shell and every app it recolours
@@ -122,21 +122,38 @@ mkdir -p "$CACHE"
 : >"$MISSING_F"
 
 # ── language ────────────────────────────────────────────────────────────────
+lang_code() {
+  case "${1,,}" in
+    ru | ru[-_.@]*) printf '%s' ru ;;
+    en | en[-_.@]*) printf '%s' en ;;
+    pt | pt[-_.@]*) printf '%s' pt-BR ;;
+  esac
+}
 L="${LANG_OPT:-}"
+if [[ -n $L ]]; then
+  L="$(lang_code "$L")"
+  [[ -n $L ]] || { echo "--lang: ru, en or pt-BR" >&2; exit 2; }
+fi
 if [[ -z $L ]] && ((UPDATE)) && [[ -f $SET_JSON ]]; then
   L="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1])).get("lang",""))' "$SET_JSON" 2>/dev/null)"
-  [[ $L == ru || $L == en ]] || L=""
+  L="$(lang_code "$L")"
 fi
 if [[ -z $L ]]; then
-  case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in ru*) L=ru ;; *) L=en ;; esac
+  L="$(lang_code "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}")"
+  L="${L:-en}"
   LANG_ASK=1
 else
   LANG_ASK=0
 fi
-[[ $L == ru || $L == en ]] || { echo "--lang: ru or en" >&2; exit 2; }
 # ${#s} must count characters, not bytes
 case "$(locale charmap 2>/dev/null)" in UTF-8) ;; *) export LC_ALL=C.UTF-8 ;; esac
-t() { if [[ $L == ru ]]; then printf '%s' "$1"; else printf '%s' "$2"; fi; }
+t() {
+  case $L in
+    ru) printf '%s' "$1" ;;
+    pt-BR) printf '%s' "${3:-$2}" ;;
+    *) printf '%s' "$2" ;;
+  esac
+}
 
 # ── distro ──────────────────────────────────────────────────────────────────
 OS_NAME="Linux" FAM="" ATOMIC=0
@@ -217,7 +234,7 @@ asroot() {
   # `<&fd`) would swap them for that moment, so the request is written from a subshell and the
   # answer read with -u. A root shell that is gone must not take the installer with it (SIGPIPE).
   if ! (trap '' PIPE; printf '%s\n%s\n' "$me" "$q" >&"$ROOT_W") 2>/dev/null || ! IFS= read -r -u "$ROOT_R" rc; then
-    printf '%s\n' "$(t "root-сеанс закрыт" "the root shell is gone")" >&2
+    printf '%s\n' "$(t "root-сеанс закрыт" "the root shell is gone" "a sessão root foi encerrada")" >&2
     return 1
   fi
   return "$rc"
@@ -400,6 +417,7 @@ noto-fonts-color-emoji kitty fastfetch pavucontrol btop qt6ct adw-gtk3 papirus-i
 PAL_ID=(blood ash sakura amber venom ice dusk)
 PAL_RU=(кровь пепел сакура янтарь яд лёд сумрак)
 PAL_EN=(blood ash sakura amber venom ice dusk)
+PAL_PT=(sangue cinza sakura âmbar veneno gelo crepúsculo)
 PAL_HEX=(c4161c a8a29c d9577c d98e1f 5fae34 3a9fd0 8a5cf0)
 pal=0
 if [[ -n "$PALETTE" ]]; then
@@ -413,6 +431,7 @@ fi
 LOOK_ID=(matte glass light solid)
 LOOK_RU=(матовое стекло светлое плотное)
 LOOK_EN=(matte glass light solid)
+LOOK_PT=(fosco vidro claro sólido)
 LOOK_GLASS=(78 55 85 100) LOOK_LIFT=(0 20 60 0) LOOK_INNER=(100 55 80 100) LOOK_DIM=(50 35 30 60)
 look=0 LOOK_SET=0
 if [[ -n $LOOK_OPT ]]; then
@@ -431,11 +450,11 @@ if [[ -n $THEME_OPT ]]; then
 elif [[ -f "$SET_JSON" ]]; then
   python3 -I -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("light") else 1)' "$SET_JSON" 2>/dev/null && theme=1
 fi
-theme_name() { case ${THEME_ID[$1]} in dark) t "тёмная" "dark" ;; light) t "светлая" "light" ;; esac; }
+theme_name() { case ${THEME_ID[$1]} in dark) t "тёмная" "dark" "escuro" ;; light) t "светлая" "light" "claro" ;; esac; }
 theme_desc() {
   case ${THEME_ID[$1]} in
-    dark) t "графит и акцент — как задумано" "graphite and the accent: the original look" ;;
-    light) t "светлая бумага, акцент темнее; GTK, Qt, kitty и курсор — тоже" "light paper, a deeper accent; GTK, Qt, kitty and the cursor follow" ;;
+    dark) t "графит и акцент — как задумано" "graphite and the accent: the original look" "grafite e destaque: a aparência original" ;;
+    light) t "светлая бумага, акцент темнее; GTK, Qt, kitty и курсор — тоже" "light paper, a deeper accent; GTK, Qt, kitty and the cursor follow" "papel claro, destaque mais escuro; GTK, Qt, kitty e o cursor acompanham" ;;
   esac
 }
 # ── app font: readable sans (default) or the pixel Tiny5 everywhere; the shell stays pixel ──
@@ -457,32 +476,32 @@ if [[ -n $FETCH_OPT ]]; then
 elif [[ -f "$SET_JSON" ]]; then
   python3 -I -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("fetchFull") else 1)' "$SET_JSON" 2>/dev/null && fetch=1
 fi
-fetch_name() { case ${FETCH_ID[$1]} in mini) t "короткий" "mini" ;; full) t "расширенный" "extended" ;; esac; }
+fetch_name() { case ${FETCH_ID[$1]} in mini) t "короткий" "mini" "resumido" ;; full) t "расширенный" "extended" "completo" ;; esac; }
 fetch_desc() {
   case ${FETCH_ID[$1]} in
-    mini) t "кто, система, окружение — без железа" "who, system, desktop: no hardware" ;;
-    full) t "ещё ядро, пакеты, процессор, видеокарта, память, диск, экран" "also kernel, packages, CPU, GPU, memory, disk, display" ;;
+    mini) t "кто, система, окружение — без железа" "who, system, desktop: no hardware" "usuário, sistema e desktop: sem hardware" ;;
+    full) t "ещё ядро, пакеты, процессор, видеокарта, память, диск, экран" "also kernel, packages, CPU, GPU, memory, disk, display" "também kernel, pacotes, CPU, GPU, memória, disco e tela" ;;
   esac
 }
-font_name() { case ${FONT_ID[$1]} in sans) t "обычный (Noto Sans)" "regular (Noto Sans)" ;; pixel) t "пиксельный (Tiny5)" "pixel (Tiny5)" ;; esac; }
+font_name() { case ${FONT_ID[$1]} in sans) t "обычный (Noto Sans)" "regular (Noto Sans)" "normal (Noto Sans)" ;; pixel) t "пиксельный (Tiny5)" "pixel (Tiny5)" "pixel (Tiny5)" ;; esac; }
 font_desc() {
   case ${FONT_ID[$1]} in
-    sans) t "программы читаются как обычно; шелл, файлы и экран входа — пиксельные" "apps read as usual; the shell, files and login screen stay pixel" ;;
-    pixel) t "пиксельный шрифт во всех программах, ровно по сетке экрана" "the pixel font in every app, exactly on the screen's grid" ;;
+    sans) t "программы читаются как обычно; шелл, файлы и экран входа — пиксельные" "apps read as usual; the shell, files and login screen stay pixel" "aplicativos com leitura normal; shell, arquivos e tela de login continuam em pixel" ;;
+    pixel) t "пиксельный шрифт во всех программах, ровно по сетке экрана" "the pixel font in every app, exactly on the screen's grid" "fonte em pixel em todos os aplicativos, alinhada à grade da tela" ;;
   esac
 }
 
-look_name() { if [[ $L == ru ]]; then printf '%s' "${LOOK_RU[$1]}"; else printf '%s' "${LOOK_EN[$1]}"; fi; }
+look_name() { case $L in ru) printf '%s' "${LOOK_RU[$1]}" ;; pt-BR) printf '%s' "${LOOK_PT[$1]}" ;; *) printf '%s' "${LOOK_EN[$1]}" ;; esac; }
 look_desc() {
   case ${LOOK_ID[$1]} in
-    matte) t "тёмный графит, панели почти сплошные — как задумано" "dark graphite, nearly solid panels: the original look" ;;
-    glass) t "панели и карточки прозрачные, стол просвечивает" "translucent panels and cards, the desktop shows through" ;;
-    light) t "графит светлее, без глухого чёрного" "lighter graphite, no deep black" ;;
-    solid) t "всё сплошное, сильное затемнение под меню" "fully solid, strong dim behind menus" ;;
+    matte) t "тёмный графит, панели почти сплошные — как задумано" "dark graphite, nearly solid panels: the original look" "grafite escuro, painéis quase sólidos: a aparência original" ;;
+    glass) t "панели и карточки прозрачные, стол просвечивает" "translucent panels and cards, the desktop shows through" "painéis e cartões translúcidos; a área de trabalho aparece ao fundo" ;;
+    light) t "графит светлее, без глухого чёрного" "lighter graphite, no deep black" "grafite mais claro, sem preto intenso" ;;
+    solid) t "всё сплошное, сильное затемнение под меню" "fully solid, strong dim behind menus" "totalmente sólido, escurecimento forte atrás dos menus" ;;
   esac
 }
 
-pal_name() { if [[ $L == ru ]]; then printf '%s' "${PAL_RU[$1]}"; else printf '%s' "${PAL_EN[$1]}"; fi; }
+pal_name() { case $L in ru) printf '%s' "${PAL_RU[$1]}" ;; pt-BR) printf '%s' "${PAL_PT[$1]}" ;; *) printf '%s' "${PAL_EN[$1]}" ;; esac; }
 
 # ── paint ───────────────────────────────────────────────────────────────────
 rgb() { printf '%d;%d;%d' "0x${1:0:2}" "0x${1:2:2}" "0x${1:4:2}"; }
@@ -544,7 +563,7 @@ logo_row() { # row text frame sweep
 }
 SUBTITLE=""
 banner() { # 1 — animate
-  SUBTITLE="$(t "пиксельный райс для niri" "pixel rice for niri")"
+  SUBTITLE="$(t "пиксельный райс для niri" "pixel rice for niri" "personalização em pixel para niri")"
   local f sw
   printf '\n'
   if (($1)) && ((ANIM)); then
@@ -570,10 +589,10 @@ banner() { # 1 — animate
     for ((i = 0; i < ${#line}; i += 4)); do printf '%s' "${line:i:4}"; sleep 0.008; done
     printf '%s\n  %s' "$R" "$D"
     for ((i = 0; i < ${#SUBTITLE}; i++)); do printf '%s' "${SUBTITLE:i:1}"; sleep 0.012; done
-    printf '%s  %s// %s%s\n\n' "$R" "$F" "$(t "установка" "installer")" "$R"
+    printf '%s  %s// %s%s\n\n' "$R" "$F" "$(t "установка" "installer" "instalador")" "$R"
   else
     printf '  %s────────────────────────────────────────%s\n' "$F" "$R"
-    printf '  %s%s%s  %s// %s%s\n\n' "$D" "$SUBTITLE" "$R" "$F" "$(t "установка" "installer")" "$R"
+    printf '  %s%s%s  %s// %s%s\n\n' "$D" "$SUBTITLE" "$R" "$F" "$(t "установка" "installer" "instalador")" "$R"
   fi
 }
 
@@ -592,7 +611,7 @@ key() {
   elif [[ $k == " " ]]; then echo space
   else echo "$k"; fi
 }
-bye() { printf '\e[H\e[J  %s\n' "$(t "ну и ладно. ничего не тронуто." "ok, nothing was touched.")"; exit 0; }
+bye() { printf '\e[H\e[J  %s\n' "$(t "ну и ладно. ничего не тронуто." "ok, nothing was touched." "certo, nada foi alterado.")"; exit 0; }
 screen() { printf '\e[H\e[J'; banner 0; }
 
 # ── components ──────────────────────────────────────────────────────────────
@@ -620,29 +639,29 @@ if ((UPDATE)) && [[ -f $INSTALLED ]]; then
 fi
 c_name() {
   case $1 in
-    core) t "niri и сеанс" "niri and session" ;;
-    apps) t "программы" "apps" ;;
-    tools) t "инструменты" "tools" ;;
-    games) t "игры" "games" ;;
-    look) t "тема программ" "app theme" ;;
-    login) t "экран входа SDDM" "SDDM login screen" ;;
-    nvidia) t "фикс NVIDIA" "NVIDIA fixes" ;;
-    fork) t "yami-niri (форк)" "yami-niri (fork)" ;;
+    core) t "niri и сеанс" "niri and session" "niri e sessão" ;;
+    apps) t "программы" "apps" "aplicativos" ;;
+    tools) t "инструменты" "tools" "ferramentas" ;;
+    games) t "игры" "games" "jogos" ;;
+    look) t "тема программ" "app theme" "tema dos aplicativos" ;;
+    login) t "экран входа SDDM" "SDDM login screen" "Tela de login do SDDM" ;;
+    nvidia) t "фикс NVIDIA" "NVIDIA fixes" "Correções NVIDIA" ;;
+    fork) t "yami-niri (форк)" "yami-niri (fork)" "yami-niri (fork)" ;;
   esac
 }
 c_desc() {
   case $1 in
-    core) t "niri, порталы, polkit, pipewire, сеть, bluetooth, буфер, скриншоты" "niri, portals, polkit, pipewire, network, bluetooth, clipboard, screenshots" ;;
-    apps) t "kitty, fastfetch, pavucontrol, btop, udisks2, миниатюры видео, bsdtar, libmpv для плеера, gvfs: телефоны и сеть" "kitty, fastfetch, pavucontrol, btop, udisks2, video thumbnails, bsdtar, libmpv for the player, gvfs: phones and network" ;;
-    tools) t "ночной свет (wlsunset), текст и QR со скриншота (tesseract, zbar)" "night light (wlsunset), text and QR from screenshots (tesseract, zbar)" ;;
-    games) t "GameMode и MangoHud в палитре" "GameMode and MangoHud in the palette" ;;
-    login) if [[ -n $OTHER_DM ]]; then t "пиксельная тема как экран блокировки; заменит $OTHER_DM" "pixel theme like the lock screen; replaces $OTHER_DM"
-      elif [[ -n $SDDM_OTHER ]]; then t "пиксельная тема как экран блокировки; заменит тему SDDM $SDDM_OTHER" "pixel theme like the lock screen; replaces the SDDM theme $SDDM_OTHER"; else t "пиксельная тема как экран блокировки, вход в niri" "pixel theme like the lock screen, logs into niri"; fi ;;
-    look) t "qt6ct + adw-gtk3 + Papirus: Qt, KDE и GTK в палитре райса" "qt6ct + adw-gtk3 + Papirus: Qt, KDE and GTK in the rice palette" ;;
-    nvidia) t "переменные драйвера, профиль против утечки VRAM, драйвер с начала загрузки (пароль диска виден и на DisplayPort), NVENC в OBS на старом драйвере" "driver env, a VRAM leak profile, the driver from the start of boot (disk password visible on DisplayPort too), NVENC in OBS on an old driver" ;;
+    core) t "niri, порталы, polkit, pipewire, сеть, bluetooth, буфер, скриншоты" "niri, portals, polkit, pipewire, network, bluetooth, clipboard, screenshots" "niri, portais, polkit, pipewire, rede, bluetooth, área de transferência e capturas de tela" ;;
+    apps) t "kitty, fastfetch, pavucontrol, btop, udisks2, миниатюры видео, bsdtar, libmpv для плеера, gvfs: телефоны и сеть" "kitty, fastfetch, pavucontrol, btop, udisks2, video thumbnails, bsdtar, libmpv for the player, gvfs: phones and network" "kitty, fastfetch, pavucontrol, btop, udisks2, miniaturas de vídeo, bsdtar, libmpv para o player, gvfs: telefones e rede" ;;
+    tools) t "ночной свет (wlsunset), текст и QR со скриншота (tesseract, zbar)" "night light (wlsunset), text and QR from screenshots (tesseract, zbar)" "luz noturna (wlsunset), texto e QR de capturas de tela (tesseract, zbar)" ;;
+    games) t "GameMode и MangoHud в палитре" "GameMode and MangoHud in the palette" "GameMode e MangoHud na paleta" ;;
+    login) if [[ -n $OTHER_DM ]]; then t "пиксельная тема как экран блокировки; заменит $OTHER_DM" "pixel theme like the lock screen; replaces $OTHER_DM" "tema em pixel como a tela de bloqueio; substitui $OTHER_DM"
+      elif [[ -n $SDDM_OTHER ]]; then t "пиксельная тема как экран блокировки; заменит тему SDDM $SDDM_OTHER" "pixel theme like the lock screen; replaces the SDDM theme $SDDM_OTHER" "tema em pixel como a tela de bloqueio; substitui o tema SDDM $SDDM_OTHER"; else t "пиксельная тема как экран блокировки, вход в niri" "pixel theme like the lock screen, logs into niri" "tema em pixel como a tela de bloqueio, entra no niri"; fi ;;
+    look) t "qt6ct + adw-gtk3 + Papirus: Qt, KDE и GTK в палитре райса" "qt6ct + adw-gtk3 + Papirus: Qt, KDE and GTK in the rice palette" "qt6ct + adw-gtk3 + Papirus: Qt, KDE e GTK na paleta do ambiente" ;;
+    nvidia) t "переменные драйвера, профиль против утечки VRAM, драйвер с начала загрузки (пароль диска виден и на DisplayPort), NVENC в OBS на старом драйвере" "driver env, a VRAM leak profile, the driver from the start of boot (disk password visible on DisplayPort too), NVENC in OBS on an old driver" "variáveis do driver, perfil contra vazamento de VRAM, driver desde o início da inicialização (senha do disco também no DisplayPort), NVENC no OBS com driver antigo" ;;
     fork)
-      if ((LIGHT)); then t "наш niri из исходников: здесь ($MEM_GB ГБ, $THREADS потоков) сборка идёт около часа, поэтому выключен; пакетный niri — тот же стол" "our niri from source: here ($MEM_GB GB, $THREADS threads) the build takes about an hour, so it is off; the packaged niri is the same desktop"
-      else t "наш niri из исходников, 5–25 мин: под этот процессор, tearing и realtime для игр; пакетный niri — запасной" "our niri from source, 5–25 min: built for this CPU, tearing and realtime for games; packaged niri stays as a fallback"; fi ;;
+      if ((LIGHT)); then t "наш niri из исходников: здесь ($MEM_GB ГБ, $THREADS потоков) сборка идёт около часа, поэтому выключен; пакетный niri — тот же стол" "our niri from source: here ($MEM_GB GB, $THREADS threads) the build takes about an hour, so it is off; the packaged niri is the same desktop" "nosso niri compilado: aqui ($MEM_GB GB, $THREADS threads) a compilação leva cerca de uma hora, por isso está desativada; o niri do pacote oferece o mesmo desktop"
+      else t "наш niri из исходников, 5–25 мин: под этот процессор, tearing и realtime для игр; пакетный niri — запасной" "our niri from source, 5–25 min: built for this CPU, tearing and realtime for games; packaged niri stays as a fallback" "nosso niri compilado, 5–25 min: otimizado para esta CPU, tearing e tempo real nos jogos; o niri do pacote fica como alternativa"; fi ;;
   esac
 }
 needs_root() { [[ $1 != fork ]]; }
@@ -658,23 +677,25 @@ for i in "${!C_ID[@]}"; do can "${C_ID[$i]}" || C_ON[i]=0; done
 ((SUDO)) || command -v clang >/dev/null || off fork
 
 pick_lang() {
-  local cur=$([[ $L == ru ]] && echo 0 || echo 1) opts=("Русский" "English") i mark style
+  local cur=1 opts=("Русский" "English" "Português (Brasil)") codes=(ru en pt-BR) i mark style
+  case $L in ru) cur=0 ;; pt-BR) cur=2 ;; esac
   printf '\e[?25l'
   while :; do
     printf '\e[H\e[J'
     banner 0
-    printf '  %s%slanguage · язык%s   %s↑↓ · enter%s\n\n' "$T" "$B" "$R" "$F" "$R"
-    for i in 0 1; do
+    printf '  %s%slanguage · язык · idioma%s   %s↑↓ · enter%s\n\n' "$T" "$B" "$R" "$F" "$R"
+    for i in "${!opts[@]}"; do
       if ((i == cur)); then mark="$A▸$R" style="$T$B"; else mark=" " style="$D"; fi
       printf '  %s %s%s%s\n' "$mark" "$style" "${opts[$i]}" "$R"
     done
     case "$(key)" in
-      up | down | k | j | left | right) cur=$((1 - cur)) ;;
+      up | k | left) cur=$(((cur + ${#opts[@]} - 1) % ${#opts[@]})) ;;
+      down | j | right) cur=$(((cur + 1) % ${#opts[@]})) ;;
       enter) break ;;
       q | esc | eof) bye ;;
     esac
   done
-  L=$([[ $cur == 0 ]] && echo ru || echo en)
+  L="${codes[$cur]}"
 }
 
 pick_components() {
@@ -682,19 +703,19 @@ pick_components() {
   printf '\e[?25l'
   while :; do
     screen
-    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "что ставим" "components")" "$R" "$F" \
-      "$(t "↑↓ выбор · пробел — галочка · a — всё · enter — дальше · q — выход" "↑↓ move · space toggle · a all · enter next · q quit")" "$R"
+    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "что ставим" "components" "componentes")" "$R" "$F" \
+      "$(t "↑↓ выбор · пробел — галочка · a — всё · enter — дальше · q — выход" "↑↓ move · space toggle · a all · enter next · q quit" "↑↓ escolher · espaço marcar · a tudo · enter avançar · q sair")" "$R"
     for ((i = 0; i < n; i++)); do
       if ((C_ON[i])); then box="${A}[■]${R}"; else box="${F}[ ]${R}"; fi
       if ((i == cur)); then mark="$A▸$R" style="$T$B"; else mark=" " style="$D"; fi
       lock=""
-      can "${C_ID[$i]}" || lock=" $F($(t "нужен root и пакетный менеджер" "needs root and a package manager"))$R"
+      can "${C_ID[$i]}" || lock=" $F($(t "нужен root и пакетный менеджер" "needs root and a package manager" "requer root e um gerenciador de pacotes"))$R"
       printf '  %s %s %s%s%s%s\n' "$mark" "$box" "$style" "$(pad "$(c_name "${C_ID[$i]}")" 20)" "$R" "$lock"
       printf '        %s%s%s\n' "$F" "$(c_desc "${C_ID[$i]}")" "$R"
     done
     printf '\n  %s%s%s\n' "$F" "$(t "всегда: шелл, файлы, просмотр картинок (сборка из исходников), шрифты, пиксельный курсор, конфиги niri, kitty, fastfetch" \
-      "always: the shell, files, image viewer (built from source), fonts, pixel cursor, niri, kitty and fastfetch configs")" "$R"
-    printf '  %s%s: %s%s%s\n' "$F" "$(t "система" "system")" "$D" "$OS_NAME${PM:+ · $PM}" "$R"
+      "always: the shell, files, image viewer (built from source), fonts, pixel cursor, niri, kitty and fastfetch configs" "sempre: shell, arquivos, visualizador de imagens (compilados do código-fonte), fontes, cursor em pixel e configurações do niri, kitty e fastfetch")" "$R"
+    printf '  %s%s: %s%s%s\n' "$F" "$(t "система" "system" "sistema")" "$D" "$OS_NAME${PM:+ · $PM}" "$R"
     case "$(key)" in
       up | k) cur=$(((cur + n - 1) % n)) ;;
       down | j) cur=$(((cur + 1) % n)) ;;
@@ -709,7 +730,7 @@ pick_components() {
 preview_bar() { # how the bar looks in this palette
   local bg=$'\e[48;2;14;12;12m' h=${PAL_HEX[$pal]} on=$'\e[38;2;255;255;255m'
   printf '  %s%s %s%s 1 %s%s %s2 3 %s│ %s■%s %s  %s%s %s■■■■%s■■■■%s 34%%  %s│  %s♪ ▂▅▇▃▆▂  %s17:42 %s\n' \
-    "$bg" "$T" "$AB" "$on" "$R" "$bg" "$D" "$F" "$A" "$T" "$(t "стол" "desk")" "$D" "$(t "цп" "cpu")" "$A" "$F" "$D" "$F" "$A" "$T" "$R"
+    "$bg" "$T" "$AB" "$on" "$R" "$bg" "$D" "$F" "$A" "$T" "$(t "стол" "desk" "livre")" "$D" "$(t "цп" "cpu" "cpu")" "$A" "$F" "$D" "$F" "$A" "$T" "$R"
   printf '  '
   local k
   for k in -80 -65 -45 -25 0 25 45 65; do printf '\e[48;2;%sm    ' "$(shade "$h" "$k")"; done
@@ -721,8 +742,8 @@ pick_palette() {
   while :; do
     paint
     screen
-    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "палитра" "palette")" "$R" "$F" \
-      "$(t "↑↓ выбор · enter — дальше · потом меняется в настройках (Mod+S)" "↑↓ move · enter next · change it later in settings (Mod+S)")" "$R"
+    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "палитра" "palette" "paleta")" "$R" "$F" \
+      "$(t "↑↓ выбор · enter — дальше · потом меняется в настройках (Mod+S)" "↑↓ move · enter next · change it later in settings (Mod+S)" "↑↓ escolher · enter avançar · mude depois nas configurações (Mod+S)")" "$R"
     for ((i = 0; i < n; i++)); do
       if ((i == pal)); then mark="$A▸$R" style="$T$B"; else mark=" " style="$D"; fi
       printf '  %s \e[48;2;%sm      %s  %s%s%s %s#%s%s\n' "$mark" "$(rgb "${PAL_HEX[$i]}")" "$R" "$style" "$(pad "$(pal_name "$i")" 8)" "$R" "$F" "${PAL_HEX[$i]}" "$R"
@@ -777,8 +798,8 @@ pick_look() {
   local n=${#LOOK_ID[@]} i mark style
   while :; do
     screen
-    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "панели" "panels")" "$R" "$F" \
-      "$(t "↑↓ выбор · enter — дальше · тонко — в настройках → цвет" "↑↓ move · enter next · fine-tune in settings → color")" "$R"
+    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "панели" "panels" "painéis")" "$R" "$F" \
+      "$(t "↑↓ выбор · enter — дальше · тонко — в настройках → цвет" "↑↓ move · enter next · fine-tune in settings → color" "↑↓ escolher · enter avançar · ajuste fino em configurações → cores")" "$R"
     for ((i = 0; i < n; i++)); do
       if ((i == look)); then mark="$A▸$R" style="$T$B"; else mark=" " style="$D"; fi
       printf '  %s %s%s%s %s%s%s\n' "$mark" "$style" "$(pad "$(look_name "$i")" 10)" "$R" "$F" "$(look_desc "$i")" "$R"
@@ -798,8 +819,8 @@ pick_font() {
   local n=${#FONT_ID[@]} i mark style
   while :; do
     screen
-    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "шрифт программ" "app font")" "$R" "$F" \
-      "$(t "↑↓ выбор · enter — дальше · потом: настройки → шрифты" "↑↓ move · enter next · later: settings → fonts")" "$R"
+    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "шрифт программ" "app font" "fonte dos aplicativos")" "$R" "$F" \
+      "$(t "↑↓ выбор · enter — дальше · потом: настройки → шрифты" "↑↓ move · enter next · later: settings → fonts" "↑↓ escolher · enter avançar · depois: configurações → fontes")" "$R"
     for ((i = 0; i < n; i++)); do
       if ((i == font)); then mark="$A▸$R" style="$T$B"; else mark=" " style="$D"; fi
       printf '  %s %s%s%s %s%s%s\n' "$mark" "$style" "$(pad "$(font_name "$i")" 22)" "$R" "$F" "$(font_desc "$i")" "$R"
@@ -816,8 +837,8 @@ pick_theme() {
   local n=${#THEME_ID[@]} i mark style
   while :; do
     screen
-    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "тема" "theme")" "$R" "$F" \
-      "$(t "↑↓ выбор · enter — дальше · потом: настройки → цвет" "↑↓ move · enter next · later: settings → color")" "$R"
+    printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "$(t "тема" "theme" "tema")" "$R" "$F" \
+      "$(t "↑↓ выбор · enter — дальше · потом: настройки → цвет" "↑↓ move · enter next · later: settings → color" "↑↓ escolher · enter avançar · depois: configurações → cores")" "$R"
     for ((i = 0; i < n; i++)); do
       if ((i == theme)); then mark="$A▸$R" style="$T$B"; else mark=" " style="$D"; fi
       printf '  %s %s%s%s %s%s%s\n' "$mark" "$style" "$(pad "$(theme_name "$i")" 22)" "$R" "$F" "$(theme_desc "$i")" "$R"
@@ -835,7 +856,7 @@ pick_fetch() {
   while :; do
     screen
     printf '  %s%s%s%s   %s%s%s\n\n' "$T" "$B" "fastfetch" "$R" "$F" \
-      "$(t "↑↓ выбор · enter — дальше · потом: настройки → вид" "↑↓ move · enter next · later: settings → look")" "$R"
+      "$(t "↑↓ выбор · enter — дальше · потом: настройки → вид" "↑↓ move · enter next · later: settings → look" "↑↓ escolher · enter avançar · depois: configurações → visual")" "$R"
     for ((i = 0; i < n; i++)); do
       if ((i == fetch)); then mark="$A▸$R" style="$T$B"; else mark=" " style="$D"; fi
       printf '  %s %s%s%s %s%s%s\n' "$mark" "$style" "$(pad "$(fetch_name "$i")" 22)" "$R" "$F" "$(fetch_desc "$i")" "$R"
@@ -850,24 +871,24 @@ pick_fetch() {
 
 confirm() {
   screen
-  printf '  %s%s%s%s\n\n' "$T" "$B" "$(t "сводка" "summary")" "$R"
+  printf '  %s%s%s%s\n\n' "$T" "$B" "$(t "сводка" "summary" "resumo")" "$R"
   local i
-  printf '  %s■%s %s%s%s %s(%s)%s\n' "$A" "$R" "$T" "$OS_NAME" "$R" "$F" "${PM:-$(t "без пакетов" "no packages")}" "$R"
+  printf '  %s■%s %s%s%s %s(%s)%s\n' "$A" "$R" "$T" "$OS_NAME" "$R" "$F" "${PM:-$(t "без пакетов" "no packages" "sem pacotes")}" "$R"
   for i in "${!C_ID[@]}"; do
     ((C_ON[i])) && printf '  %s■%s %s%s%s\n' "$A" "$R" "$T" "$(c_name "${C_ID[$i]}")" "$R"
   done
-  printf '  %s■%s %s%s%s\n' "$A" "$R" "$T" "$(t "шелл, шрифты, niri, kitty, fastfetch" "shell, fonts, niri, kitty, fastfetch")" "$R"
-  printf '  %s■%s %s%s: %s%s \e[48;2;%sm    %s\n' "$A" "$R" "$T" "$(t "палитра" "palette")" "$(pal_name "$pal")" "$R" "$(rgb "${PAL_HEX[$pal]}")" "$R"
-  ((LOOK_SET)) && printf '  %s■%s %s%s: %s%s\n' "$A" "$R" "$T" "$(t "панели" "panels")" "$(look_name "$look")" "$R"
-  printf '  %s■%s %s%s: %s%s\n' "$A" "$R" "$T" "$(t "тема" "theme")" "$(theme_name "$theme")" "$R"
-  printf '  %s■%s %s%s: %s%s\n' "$A" "$R" "$T" "$(t "шрифт программ" "app font")" "$(font_name "$font")" "$R"
+  printf '  %s■%s %s%s%s\n' "$A" "$R" "$T" "$(t "шелл, шрифты, niri, kitty, fastfetch" "shell, fonts, niri, kitty, fastfetch" "shell, fontes, niri, kitty e fastfetch")" "$R"
+  printf '  %s■%s %s%s: %s%s \e[48;2;%sm    %s\n' "$A" "$R" "$T" "$(t "палитра" "palette" "paleta")" "$(pal_name "$pal")" "$R" "$(rgb "${PAL_HEX[$pal]}")" "$R"
+  ((LOOK_SET)) && printf '  %s■%s %s%s: %s%s\n' "$A" "$R" "$T" "$(t "панели" "panels" "painéis")" "$(look_name "$look")" "$R"
+  printf '  %s■%s %s%s: %s%s\n' "$A" "$R" "$T" "$(t "тема" "theme" "tema")" "$(theme_name "$theme")" "$R"
+  printf '  %s■%s %s%s: %s%s\n' "$A" "$R" "$T" "$(t "шрифт программ" "app font" "fonte dos aplicativos")" "$(font_name "$font")" "$R"
   printf '  %s■%s %sfastfetch: %s%s\n' "$A" "$R" "$T" "$(fetch_name "$fetch")" "$R"
-  printf '  %s■%s %s%s%s\n\n' "$A" "$R" "$T" "$(t "язык: русский" "language: English")" "$R"
-  [[ $FAM == nixos ]] && note "$(t "NixOS: пакеты добавь в configuration.nix — список будет в конце" "NixOS: add the packages to configuration.nix, the list is printed at the end")"
-  ((ATOMIC)) && note "$(t "атомарная Fedora: пакеты ставятся слоем rpm-ostree, нужна перезагрузка" "atomic Fedora: packages are layered with rpm-ostree, a reboot is needed")"
-  ((RUNNING_NIRI)) && note "$(t "niri уже запущен — шелл перезапустится сам, остальное подхватится на лету" "niri is running: the shell restarts by itself, the rest reloads live")"
-  ((DRY)) && note "$(t "--dry-run: только план, ничего не меняется" "--dry-run: plan only, nothing changes")"
-  printf '\n  %s%s%s %s[%s]%s ' "$T" "$(t "поехали?" "go?")" "$R" "$F" "$(t "enter — да, q — нет" "enter yes, q no")" "$R"
+  printf '  %s■%s %s%s%s\n\n' "$A" "$R" "$T" "$(t "язык: русский" "language: English" "idioma: português do Brasil")" "$R"
+  [[ $FAM == nixos ]] && note "$(t "NixOS: пакеты добавь в configuration.nix — список будет в конце" "NixOS: add the packages to configuration.nix, the list is printed at the end" "NixOS: adicione os pacotes ao configuration.nix; a lista aparece no final")"
+  ((ATOMIC)) && note "$(t "атомарная Fedora: пакеты ставятся слоем rpm-ostree, нужна перезагрузка" "atomic Fedora: packages are layered with rpm-ostree, a reboot is needed" "Fedora atômico: os pacotes são adicionados com rpm-ostree; é necessário reiniciar")"
+  ((RUNNING_NIRI)) && note "$(t "niri уже запущен — шелл перезапустится сам, остальное подхватится на лету" "niri is running: the shell restarts by itself, the rest reloads live" "niri está em execução: o shell reinicia sozinho; o restante recarrega na hora")"
+  ((DRY)) && note "$(t "--dry-run: только план, ничего не меняется" "--dry-run: plan only, nothing changes" "--dry-run: apenas o plano, nada será alterado")"
+  printf '\n  %s%s%s %s[%s]%s ' "$T" "$(t "поехали?" "go?" "continuar?")" "$R" "$F" "$(t "enter — да, q — нет" "enter yes, q no" "enter para sim, q para não")" "$R"
   printf '\e[?25h'
   case "$(key)" in enter | y) printf '\n' ;; *) bye ;; esac
 }
@@ -924,10 +945,10 @@ step() { # index
   if ((rc == 0)); then
     printf '\r\e[K  %s✓%s %s%s%s %s%s%s\n\e[K' "$OK" "$R" "$T" "$title" "$R" "$F" "$dt" "$R"
   elif ((rc == 99)); then
-    printf '\r\e[K  %s–%s %s%s%s %s%s%s\n\e[K' "$F" "$R" "$D" "$title" "$R" "$F" "$(t "не нужно" "not needed")" "$R"
+    printf '\r\e[K  %s–%s %s%s%s %s%s%s\n\e[K' "$F" "$R" "$D" "$title" "$R" "$F" "$(t "не нужно" "not needed" "desnecessário")" "$R"
     SKIPPED+=("$title")
   else
-    printf '\r\e[K  %s✗%s %s%s%s %s— %s%s\n\e[K' "$BAD" "$R" "$T" "$title" "$R" "$F" "$(t "хвост лога:" "log tail:")" "$R"
+    printf '\r\e[K  %s✗%s %s%s%s %s— %s%s\n\e[K' "$BAD" "$R" "$T" "$title" "$R" "$F" "$(t "хвост лога:" "log tail:" "final do registro:")" "$R"
     tail -n 6 "$LOG" | sed "s/^/      $F/; s/\$/$R/"
     FAILED+=("$title")
   fi
@@ -949,9 +970,9 @@ run_steps() {
     if [[ ${STEPS_F[$i]%% *} == do_build_shell ]] && ((${#FAILED[@]} > nf)); then
       BUILD_FAILED=1
       if ((UPDATE)); then
-        warn "$(t "сборка не удалась — обновление остановлено, стоит прежняя версия" "the build failed: update stopped, the previous version stays")"
+        warn "$(t "сборка не удалась — обновление остановлено, стоит прежняя версия" "the build failed: update stopped, the previous version stays" "a compilação falhou: atualização interrompida, a versão anterior é mantida")"
       else
-        warn "$(t "шелл не собрался — конфиги не тронуты; поправь причину (лог ниже) и запусти установку снова" "the shell did not build: your configs are untouched; fix the cause (log below) and run the installer again")"
+        warn "$(t "шелл не собрался — конфиги не тронуты; поправь причину (лог ниже) и запусти установку снова" "the shell did not build: your configs are untouched; fix the cause (log below) and run the installer again" "o shell não compilou: suas configurações foram preservadas; corrija a causa (registro abaixo) e execute o instalador novamente")"
       fi
       break
     fi
@@ -1299,7 +1320,7 @@ fork_tidy() {
   local src="${YAMI_NIRI_SRC:-$CACHE/niri-src}" sz
   [[ $ROOT == "${XDG_DATA_HOME:-$HOME/.local/share}/yami/src" ]] && niri_src_plain "$src" || return 0
   sz="$(du -sh "$src" 2>/dev/null | cut -f1)"
-  rm -rf -- "$src" && note "$(t "исходники yami-niri удалены (${sz:-?}): бинарник стоит, следующая сборка скачает их заново (--keep-build — оставить)" "yami-niri sources removed (${sz:-?}): the binary stays, the next build fetches them again (--keep-build keeps them)")"
+  rm -rf -- "$src" && note "$(t "исходники yami-niri удалены (${sz:-?}): бинарник стоит, следующая сборка скачает их заново (--keep-build — оставить)" "yami-niri sources removed (${sz:-?}): the binary stays, the next build fetches them again (--keep-build keeps them)" "código-fonte do yami-niri removido (${sz:-?}): o binário permanece; a próxima compilação baixa novamente (--keep-build preserva)")"
 }
 
 # the install counter: one download of a tiny release file per machine, ever. GitHub counts
@@ -1311,7 +1332,7 @@ do_count() {
   local mark="${XDG_STATE_HOME:-$HOME/.local/state}/yami/counted"
   ((COUNT)) && [[ -z ${YAMI_NO_COUNT:-} && -z ${CI:-} && ! -e $mark ]] || return 99
   command -v curl >/dev/null || return 99
-  curl -fsSL --max-time 15 -o /dev/null "$COUNT_URL" || { note "$(t "счётчик недоступен — не страшно" "counter unreachable, never mind")"; return 0; }
+  curl -fsSL --max-time 15 -o /dev/null "$COUNT_URL" || { note "$(t "счётчик недоступен — не страшно" "counter unreachable, never mind" "contador indisponível, sem problema")"; return 0; }
   mkdir -p "${mark%/*}" && : >"$mark"
 }
 # what is installed and from where: `yami update` compares against it
@@ -1387,14 +1408,14 @@ sddm_qt6() {
 sddm_check() {
   command -v sddm >/dev/null || return 0
   if ! sddm_qt6; then
-    warn "$(t "SDDM здесь без Qt 6 (старше 0.21): тема yami не встанет, экран входа оставлен как был" "this SDDM has no Qt 6 greeter (older than 0.21): the yami theme cannot run, the login screen is left as it was")"
+    warn "$(t "SDDM здесь без Qt 6 (старше 0.21): тема yami не встанет, экран входа оставлен как был" "this SDDM has no Qt 6 greeter (older than 0.21): the yami theme cannot run, the login screen is left as it was" "este SDDM não tem tela de login Qt 6 (anterior a 0.21): o tema yami não funciona; a tela de login foi preservada")"
     return 0
   fi
   # /etc/sddm.conf is read after the folder: a theme set there still wins
   local by
   by="$(sddm_theme_by)"
   [[ -e $SDDM_OURS && -n $by && ${by%%	*} != "$SDDM_OURS" && ${by#*	} != yami ]] &&
-    warn "$(t "тему SDDM задаёт ${by%%	*} (Current=${by#*	}): поставь там Current=yami" "${by%%	*} sets the SDDM theme (Current=${by#*	}): put Current=yami there")"
+    warn "$(t "тему SDDM задаёт ${by%%	*} (Current=${by#*	}): поставь там Current=yami" "${by%%	*} sets the SDDM theme (Current=${by#*	}): put Current=yami there" "${by%%	*} define o tema do SDDM (Current=${by#*	}): coloque Current=yami nesse arquivo")"
   return 0
 }
 do_sddm() {
@@ -1621,22 +1642,22 @@ uninstall_login() {
   local cmd="rm -rf ${files[*]}"
   [[ -n $dm ]] && cmd+="; systemctl enable -f $dm.service"
   if ((EUID != 0)) && { [[ -z $SU ]] || ! root_start; }; then
-    warn "$(t "экран входа не убран, нужен root:" "the login screen is not removed, root is needed:") sudo sh -c '$cmd'"
+    warn "$(t "экран входа не убран, нужен root:" "the login screen is not removed, root is needed:" "a tela de login não foi removida; root é necessário:") sudo sh -c '$cmd'"
     return 0
   fi
   ((${#files[@]})) && $SU rm -rf -- "${files[@]}"
-  say "$(t "экран входа: тема yami убрана, у SDDM снова своя" "login screen: the yami theme is gone, SDDM has its own again")"
+  say "$(t "экран входа: тема yami убрана, у SDDM снова своя" "login screen: the yami theme is gone, SDDM has its own again" "tela de login: tema yami removido; SDDM voltou ao próprio tema")"
   # Current=yami written by hand into another file (sddm_check asks for it) would point at nothing
   local by
   by="$(sddm_theme_by)"
   [[ -n $by && ${by#*	} == yami ]] &&
-    warn "$(t "${by%%	*} всё ещё ставит тему yami (Current=yami): поменяй её там или убери строку" "${by%%	*} still sets the yami theme (Current=yami): change it there or remove the line")"
+    warn "$(t "${by%%	*} всё ещё ставит тему yami (Current=yami): поменяй её там или убери строку" "${by%%	*} still sets the yami theme (Current=yami): change it there or remove the line" "${by%%	*} ainda define o tema yami (Current=yami): altere ou remova essa linha")"
   if [[ -n $dm ]] && ((SYSTEMD)); then
     if $SU systemctl enable -f "$dm.service"; then
-      say "$(t "менеджер входа: снова $dm со следующей загрузки" "login manager: $dm again from the next boot")"
+      say "$(t "менеджер входа: снова $dm со следующей загрузки" "login manager: $dm again from the next boot" "gerenciador de login: $dm novamente a partir da próxima inicialização")"
       rm -f "$STATE/login-dm"
     else
-      warn "$(t "не включился $dm: sudo systemctl enable -f $dm.service" "$dm did not enable: sudo systemctl enable -f $dm.service")"
+      warn "$(t "не включился $dm: sudo systemctl enable -f $dm.service" "$dm did not enable: sudo systemctl enable -f $dm.service" "$dm não foi ativado: sudo systemctl enable -f $dm.service")"
     fi
   elif ((SYSTEMD)) && [[ $now == sddm ]]; then
     # installed before the replaced manager was written down: name the ones on this system
@@ -1644,14 +1665,14 @@ uninstall_login() {
     for u in gdm lightdm lxdm ly greetd cosmic-greeter plasmalogin; do
       [[ -f /usr/lib/systemd/system/$u.service || -f /etc/systemd/system/$u.service ]] && others+=("$u")
     done
-    ((${#others[@]})) && note "$(t "SDDM остаётся менеджером входа; вернуть прежний:" "SDDM stays the login manager; to switch back:") sudo systemctl enable -f ${others[0]}.service$( ((${#others[@]} > 1)) && printf ' (%s)' "${others[*]}")"
+    ((${#others[@]})) && note "$(t "SDDM остаётся менеджером входа; вернуть прежний:" "SDDM stays the login manager; to switch back:" "O SDDM continua como gerenciador de login; para voltar:") sudo systemctl enable -f ${others[0]}.service$( ((${#others[@]} > 1)) && printf ' (%s)' "${others[*]}")"
   fi
   root_stop
 }
 uninstall() {
   printf '\e[H\e[J'
   banner 1
-  say "$(t "удаляю YAMI" "removing YAMI")"
+  say "$(t "удаляю YAMI" "removing YAMI" "removendo YAMI")"
   ((DRY)) && { note "--dry-run"; return; }
   pgrep -x yami-shell >/dev/null && "$BIN/yami-shell" msg quit 2>/dev/null
   [[ -x $HOME/.local/lib/yami-niri/yami-niri.sh ]] && "$HOME/.local/lib/yami-niri/yami-niri.sh" off
@@ -1676,7 +1697,7 @@ uninstall() {
   if niri_src_plain "$src"; then
     rm -rf -- "$src"
   elif [[ -d $src ]]; then
-    note "$(t "в $src твоя работа над патчами — оставил" "your patch work is in $src: kept")"
+    note "$(t "в $src твоя работа над патчами — оставил" "your patch work is in $src: kept" "seus patches estão em $src: preservados")"
   fi
   rm -f "$CFG/qt6ct/qss/yami.qss" "$CFG/qt6ct/colors/yami.conf"
   fc-cache -f >/dev/null 2>&1
@@ -1688,12 +1709,12 @@ uninstall() {
   b="$(ls -d "$CFG"/niri.bak-* 2>/dev/null | sort | tail -n1)"
   if [[ -n $b ]]; then
     mv "$CFG/niri" "$CFG/niri.yami-$STAMP" && mv "$b" "$CFG/niri"
-    say "$(t "niri: вернул" "niri: restored") $b"
+    say "$(t "niri: вернул" "niri: restored" "niri: restaurado") $b"
   else
-    note "$(t "niri: прежнего конфига нет, оставил текущий" "niri: no previous config, kept the current one")"
+    note "$(t "niri: прежнего конфига нет, оставил текущий" "niri: no previous config, kept the current one" "niri: sem configuração anterior; mantendo a atual")"
   fi
   while IFS= read -r b; do mv -f "$b" "${b%.bak-yami}"; done < <(find "$CFG" -maxdepth 3 -name '*.bak-yami' 2>/dev/null)
-  say "$(t "готово. настройки шелла остались в" "done. shell settings are kept in") $CFG/yami-shell.json"
+  say "$(t "готово. настройки шелла остались в" "done. shell settings are kept in" "concluído. as configurações do shell ficam em") $CFG/yami-shell.json"
   exit 0
 }
 
@@ -1702,32 +1723,32 @@ uninstall() {
 
 if ((UPDATE)); then
   # rebuild from this tree with the choices of the first install; no packages, no sudo
-  say "$(t "обновление из" "update from") $ROOT"
-  add "$(t "шелл: сборка из исходников" "shell: build from source")" do_build_shell
-  add "$(t "файлы: yami-files и диалог выбора файлов" "files: yami-files and the file dialog")" do_files
-  add "$(t "шрифты" "fonts")" do_fonts
-  add "$(t "niri: конфиг" "niri: config")" do_niri_config
-  add "$(t "палитра: всё, что из неё выводится" "palette: everything derived from it")" do_refresh
-  add "$(t "запись об установке" "install record")" do_stamp
+  say "$(t "обновление из" "update from" "atualizar de") $ROOT"
+  add "$(t "шелл: сборка из исходников" "shell: build from source" "shell: compilar do código-fonte")" do_build_shell
+  add "$(t "файлы: yami-files и диалог выбора файлов" "files: yami-files and the file dialog" "arquivos: yami-files e diálogo de arquivos")" do_files
+  add "$(t "шрифты" "fonts" "fontes")" do_fonts
+  add "$(t "niri: конфиг" "niri: config" "niri: configuração")" do_niri_config
+  add "$(t "палитра: всё, что из неё выводится" "palette: everything derived from it" "paleta: tudo deriva dela")" do_refresh
+  add "$(t "запись об установке" "install record" "registro de instalação")" do_stamp
   # an update has no sudo: what the chosen components still miss goes to packages-needed, and the
   # shell offers one command for it (settings → updates, yami doctor, yami update need)
-  add "$(t "каких пакетов ещё не хватает" "packages still missing")" do_need_pkgs
-  add "$(t "счётчик установок (один раз, без данных)" "install counter (once, no data)")" do_count
-  ((RUNNING_NIRI)) && add "$(t "перезапуск шелла" "restart the shell")" do_restart_shell
+  add "$(t "каких пакетов ещё не хватает" "packages still missing" "pacotes ainda ausentes")" do_need_pkgs
+  add "$(t "счётчик установок (один раз, без данных)" "install counter (once, no data)" "contador de instalações (uma vez, sem dados)")" do_count
+  ((RUNNING_NIRI)) && add "$(t "перезапуск шелла" "restart the shell" "reiniciar o shell")" do_restart_shell
   run_steps
   if on fork && ((!DRY && ${#FAILED[@]} == 0)) && fork_stale; then
-    say "$(t "yami-niri: новая серия патчей — сборка (5–25 минут)" "yami-niri: a new patch series, building (5–25 minutes)")"
+    say "$(t "yami-niri: новая серия патчей — сборка (5–25 минут)" "yami-niri: a new patch series, building (5–25 minutes)" "yami-niri: nova série de patches, compilando (5–25 minutos)")"
     if need_rust && "$ROOT/fork/yami-niri.sh" build 2>&1 | tee -a "$LOG"; then fork_tidy; else FAILED+=("yami-niri"); fi
   fi
   if on login && [[ -d /usr/share/sddm/themes/yami ]] && sddm_stale; then
-    note "$(t "экран входа обновился — поставь его: $ROOT/tools/sddm-install.sh (нужен sudo)" "the login screen changed, install it: $ROOT/tools/sddm-install.sh (needs sudo)")"
+    note "$(t "экран входа обновился — поставь его: $ROOT/tools/sddm-install.sh (нужен sudo)" "the login screen changed, install it: $ROOT/tools/sddm-install.sh (needs sudo)" "a tela de login mudou; instale: $ROOT/tools/sddm-install.sh (requer sudo)")"
   fi
   if ((${#FAILED[@]})); then
-    warn "$(t "не вышло:" "failed:") ${FAILED[*]}"
-    note "$(t "подробности:" "details:") $LOG"
+    warn "$(t "не вышло:" "failed:" "falhas:") ${FAILED[*]}"
+    note "$(t "подробности:" "details:" "detalhes:") $LOG"
     exit 1
   fi
-  say "$(t "обновлено" "updated")"
+  say "$(t "обновлено" "updated" "atualizado")"
   exit 0
 fi
 
@@ -1749,14 +1770,14 @@ paint
 banner $((YES))
 
 if ((SUDO && !DRY)) && [[ -n $SU ]]; then
-  say "$(t "нужен пароль администратора — один раз на всю установку" "the administrator password, once for the whole install")"
+  say "$(t "нужен пароль администратора — один раз на всю установку" "the administrator password, once for the whole install" "a senha de administrador, uma vez para toda a instalação")"
   if ! root_start; then
     if $SU true; then
       # the password is right but the root shell did not come up (an unusual sudo setup): every
       # root command asks on its own, the steps run in the foreground so the prompts are seen
-      warn "$(t "общий root-сеанс не поднялся — пароль может спрашиваться не раз" "the shared root session did not start: the password may be asked more than once")"
+      warn "$(t "общий root-сеанс не поднялся — пароль может спрашиваться не раз" "the shared root session did not start: the password may be asked more than once" "a sessão root compartilhada não iniciou: a senha pode ser solicitada mais de uma vez")"
     else
-      warn "$(t "без root — ставлю только домашнюю папку" "no root: home directory only")"
+      warn "$(t "без root — ставлю только домашнюю папку" "no root: home directory only" "sem root: apenas a pasta pessoal")"
       SUDO=0
       for i in "${!C_ID[@]}"; do can "${C_ID[$i]}" || C_ON[i]=0; done
     fi
@@ -1765,46 +1786,46 @@ if ((SUDO && !DRY)) && [[ -n $SU ]]; then
 fi
 
 if ((SUDO)) && { on core || on apps || on look; }; then
-  add "$(t "пакеты: обновить списки" "packages: refresh index")" pm_refresh
+  add "$(t "пакеты: обновить списки" "packages: refresh index" "pacotes: atualizar índice")" pm_refresh
 fi
-on core && add "$(t "пакеты: niri" "packages: niri")" pkgs "${P_niri[@]}"
-on core && add "$(t "пакеты: сеанс и шелл" "packages: session and shell")" pkgs "${P_base[@]}"
+on core && add "$(t "пакеты: niri" "packages: niri" "pacotes: niri")" pkgs "${P_niri[@]}"
+on core && add "$(t "пакеты: сеанс и шелл" "packages: session and shell" "pacotes: sessão e shell")" pkgs "${P_base[@]}"
 # a working toolchain (rustup included) is kept: only the libraries and pkg-config are added
 P_build_need=()
 for p in "${P_build[@]}"; do
   case "$p" in rust | rustc | cargo | virtual/rust) rust_ok && continue ;; esac
   P_build_need+=("$p")
 done
-((SUDO)) && add "$(t "пакеты: сборка шелла" "packages: shell build deps")" pkgs "${P_build_need[@]}"
-on apps && add "$(t "пакеты: программы" "packages: apps")" pkgs "${P_apps[@]}"
-on look && add "$(t "пакеты: тема Qt и GTK" "packages: Qt and GTK theme")" pkgs "${P_look[@]}"
-on tools && add "$(t "пакеты: ночной свет, текст и QR со скриншота" "packages: night light, text and QR from screenshots")" pkgs "${P_tools[@]}"
-on games && add "$(t "пакеты: GameMode, MangoHud" "packages: GameMode, MangoHud")" pkgs "${P_games[@]}"
-on login && add "$(t "пакеты: SDDM" "packages: SDDM")" pkgs "$([[ $FAM == gentoo ]] && echo x11-misc/sddm || echo sddm)"
+((SUDO)) && add "$(t "пакеты: сборка шелла" "packages: shell build deps" "pacotes: dependências de compilação do shell")" pkgs "${P_build_need[@]}"
+on apps && add "$(t "пакеты: программы" "packages: apps" "pacotes: aplicativos")" pkgs "${P_apps[@]}"
+on look && add "$(t "пакеты: тема Qt и GTK" "packages: Qt and GTK theme" "pacotes: tema Qt e GTK")" pkgs "${P_look[@]}"
+on tools && add "$(t "пакеты: ночной свет, текст и QR со скриншота" "packages: night light, text and QR from screenshots" "pacotes: luz noturna, texto e QR de capturas de tela")" pkgs "${P_tools[@]}"
+on games && add "$(t "пакеты: GameMode, MangoHud" "packages: GameMode, MangoHud" "pacotes: GameMode e MangoHud")" pkgs "${P_games[@]}"
+on login && add "$(t "пакеты: SDDM" "packages: SDDM" "pacotes: SDDM")" pkgs "$([[ $FAM == gentoo ]] && echo x11-misc/sddm || echo sddm)"
 if on core; then
-  niri_ok || ((DRY)) || add "$(t "пакеты: сборка niri" "packages: niri build deps")" pkgs "${P_nirisrc[@]}"
-  add "$(t "niri $NIRI_MIN+ из исходников, если пакет старее" "niri $NIRI_MIN+ from source if the package is older")" do_niri_source
+  niri_ok || ((DRY)) || add "$(t "пакеты: сборка niri" "packages: niri build deps" "pacotes: dependências de compilação do niri")" pkgs "${P_nirisrc[@]}"
+  add "$(t "niri $NIRI_MIN+ из исходников, если пакет старее" "niri $NIRI_MIN+ from source if the package is older" "niri $NIRI_MIN+ compilado se o pacote for mais antigo")" do_niri_source
 fi
-on nvidia && add "$(t "NVIDIA: профиль против утечки VRAM" "NVIDIA: VRAM leak profile")" do_nvidia_profile
-on nvidia && add "$(t "NVIDIA: картинка с начала загрузки (пароль диска на любом выходе)" "NVIDIA: picture from the start of boot (disk password on any output)")" do_nvidia_early
-on nvidia && add "$(t "NVIDIA: кодек видеокарты в OBS на старом драйвере (GStreamer)" "NVIDIA: the GPU encoder in OBS on an old driver (GStreamer)")" do_nvidia_obs
-on core && ((SUDO)) && add "$(t "службы: bluetooth, профили питания, сеть" "services: bluetooth, power profiles, network")" do_services
-on fork && ((SUDO)) && add "$(t "пакеты: сборка yami-niri" "packages: yami-niri build deps")" pkgs "${P_nirisrc[@]}"
-old_install && add "$(t "переезд со старого имени DARK-4RMY" "move from the old name DARK-4RMY")" do_migrate
+on nvidia && add "$(t "NVIDIA: профиль против утечки VRAM" "NVIDIA: VRAM leak profile" "NVIDIA: perfil contra vazamento de VRAM")" do_nvidia_profile
+on nvidia && add "$(t "NVIDIA: картинка с начала загрузки (пароль диска на любом выходе)" "NVIDIA: picture from the start of boot (disk password on any output)" "NVIDIA: imagem desde o início da inicialização (senha do disco em qualquer saída)")" do_nvidia_early
+on nvidia && add "$(t "NVIDIA: кодек видеокарты в OBS на старом драйвере (GStreamer)" "NVIDIA: the GPU encoder in OBS on an old driver (GStreamer)" "NVIDIA: codificador da GPU no OBS com driver antigo (GStreamer)")" do_nvidia_obs
+on core && ((SUDO)) && add "$(t "службы: bluetooth, профили питания, сеть" "services: bluetooth, power profiles, network" "serviços: bluetooth, perfis de energia e rede")" do_services
+on fork && ((SUDO)) && add "$(t "пакеты: сборка yami-niri" "packages: yami-niri build deps" "pacotes: dependências de compilação do yami-niri")" pkgs "${P_nirisrc[@]}"
+old_install && add "$(t "переезд со старого имени DARK-4RMY" "move from the old name DARK-4RMY" "migrar do nome antigo DARK-4RMY")" do_migrate
 # the login screen is the last root step: it goes before the build (run_steps closes the root shell there)
-on login && add "$(t "экран входа: тема yami для SDDM" "login screen: yami theme for SDDM")" do_sddm
-add "$(t "шелл: сборка из исходников" "shell: build from source")" do_build_shell
-add "$(t "файлы: yami-files и диалог выбора файлов" "files: yami-files and the file dialog")" do_files
-add "$(t "шрифты: Tiny5, DotGothic16, Terminess, Monocraft" "fonts: Tiny5, DotGothic16, Terminess, Monocraft")" do_fonts
-add "$(t "niri: конфиг и настройки под железо" "niri: config and hardware settings")" do_niri_config
-add "$(t "палитра «$(pal_name "$pal")»: шелл, kitty, fastfetch, обои" "palette «$(pal_name "$pal")»: shell, kitty, fastfetch, wallpaper")" do_dotfiles
-on look && add "$(t "тема программ: Qt, KDE, GTK" "app theme: Qt, KDE, GTK")" do_look
-add "$(t "убрать старый форк dark-niri" "remove the old dark-niri fork")" do_drop_dark_niri
-old_install && add "$(t "убрать файлы под старым именем" "remove files under the old name")" do_drop_old
-add "$(t "запись об установке (для yami update)" "install record (for yami update)")" do_stamp
-add "$(t "каких пакетов ещё не хватает" "packages still missing")" do_need_pkgs
-add "$(t "счётчик установок (один раз, без данных)" "install counter (once, no data)")" do_count
-((RUNNING_NIRI)) && add "$(t "перезапуск шелла" "restart the shell")" do_restart_shell
+on login && add "$(t "экран входа: тема yami для SDDM" "login screen: yami theme for SDDM" "tela de login: tema yami para o SDDM")" do_sddm
+add "$(t "шелл: сборка из исходников" "shell: build from source" "shell: compilar do código-fonte")" do_build_shell
+add "$(t "файлы: yami-files и диалог выбора файлов" "files: yami-files and the file dialog" "arquivos: yami-files e diálogo de arquivos")" do_files
+add "$(t "шрифты: Tiny5, DotGothic16, Terminess, Monocraft" "fonts: Tiny5, DotGothic16, Terminess, Monocraft" "fontes: Tiny5, DotGothic16, Terminess e Monocraft")" do_fonts
+add "$(t "niri: конфиг и настройки под железо" "niri: config and hardware settings" "niri: configuração e ajustes de hardware")" do_niri_config
+add "$(t "палитра «$(pal_name "$pal")»: шелл, kitty, fastfetch, обои" "palette «$(pal_name "$pal")»: shell, kitty, fastfetch, wallpaper" "paleta «$(pal_name "$pal")»: shell, kitty, fastfetch e papel de parede")" do_dotfiles
+on look && add "$(t "тема программ: Qt, KDE, GTK" "app theme: Qt, KDE, GTK" "tema dos aplicativos: Qt, KDE e GTK")" do_look
+add "$(t "убрать старый форк dark-niri" "remove the old dark-niri fork" "remover o fork antigo dark-niri")" do_drop_dark_niri
+old_install && add "$(t "убрать файлы под старым именем" "remove files under the old name" "remover arquivos com o nome antigo")" do_drop_old
+add "$(t "запись об установке (для yami update)" "install record (for yami update)" "registro de instalação (para yami update)")" do_stamp
+add "$(t "каких пакетов ещё не хватает" "packages still missing" "pacotes ainda ausentes")" do_need_pkgs
+add "$(t "счётчик установок (один раз, без данных)" "install counter (once, no data)" "contador de instalações (uma vez, sem dados)")" do_count
+((RUNNING_NIRI)) && add "$(t "перезапуск шелла" "restart the shell" "reiniciar o shell")" do_restart_shell
 
 run_steps
 # the root shell is already closed (run_steps, before the build); the setcap below asks for the
@@ -1815,7 +1836,7 @@ if [[ $SU == asroot ]]; then
 fi
 
 if on fork && ((!DRY && !BUILD_FAILED)); then
-  printf '\n  %s%s%s\n\n' "$T" "$(t "сборка yami-niri — 5–25 минут, вывод прямо здесь:" "building yami-niri takes 5–25 minutes, output below:")" "$R"
+  printf '\n  %s%s%s\n\n' "$T" "$(t "сборка yami-niri — 5–25 минут, вывод прямо здесь:" "building yami-niri takes 5–25 minutes, output below:" "compilar o yami-niri leva de 5 a 25 minutos; saída abaixo:")" "$R"
   if need_rust && "$ROOT/fork/yami-niri.sh" build 2>&1 | tee -a "$LOG"; then
     # realtime priority without the rtprio limit: the capability on the binary (dropped at start)
     if [[ "$(ulimit -r)" == 0 ]] && ((SUDO)) && command -v setcap >/dev/null; then
@@ -1826,48 +1847,48 @@ if on fork && ((!DRY && !BUILD_FAILED)); then
     FAILED+=("yami-niri")
   fi
 elif ((DRY)); then
-  printf '  %s·%s %s%s%s\n' "$A" "$R" "$T" "$(t "yami-niri: сборка и включение со следующего входа" "yami-niri: build and enable from the next login")" "$R"
+  printf '  %s·%s %s%s%s\n' "$A" "$R" "$T" "$(t "yami-niri: сборка и включение со следующего входа" "yami-niri: build and enable from the next login" "yami-niri: compilar e ativar a partir do próximo login")" "$R"
 fi
 
 # ── summary ─────────────────────────────────────────────────────────────────
 printf '\n  %s────────────────────────────────────────%s\n' "$F" "$R"
 if ((${#FAILED[@]})); then
-  warn "$(t "не вышло:" "failed:") ${FAILED[*]}"
-  note "$(t "подробности:" "details:") $LOG"
+  warn "$(t "не вышло:" "failed:" "falhas:") ${FAILED[*]}"
+  note "$(t "подробности:" "details:" "detalhes:") $LOG"
 else
-  printf '  %s%s%s %s%s %s%s\n' "$OK" "$(t "готово." "done.")" "$R" "$D" "$(t "лог:" "log:")" "$LOG" "$R"
+  printf '  %s%s%s %s%s %s%s\n' "$OK" "$(t "готово." "done." "concluído.")" "$R" "$D" "$(t "лог:" "log:" "registro:")" "$LOG" "$R"
 fi
 if [[ -s $MISSING_F ]]; then
-  warn "$(t "этих пакетов нет в репозиториях" "not in the repositories") ($OS_NAME): $(sort -u "$MISSING_F" | tr '\n' ' ')"
-  note "$(t "шелл работает и без них; поставь аналоги вручную, если нужно" "the shell works without them; install equivalents by hand if needed")"
+  warn "$(t "этих пакетов нет в репозиториях" "not in the repositories" "fora dos repositórios") ($OS_NAME): $(sort -u "$MISSING_F" | tr '\n' ' ')"
+  note "$(t "шелл работает и без них; поставь аналоги вручную, если нужно" "the shell works without them; install equivalents by hand if needed" "o shell funciona sem eles; instale equivalentes manualmente, se necessário")"
 fi
 if [[ -s $STATE/packages-needed ]] && ((!DRY)); then
-  warn "$(t "для выбранного не хватает пакетов — одна команда (или настройки → обновления):" "the chosen components miss packages; one command (or settings → updates):")"
+  warn "$(t "для выбранного не хватает пакетов — одна команда (или настройки → обновления):" "the chosen components miss packages; one command (or settings → updates):" "faltam pacotes para os componentes escolhidos; um comando (ou configurações → atualizações):")"
   note "$("$BIN/yami-shell" update need --print 2>/dev/null)"
 fi
 if [[ $FAM == nixos ]]; then
-  printf '\n  %s%s%s\n' "$T" "$(t "добавь в environment.systemPackages:" "add to environment.systemPackages:")" "$R"
+  printf '\n  %s%s%s\n' "$T" "$(t "добавь в environment.systemPackages:" "add to environment.systemPackages:" "adicione a environment.systemPackages:")" "$R"
   printf '%s\n' "$NIX_PKGS" | sed "s/^/    $D/; s/\$/$R/"
   note "programs.niri.enable = true;"
 fi
 on login && ((!DRY)) && sddm_check
-niri_ok || ((DRY)) || on fork || warn "$(t "нужен niri $NIRI_MIN или новее — поставь его или запусти без --no-fork" "niri $NIRI_MIN or newer is required: install it or rerun without --no-fork")"
+niri_ok || ((DRY)) || on fork || warn "$(t "нужен niri $NIRI_MIN или новее — поставь его или запусти без --no-fork" "niri $NIRI_MIN or newer is required: install it or rerun without --no-fork" "niri $NIRI_MIN ou superior é necessário: instale ou execute novamente sem --no-fork")"
 
-if ((RUNNING_NIRI)); then next="$(t "всё уже применилось; Qt и GTK-программы — после перезапуска" "everything is live; Qt and GTK apps pick it up after a restart")"
-else next="$(t "в экране входа выбери сессию «Niri» (или niri-session из TTY)" "pick the «Niri» session at login (or run niri-session from a TTY)")"; fi
+if ((RUNNING_NIRI)); then next="$(t "всё уже применилось; Qt и GTK-программы — после перезапуска" "everything is live; Qt and GTK apps pick it up after a restart" "tudo muda na hora; aplicativos Qt e GTK adotam as mudanças ao reiniciar")"
+else next="$(t "в экране входа выбери сессию «Niri» (или niri-session из TTY)" "pick the «Niri» session at login (or run niri-session from a TTY)" "escolha a sessão «Niri» no login (ou execute niri-session num TTY)")"; fi
 k() { printf '  %s%s%s %s%s%s %s%s%s %s%s%s\n' "$A" "$(pad "$1" 16)" "$R" "$D" "$(pad "$2" 22)" "$R" "$A" "$(pad "$3" 16)" "$R" "$D" "$4" "$R"; }
-printf '\n  %s%s%s%s  %s%s%s\n\n' "$T" "$B" "$(t "дальше" "next")" "$R" "$T" "$next" "$R"
-k "Mod+Space" "$(t "программы" "launcher")" "Mod+V" "$(t "буфер обмена" "clipboard")"
-k "Mod+S" "$(t "настройки, палитра" "settings, palette")" "Mod+Shift+Space" "$(t "стол / лента" "desk / tiling")"
-k "Mod+Escape" "$(t "блокировка" "lock")" "Mod+N" "$(t "свернуть окно" "minimize")"
-k "Mod+Shift+E" "$(t "питание" "power")" "Mod+Shift+/" "$(t "все клавиши" "all keys")"
-k "Mod+Shift+S" "$(t "скриншот" "screenshot")" "Mod+E" "$(t "файлы" "files")"
-printf '\n  %s%s%s\n' "$F" "$(t "клавиши меняются в настройках → клавиши; всё остальное: yami help, yami config list" "rebind keys in settings → keys; everything else: yami help, yami config list")" "$R"
-printf '  %s%s%s\n' "$F" "$(t "обновления: настройки → обновления или yami update" "updates: settings → updates or yami update")" "$R"
+printf '\n  %s%s%s%s  %s%s%s\n\n' "$T" "$B" "$(t "дальше" "next" "próximo")" "$R" "$T" "$next" "$R"
+k "Mod+Space" "$(t "программы" "launcher" "menu de aplicativos")" "Mod+V" "$(t "буфер обмена" "clipboard" "área de transferência")"
+k "Mod+S" "$(t "настройки, палитра" "settings, palette" "configurações, paleta")" "Mod+Shift+Space" "$(t "стол / лента" "desk / tiling" "livre / mosaico")"
+k "Mod+Escape" "$(t "блокировка" "lock" "bloquear")" "Mod+N" "$(t "свернуть окно" "minimize" "minimizar")"
+k "Mod+Shift+E" "$(t "питание" "power" "energia")" "Mod+Shift+/" "$(t "все клавиши" "all keys" "todas as teclas")"
+k "Mod+Shift+S" "$(t "скриншот" "screenshot" "captura de tela")" "Mod+E" "$(t "файлы" "files" "arquivos")"
+printf '\n  %s%s%s\n' "$F" "$(t "клавиши меняются в настройках → клавиши; всё остальное: yami help, yami config list" "rebind keys in settings → keys; everything else: yami help, yami config list" "redefina os atalhos em configurações → atalhos; demais opções: yami help, yami config list")" "$R"
+printf '  %s%s%s\n' "$F" "$(t "обновления: настройки → обновления или yami update" "updates: settings → updates or yami update" "atualizações: configurações → atualizações ou yami update")" "$R"
 if on fork; then
-  printf '  %s%s ~/.local/lib/yami-niri/yami-niri.sh status | off%s\n\n' "$F" "$(t "yami-niri:" "yami-niri:")" "$R"
+  printf '  %s%s ~/.local/lib/yami-niri/yami-niri.sh status | off%s\n\n' "$F" "$(t "yami-niri:" "yami-niri:" "yami-niri:")" "$R"
 else
-  printf '  %s%s %s/fork/yami-niri.sh build%s\n\n' "$F" "$(t "наш niri для игр и плавности:" "our niri for games and smoothness:")" "$ROOT" "$R"
+  printf '  %s%s %s/fork/yami-niri.sh build%s\n\n' "$F" "$(t "наш niri для игр и плавности:" "our niri for games and smoothness:" "nosso niri para jogos e fluidez:")" "$ROOT" "$R"
 fi
 
 exit 0
