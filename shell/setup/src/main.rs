@@ -2,7 +2,7 @@
 // Запускается шеллом при первом входе (метка ~/.local/state/yami/first-run) и потом по `yami setup`.
 //
 //   yami-setup
-//   yami-setup shot [-o ПАПКА] [--lang en]   страницы в PNG без Wayland
+//   yami-setup shot [-o ПАПКА] [--lang en] [--plain] [--size ШxВ]   страницы в PNG без Wayland
 
 mod app;
 mod run;
@@ -19,7 +19,7 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("--version") => return println!("yami-setup {}", env!("CARGO_PKG_VERSION")),
-        Some("-h") | Some("--help") => return println!("yami-setup | shot [-o DIR] [--lang en]"),
+        Some("-h") | Some("--help") => return println!("yami-setup | shot [-o DIR] [--lang en] [--plain] [--size WxH]"),
         Some("shot") => std::process::exit(shot(&args[1..])),
         _ => {}
     }
@@ -33,12 +33,18 @@ fn shot(args: &[String]) -> i32 {
     let mut out = PathBuf::from("shots");
     let mut lang = String::new();
     let mut plain = false;
+    let (mut sw, mut sh) = (1280, 720);
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
             "-o" => out = it.next().map(PathBuf::from).unwrap_or(out),
             "--lang" => lang = it.next().cloned().unwrap_or_default(),
             "--plain" => plain = true,
+            "--size" => {
+                if let Some((a, b)) = it.next().and_then(|v| v.split_once('x')).and_then(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?))) {
+                    (sw, sh) = (a, b);
+                }
+            }
             _ => {}
         }
     }
@@ -51,7 +57,6 @@ fn shot(args: &[String]) -> i32 {
     yami_px::i18n::set(&lang);
     let mut fonts = font::Fonts::with(w.look.font("setup"));
     let mut ic = icons::Icons::new("");
-    let (sw, sh) = (1280, 720);
     let mut bad = 0;
     for (name, p) in [("hello", Page::Hello), ("look", Page::Look), ("modules", Page::Modules), ("restyle", Page::Restyle), ("confirm", Page::Confirm), ("install", Page::Install), ("failed", Page::Install), ("done", Page::Done)] {
         w.page = p;

@@ -35,7 +35,7 @@ pub fn source_dir() -> PathBuf {
     if let Some(d) = std::env::var_os("YAMI_SRC") {
         return PathBuf::from(d);
     }
-    let state = yami_px::paths::state_dir().join("yami/source");
+    let state = yami_px::paths::state_dir().join("source");
     std::fs::read_to_string(state).ok().map(|s| PathBuf::from(s.trim())).filter(|p| p.join("install.sh").exists()).unwrap_or_else(|| yami_px::paths::data_dir().join("yami/src"))
 }
 

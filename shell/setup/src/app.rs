@@ -203,7 +203,7 @@ impl App {
     }
 
     fn finish_marker(&self) {
-        let _ = std::fs::remove_file(yami_px::paths::state_dir().join("yami/first-run"));
+        let _ = std::fs::remove_file(yami_px::paths::state_dir().join("first-run"));
     }
 
     fn start_install(&mut self) {

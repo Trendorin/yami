@@ -5,11 +5,11 @@
 
 use crate::run::Ev;
 use std::time::Instant;
-use yami_px::font::{self, PX, PX24};
+use yami_px::font::{self, Face, PX, PX24};
 use yami_px::gfx::{BoxStyle, C, R};
 use yami_px::look::Look;
-use yami_px::theme::PRESETS;
-use yami_px::ui::{Cur, Field, Tone};
+use yami_px::theme::{CLEAR, PRESETS};
+use yami_px::ui::{Cur, Field};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Act {
@@ -77,12 +77,12 @@ const fn m(id: &'static str, name: &'static str, group: u8, on: bool, ru: &'stat
 
 pub fn modules() -> Vec<Module> {
     vec![
-        m("files", "yami-files", 0, true, "файлы, диалог выбора во всех программах, флешки и телефоны", "files, the file dialog of every app, drives and phones", "arquivos, o diálogo de todos os apps, pendrives e telefones"),
-        m("view", "yami-view", 0, true, "картинки: мгновенно, с быстрыми правками", "pictures: instant, with quick edits", "imagens: instantâneo, com edições rápidas"),
-        m("play", "yami-play", 0, true, "видео и музыка на libmpv", "video and music on libmpv", "vídeo e música com libmpv"),
-        m("shot", "yami-shot", 0, true, "скриншоты: разметка, текст и QR со снимка", "screenshots: markup, text and QR from a shot", "capturas: anotações, texto e QR"),
-        m("agents", "yami-agents", 1, true, "окна паролей, показ экрана, автоподключение", "password windows, screen sharing, automount", "senhas, compartilhar a tela, montagem automática"),
-        m("login", "yami-greet", 1, true, "свой экран входа вместо чужого", "our own login screen", "nossa própria tela de login"),
+        m("files", "yami-files", 0, false, "файлы, диалог выбора во всех программах, флешки и телефоны", "files, the file dialog of every app, drives and phones", "arquivos, o diálogo de todos os apps, pendrives e telefones"),
+        m("view", "yami-view", 0, false, "картинки: мгновенно, с быстрыми правками", "pictures: instant, with quick edits", "imagens: instantâneo, com edições rápidas"),
+        m("play", "yami-play", 0, false, "видео и музыка на libmpv", "video and music on libmpv", "vídeo e música com libmpv"),
+        m("shot", "yami-shot", 0, false, "скриншоты: разметка, текст и QR со снимка", "screenshots: markup, text and QR from a shot", "capturas: anotações, texto e QR"),
+        m("agents", "yami-agents", 1, false, "окна паролей, показ экрана, автоподключение", "password windows, screen sharing, automount", "senhas, compartilhar a tela, montagem automática"),
+        m("login", "yami-greet", 1, false, "свой экран входа вместо чужого", "our own login screen", "nossa própria tela de login"),
         m("games", "games", 2, false, "GameMode и MangoHud в палитре", "GameMode and MangoHud in the palette", "GameMode e MangoHud na paleta"),
         m("fork", "yami-niri", 2, false, "наш niri из исходников: 5–25 минут сборки", "our niri from source: a 5–25 minute build", "nosso niri do código-fonte: 5–25 minutos"),
     ]
@@ -126,7 +126,7 @@ fn read_json(p: &std::path::Path) -> Option<serde_json::Value> {
 impl W {
     /// то, что уже стоит и выбрано, — из записи об установке и настроек шелла
     pub fn fill_from_system(&mut self) {
-        let first = yami_px::paths::state_dir().join("yami/first-run").exists();
+        let first = yami_px::paths::state_dir().join("first-run").exists();
         self.dm = other_dm();
         self.steam = has_steam();
         if first {
@@ -139,7 +139,7 @@ impl W {
                 }
             }
         }
-        if let Some(list) = read_json(&yami_px::paths::state_dir().join("yami/install.json")).and_then(|v| v["components"].as_str().map(str::to_string)) {
+        if let Some(list) = read_json(&yami_px::paths::state_dir().join("install.json")).and_then(|v| v["components"].as_str().map(str::to_string)) {
             if !first {
                 for m in self.mods.iter_mut() {
                     m.on = list.split_whitespace().any(|c| c == m.id);
@@ -270,163 +270,336 @@ pub fn prev_of(p: Page) -> Option<Page> {
     step_index(p).checked_sub(1).and_then(|i| STEPS.get(i)).copied()
 }
 
-const CARD_W: i32 = 880;
-const CARD_H: i32 = 560;
+/// размеры страницы: на большом экране всё крупнее, шрифт — целые кратные своей сетки
+#[derive(Clone, Copy)]
+struct M {
+    text: Face,
+    small: Face,
+    title: Face,
+    hero: Face,
+    logo: u16,
+    /// клетка иконки 7×7
+    cell: i32,
+    btn: i32,
+    row: i32,
+    gap: i32,
+    pad: i32,
+    check: i32,
+    swatch: i32,
+    card: i32,
+}
 
-/// вся страница: фон, карточка по центру, содержимое, кнопки
+fn metrics(sw: i32, sh: i32) -> M {
+    if sw >= 1600 && sh >= 900 {
+        M { text: PX24, small: PX, title: font::px(48), hero: font::px(64), logo: 64, cell: 3, btn: 56, row: 84, gap: 12, pad: 72, check: 28, swatch: 40, card: 340 }
+    } else {
+        M { text: PX, small: PX, title: font::px(32), hero: font::px(48), logo: 48, cell: 2, btn: 40, row: 58, gap: 8, pad: 44, check: 20, swatch: 28, card: 220 }
+    }
+}
+
+/// вся страница: слева знак и шаги, справа содержимое и кнопки на одном месте
 pub fn draw(ui: &mut Ui, w: &W, sw: i32, sh: i32) {
     let t = ui.t;
+    let m = metrics(sw, sh);
     ui.cv.fill(R::new(0, 0, sw, sh), t.bg);
-    backdrop(ui, w, sw, sh);
-    let card = R::new((sw - CARD_W) / 2, (sh - CARD_H) / 2, CARD_W, CARD_H);
-    ui.cv.pxbox(card, &BoxStyle::new(t.panel, t.border).shadow(6));
-    ui.zone(card, Act::Block, Cur::Default);
-    let body = card.inset(36);
-    dots(ui, w, card);
+    let rail_w = if sw < 960 { 0 } else { (sw * 24 / 100).clamp(300, 460) };
+    if rail_w > 0 {
+        rail(ui, w, m, R::new(0, 0, rail_w, sh));
+    }
+    let area = R::new(rail_w, 0, sw - rail_w, sh);
+    let inner = (area.w - 2 * m.pad).min(1180);
+    let b = R::new(area.x + (area.w - inner) / 2, m.pad, inner, sh - 2 * m.pad);
     match w.page {
-        Page::Hello => hello(ui, w, body),
-        Page::Look => look_page(ui, w, body),
-        Page::Modules => modules_page(ui, w, body),
-        Page::Restyle => restyle_page(ui, w, body),
-        Page::Confirm => confirm(ui, w, body),
-        Page::Install => install(ui, w, body),
-        Page::Done => done(ui, w, body),
+        Page::Hello => hello(ui, w, m, b),
+        Page::Look => look_page(ui, w, m, b),
+        Page::Modules => modules_page(ui, w, m, b),
+        Page::Restyle => restyle_page(ui, w, m, b),
+        Page::Confirm => confirm(ui, w, m, b),
+        Page::Install => install(ui, w, m, b),
+        Page::Done => done(ui, w, m, b),
     }
     let ms = w.reveal.elapsed().as_millis() as f32;
     let dur = w.look.dur(260.0);
     if dur > 0.0 && ms < dur {
-        ui.cv.dissolve_rect(card, ms / dur, 3);
+        ui.cv.dissolve_rect(area, ms / dur, 3);
         ui.anim = true;
     }
 }
 
-/// за карточкой: у пиксельного вида — 闇 клетками, у нейтрального — ровный фон
-fn backdrop(ui: &mut Ui, w: &W, sw: i32, sh: i32) {
-    if w.plain {
-        return;
-    }
+/// левая панель: знак, шаги, большой 闇 у нижнего края (только у пиксельного вида)
+fn rail(ui: &mut Ui, w: &W, m: M, r: R) {
     let t = ui.t;
-    let face = font::jp(240);
-    let c = t.red.alpha(0.09);
-    ui.text(face, sw - 300, sh - 330, "闇", c); // i18n-ok
-    for y in (0..sh).step_by(4) {
-        ui.cv.fill(R::new(0, y, sw, 1), C(0xff000000).alpha(0.10));
+    ui.cv.fill(r, t.panel);
+    ui.cv.fill(R::new(r.right() - 1, r.y, 1, r.h), t.border);
+    if !w.plain {
+        ui.cv.push_clip(r);
+        ui.text(font::jp(240), r.right() - 216, r.bottom() - 232, "闇", t.red.alpha(0.10)); // i18n-ok
+        ui.cv.pop_clip();
+    }
+    let x = r.x + m.pad / 2 + 12;
+    let mut y = m.pad;
+    let logo = font::px(m.logo);
+    ui.cv.text_in(ui.f, logo, R::new(x, y, r.w - 2 * (x - r.x), m.logo as i32 + 8), "yami", t.text_hi);
+    y += m.logo as i32 + 8;
+    ui.cv.text_in(ui.f, m.small, R::new(x, y, r.w - 2 * (x - r.x), 22), l("первая настройка", "first-run setup", "configuração inicial"), t.text_dim);
+    y += 22 + m.pad;
+    let names = [l("Язык", "Language", "Idioma"), l("Вид", "Look", "Aparência"), l("Модули", "Modules", "Módulos"), l("Цвета программ", "App colours", "Cores dos apps"), l("Установка", "Install", "Instalar")];
+    let cur = match w.page {
+        Page::Install => names.len() - 1,
+        Page::Done => names.len(),
+        p => step_index(p),
+    };
+    let size = m.check + 8;
+    let step = size + m.gap * 3;
+    for (i, name) in names.iter().enumerate() {
+        let b = R::new(x, y + i as i32 * step, size, size);
+        if i + 1 < names.len() {
+            ui.cv.fill(R::new(b.x + size / 2 - 1, b.bottom() + 3, 2, step - size - 6), if i < cur { t.red } else { t.border });
+        }
+        let (fill, line, fg) = if i < cur {
+            (t.red, t.red, t.on_accent)
+        } else if i == cur {
+            (t.selection, t.ember, t.text_hi)
+        } else {
+            (t.surface, t.border, t.text_dim)
+        };
+        ui.cv.pxbox(b, &BoxStyle::new(fill, line));
+        if i < cur {
+            let s = 7 * (m.cell - 1).max(1);
+            ui.cv.icon("check", b.x + (size - s) / 2, b.y + (size - s) / 2, (m.cell - 1).max(1), fg);
+        } else {
+            ui.cv.text_center(ui.f, m.small, b, &(i + 1).to_string(), fg);
+        }
+        ui.cv.text_in(ui.f, m.text, R::new(b.right() + m.gap + 2, b.y, r.right() - b.right() - m.gap - 12, size), name, if i == cur { t.text_hi } else if i < cur { t.text } else { t.text_dim });
     }
 }
 
-/// где мы: точка на страницу
-fn dots(ui: &mut Ui, w: &W, card: R) {
-    if step_index(w.page) >= STEPS.len() {
-        return;
-    }
-    let t = ui.t;
-    let cur = step_index(w.page) as i32;
-    let n = STEPS.len() as i32;
-    let x0 = card.x + (card.w - (n * 22 - 8)) / 2;
-    for i in 0..n {
-        let r = R::new(x0 + i * 22, card.bottom() - 26, if i == cur { 22 } else { 8 }, 6);
-        let r = if i > cur { R::new(r.x + 14, r.y, 8, 6) } else { r };
-        ui.cv.notched(r, 1, if i == cur { t.red } else if i < cur { t.dim } else { t.border });
-    }
+#[derive(Clone, Copy, PartialEq)]
+enum Kind {
+    Primary,
+    Plain,
+    Ghost,
 }
 
-fn head(ui: &mut Ui, b: R, title: &str, sub: &str) -> i32 {
+/// кнопка размера страницы; по виду как ui.button, но шрифт и иконка растут вместе с экраном
+#[allow(clippy::too_many_arguments)]
+fn btn(ui: &mut Ui, m: M, r: R, text: &str, icon: &str, kind: Kind, on: bool, act: Act) {
     let t = ui.t;
-    ui.cv.text_in(ui.f, PX24, R::new(b.x, b.y, b.w, 34), title, t.text);
-    ui.cv.text_wrap(ui.f, PX, R::new(b.x, b.y + 38, b.w, 44), sub, t.text_dim, 2);
-    b.y + 90
+    let hov = ui.hover(r);
+    let down = hov && ui.down;
+    let h = if hov { 1.0 } else { 0.0 };
+    let (fill, line, fg) = match kind {
+        Kind::Primary => (t.red.lerp(t.ember, h * 0.45), CLEAR, t.on_accent),
+        Kind::Plain if on => (t.selection, t.ember, t.text_hi),
+        Kind::Plain => (t.surface.lerp(t.surface_hi, h), t.border.lerp(t.red, h), t.text),
+        Kind::Ghost => (t.selection.alpha(0.6 * h), CLEAR, t.text_dim.lerp(t.text_hi, h)),
+    };
+    let d = i32::from(down);
+    if kind != Kind::Ghost || hov {
+        let solid = kind != Kind::Ghost;
+        ui.cv.pxbox(R::new(r.x + d, r.y + d, r.w, r.h), &BoxStyle::new(fill, line).shadow(if solid { 2 } else { 0 }).bevel(solid).pressed(down));
+    }
+    let tw = ui.f.width(m.text, text);
+    let iw = if icon.is_empty() { 0 } else { 7 * m.cell };
+    let gap = if iw > 0 { m.gap + 2 } else { 0 };
+    let mut x = r.x + (r.w - tw - iw - gap) / 2 + d;
+    if iw > 0 {
+        ui.cv.icon(icon, x, r.y + (r.h - iw) / 2 + d, m.cell, fg);
+        x += iw + gap;
+    }
+    ui.cv.text_in(ui.f, m.text, R::new(x, r.y + d, tw + 4, r.h), text, fg);
+    ui.zone(r, act, Cur::Pointer);
 }
 
-/// кнопки внизу карточки
-fn nav(ui: &mut Ui, w: &W, b: R, next: &str, ok: bool) {
-    let y = b.bottom() - 34;
+/// строка-выбор на всю ширину: флажок, название, под ним описание
+#[allow(clippy::too_many_arguments)]
+fn pick(ui: &mut Ui, m: M, r: R, name: &str, desc: &str, on: bool, act: Act) {
+    let t = ui.t;
+    let hov = ui.hover(r);
+    let fill = if on { t.selection.alpha(0.45) } else if hov { t.surface_hi } else { t.surface };
+    ui.cv.pxbox(r, &BoxStyle::new(fill, if on { t.ember } else if hov { t.red } else { t.border }));
+    let c = R::new(r.x + m.gap + 4, r.y + (r.h - m.check) / 2, m.check, m.check);
+    ui.cv.pxbox(c, &BoxStyle::new(if on { t.red } else { t.code_bg }, if on { t.red } else { t.border }));
+    if on {
+        let cell = (m.check - 6) / 7;
+        ui.cv.icon("check", c.x + (m.check - 7 * cell) / 2, c.y + (m.check - 7 * cell) / 2, cell, t.on_accent);
+    }
+    let x = c.right() + m.gap + 4;
+    let w_ = r.right() - x - m.gap;
+    if desc.is_empty() {
+        ui.cv.text_in(ui.f, m.text, R::new(x, r.y, w_, r.h), name, t.text_hi);
+    } else {
+        let line = ui.f.line(m.text);
+        let small = ui.f.line(m.small);
+        let top = r.y + (r.h - line - small - 4) / 2;
+        ui.cv.text_in(ui.f, m.text, R::new(x, top, w_, line), name, t.text_hi);
+        ui.cv.text_in(ui.f, m.small, R::new(x, top + line + 4, w_, small), desc, t.text_dim);
+    }
+    ui.zone(r, act, Cur::Pointer);
+}
+
+/// поле пароля размера страницы (как ui.field: звёзды, курсор всегда виден)
+fn pass_field(ui: &mut Ui, m: M, r: R, f: &Field, placeholder: &str) {
+    let t = ui.t;
+    ui.cv.pxbox(r, &BoxStyle::new(t.code_bg, t.ember));
+    let inner = R::new(r.x + 14, r.y, r.w - 28, r.h);
+    let shown = "■".repeat(f.text.chars().count());
+    let before: String = shown.chars().take(f.cur).collect();
+    let bw = ui.f.width(m.text, &before);
+    let shift = (bw - (inner.w - 12)).max(0);
+    let lh = ui.f.line(m.text);
+    ui.cv.push_clip(inner);
+    if shown.is_empty() {
+        ui.cv.text_in(ui.f, m.text, R::new(inner.x + 16, inner.y, inner.w - 16, inner.h), placeholder, t.text_dim);
+    } else {
+        ui.cv.text(ui.f, m.text, inner.x - shift, r.y + (r.h - lh) / 2, &shown, t.text);
+    }
+    if ui.blink {
+        ui.cv.fill(R::new(inner.x - shift + bw, r.y + (r.h - lh) / 2, m.cell * 4, lh), t.ember);
+    }
+    ui.cv.pop_clip();
+    ui.zone(r, Act::Pass, Cur::Text);
+}
+
+/// заголовок страницы: номер шага, название, одна мысль под ним; возвращает, где начать содержимое
+fn head(ui: &mut Ui, m: M, b: R, n: usize, title: &str, sub: &str) -> i32 {
+    let t = ui.t;
+    let mut y = b.y;
+    if n > 0 {
+        ui.cv.text_in(ui.f, m.small, R::new(b.x, y, b.w, 20), &format!("{} {n} / {}", l("шаг", "step", "etapa"), STEPS.len()), t.red);
+        y += 28;
+    }
+    let tl = ui.f.line(m.title);
+    ui.cv.text_in(ui.f, m.title, R::new(b.x, y, b.w, tl + 4), title, t.text_hi);
+    y += tl + 8 + m.gap;
+    let sl = ui.f.line(m.text);
+    ui.cv.text_wrap(ui.f, m.text, R::new(b.x, y, b.w, 2 * sl + 8), sub, t.text_dim, 2);
+    y + 2 * sl + 8 + m.gap * 2
+}
+
+/// кнопки внизу, всегда на одном месте
+fn nav(ui: &mut Ui, w: &W, m: M, b: R, next: &str, icon: &str) {
+    let y = b.bottom() - m.btn;
+    let bw = m.btn * 4;
     if prev_of(w.page).is_some() {
-        ui.button(R::new(b.x, y, 130, 34), l("назад", "back", "voltar"), "left", Tone::Plain, false, true, Act::Back);
+        btn(ui, m, R::new(b.x, y, bw * 3 / 4, m.btn), l("назад", "back", "voltar"), "left", Kind::Plain, false, Act::Back);
     }
-    ui.button(R::new(b.right() - 180, y, 180, 34), next, "check", Tone::Primary, false, ok, Act::Next);
+    btn(ui, m, R::new(b.right() - bw, y, bw, m.btn), next, icon, Kind::Primary, false, Act::Next);
 }
 
-fn hello(ui: &mut Ui, w: &W, b: R) {
+/// по центру места между верхом и кнопками
+fn middle(m: M, b: R, top: i32, h: i32) -> i32 {
+    // под заголовком — ближе к нему, на страницах без заголовка — ровно по центру
+    let div = if top > b.y { 4 } else { 2 };
+    top + ((b.bottom() - m.btn - m.gap * 2 - top - h) / div).max(0)
+}
+
+fn hello(ui: &mut Ui, w: &W, m: M, b: R) {
     let t = ui.t;
-    let face = font::px(48);
-    ui.cv.text_in(ui.f, face, R::new(b.x, b.y + 8, b.w, 60), l("Добро пожаловать", "Welcome", "Bem-vindo"), t.text);
-    ui.cv.text_wrap(ui.f, PX, R::new(b.x, b.y + 84, b.w, 70), l("Рабочий стол уже работает. Пара вопросов — и мастер поставит только то, что ты выберешь. Всё можно поменять потом в настройках.", "The desktop is already running. A few questions, and the setup installs only what you pick. Everything can be changed later in the settings.", "A área de trabalho já está funcionando. Algumas perguntas, e a configuração instala só o que você escolher. Tudo pode ser alterado depois nas configurações."), t.text_dim, 3);
-    let y = b.y + 176;
-    ui.cv.text_in(ui.f, PX, R::new(b.x, y, b.w, 20), l("язык", "language", "idioma"), t.text_faint);
-    let bw = (b.w - 2 * 12) / 3;
-    for (i, (id, name)) in [("ru", "Русский"), ("en", "English"), ("pt-BR", "Português")].into_iter().enumerate() { // i18n-ok
+    let hl = ui.f.line(m.hero);
+    let sl = ui.f.line(m.text);
+    let tile = m.btn * 2 + m.gap;
+    let total = hl + 12 + 3 * sl + 16 + m.gap * 4 + 24 + tile;
+    let mut y = middle(m, b, b.y, total);
+    ui.cv.text_in(ui.f, m.hero, R::new(b.x, y, b.w, hl + 4), l("Добро пожаловать", "Welcome", "Bem-vindo"), t.text_hi);
+    y += hl + 12;
+    ui.cv.text_wrap(ui.f, m.text, R::new(b.x, y, b.w.min(sl * 44), 3 * sl + 16), l("Рабочий стол уже работает. Пара вопросов, и мастер поставит только то, что ты выберешь. Всё можно поменять потом в настройках.", "The desktop is already running. A few questions, and the setup installs only what you pick. Everything can be changed later in the settings.", "A área de trabalho já está funcionando. Algumas perguntas, e a configuração instala só o que você escolher. Tudo pode ser alterado depois nas configurações."), t.text_dim, 3);
+    y += 3 * sl + 16 + m.gap * 4;
+    ui.cv.text_in(ui.f, m.small, R::new(b.x, y, b.w, 20), l("язык", "language", "idioma"), t.text_dim);
+    y += 24;
+    let bw = (b.w - 2 * m.gap) / 3;
+    for (i, (id, code, name)) in [("ru", "RU", "Русский"), ("en", "EN", "English"), ("pt-BR", "PT", "Português")].into_iter().enumerate() { // i18n-ok
         let on = yami_px::i18n::normalize(&w.lang) == id;
-        ui.button(R::new(b.x + i as i32 * (bw + 12), y + 28, bw, 56), name, "", Tone::Plain, on, true, Act::Lang(id));
+        let r = R::new(b.x + i as i32 * (bw + m.gap), y, bw, tile);
+        let hov = ui.hover(r);
+        ui.cv.pxbox(r, &BoxStyle::new(if on { t.selection.alpha(0.45) } else if hov { t.surface_hi } else { t.surface }, if on { t.ember } else if hov { t.red } else { t.border }));
+        ui.cv.text_in(ui.f, m.title, R::new(r.x + m.gap * 2, r.y + 8, r.w - m.gap * 4, r.h / 2), code, if on { t.text_hi } else { t.text_dim });
+        ui.cv.text_in(ui.f, m.text, R::new(r.x + m.gap * 2, r.y + r.h / 2 + 2, r.w - m.gap * 4, r.h / 2 - 8), name, t.text);
+        ui.zone(r, Act::Lang(id), Cur::Pointer);
     }
-    let bottom = b.bottom() - 34;
-    ui.button(R::new(b.x, bottom, 240, 34), l("пропустить настройку", "skip the setup", "pular a configuração"), "", Tone::Ghost, false, true, Act::Skip);
-    ui.button(R::new(b.right() - 180, bottom, 180, 34), l("начать", "start", "começar"), "right", Tone::Primary, false, true, Act::Next);
+    let bottom = b.bottom() - m.btn;
+    let sw = ui.f.width(m.text, l("пропустить настройку", "skip the setup", "pular a configuração")) + m.gap * 4;
+    btn(ui, m, R::new(b.x, bottom, sw, m.btn), l("пропустить настройку", "skip the setup", "pular a configuração"), "", Kind::Ghost, false, Act::Skip);
+    nav(ui, w, m, b, l("начать", "start", "começar"), "right");
 }
 
 /// миниатюра вида: окно с панелью и кнопками, нарисованное этим стилем
-fn look_card(ui: &mut Ui, r: R, title: &str, sub: &str, plain: bool, on: bool) {
+#[allow(clippy::too_many_arguments)]
+fn look_card(ui: &mut Ui, m: M, r: R, title: &str, sub: &str, plain: bool, on: bool) {
     let t = ui.t;
     let was = ui.cv.style;
     let style = if plain { yami_px::style::Style::PLAIN } else { yami_px::style::Style::PIXEL };
     let hov = ui.hover(r);
-    ui.cv.pxbox(r, &BoxStyle::new(if on { t.selection.alpha(0.35) } else { t.surface }, if on { t.ember } else if hov { t.red } else { t.border }));
+    ui.cv.pxbox(r, &BoxStyle::new(if on { t.selection.alpha(0.45) } else { t.surface }, if on { t.ember } else if hov { t.red } else { t.border }));
+    let text_h = ui.f.line(m.text) + ui.f.line(m.small) + 12;
+    let k = m.cell - 1;
     ui.cv.style = style;
-    let win = R::new(r.x + 20, r.y + 18, r.w - 40, 96);
+    let win = R::new(r.x + m.gap * 2, r.y + m.gap * 2, r.w - m.gap * 4, r.h - m.gap * 4 - text_h);
     ui.cv.pxbox(win, &BoxStyle::new(t.panel, t.border).shadow(3));
-    ui.cv.fill(R::new(win.x + 1, win.y + 22, win.w - 2, 1), t.border);
+    ui.cv.fill(R::new(win.x + 1, win.y + 22 * k, win.w - 2, 1), t.border);
     for i in 0..3 {
-        ui.cv.notched(R::new(win.x + 10 + i * 14, win.y + 8, 8, 8), 2, if i == 0 { t.red } else { t.dim });
+        ui.cv.notched(R::new(win.x + (10 + i * 14) * k, win.y + 8 * k, 8 * k, 8 * k), 2, if i == 0 { t.red } else { t.dim });
     }
-    ui.cv.pxbox(R::new(win.x + 12, win.y + 36, 82, 24), &BoxStyle::new(t.red, t.ember).bevel(true));
-    ui.cv.pxbox(R::new(win.x + 104, win.y + 36, 82, 24), &BoxStyle::new(t.surface_hi, t.border).bevel(true));
-    ui.cv.gauge(R::new(win.x + 12, win.y + 72, win.w - 24, 8), 16, 0.62, t.red, t.surface_hi, 2);
+    let (bw, by) = (win.w * 30 / 100, win.y + 22 * k + (win.h - 22 * k) / 4);
+    ui.cv.pxbox(R::new(win.x + 12 * k, by, bw, 24 * k), &BoxStyle::new(t.red, t.ember).bevel(true));
+    ui.cv.pxbox(R::new(win.x + 12 * k + bw + 10 * k, by, bw, 24 * k), &BoxStyle::new(t.surface_hi, t.border).bevel(true));
+    ui.cv.gauge(R::new(win.x + 12 * k, win.bottom() - 18 * k, win.w - 24 * k, 8 * k), 16, 0.62, t.red, t.surface_hi, 2);
     ui.cv.style = was;
-    ui.cv.text_in(ui.f, PX, R::new(r.x + 20, r.y + 122, r.w - 40, 20), title, t.text);
-    ui.cv.text_in(ui.f, PX, R::new(r.x + 20, r.y + 142, r.w - 40, 20), sub, t.text_faint);
+    let y = win.bottom() + m.gap;
+    let lh = ui.f.line(m.text);
+    ui.cv.text_in(ui.f, m.text, R::new(win.x, y, win.w, lh), title, t.text_hi);
+    ui.cv.text_in(ui.f, m.small, R::new(win.x, y + lh + 4, win.w, ui.f.line(m.small)), sub, t.text_dim);
     ui.zone(r, Act::Preset(plain), Cur::Pointer);
 }
 
-fn look_page(ui: &mut Ui, w: &W, b: R) {
+fn look_page(ui: &mut Ui, w: &W, m: M, b: R) {
     let t = ui.t;
-    let mut y = head(ui, b, l("Как будет выглядеть", "How it will look", "Como vai ficar"), l("Вид сразу применяется к этому окну. Его можно настроить вплоть до каждого цвета: style.json.", "The look applies to this window right away. Every colour can be changed later: style.json.", "A aparência é aplicada a esta janela na hora. Cada cor pode ser alterada depois: style.json."));
-    let cw = (b.w - 16) / 2;
-    look_card(ui, R::new(b.x, y, cw, 172), l("пиксели", "pixels", "pixels"), l("как задумано: фаски, ступени, Tiny5", "the original: notches, steps, Tiny5", "o original: chanfros, degraus, Tiny5"), false, !w.plain);
-    look_card(ui, R::new(b.x + cw + 16, y, cw, 172), l("нейтральный", "neutral", "neutro"), l("скругления, системный шрифт, мягкие тени", "rounded corners, the system font, soft shadows", "cantos arredondados, fonte do sistema"), true, w.plain);
-    y += 188;
-    ui.cv.text_in(ui.f, PX, R::new(b.x, y, 100, 28), l("акцент", "accent", "destaque"), t.text_dim);
-    let mut x = b.x + 104;
+    let top = head(ui, m, b, 2, l("Как будет выглядеть", "How it will look", "Como vai ficar"), l("Вид сразу применяется к этому окну. Каждый цвет можно настроить потом.", "The look applies to this window right away. Every colour can be changed later.", "A aparência é aplicada a esta janela na hora. Cada cor pode ser alterada depois."));
+    let total = m.card + m.gap * 3 + m.swatch + 8;
+    let mut y = middle(m, b, top, total);
+    let cw = (b.w - m.gap * 2) / 2;
+    look_card(ui, m, R::new(b.x, y, cw, m.card), l("Пиксели", "Pixels", "Pixels"), l("как задумано: фаски, ступени, Tiny5", "the original: notches, steps, Tiny5", "o original: chanfros, degraus, Tiny5"), false, !w.plain);
+    look_card(ui, m, R::new(b.x + cw + m.gap * 2, y, cw, m.card), l("Нейтральный", "Neutral", "Neutro"), l("скругления, системный шрифт, мягкие тени", "rounded corners, the system font, soft shadows", "cantos arredondados, fonte do sistema"), true, w.plain);
+    y += m.card + m.gap * 3;
+    let row = m.swatch + 8;
+    let label = l("акцент", "accent", "destaque");
+    ui.cv.text_in(ui.f, m.text, R::new(b.x, y, 200, row), label, t.text);
+    let mut x = b.x + ui.f.width(m.text, label) + m.gap * 3;
     for p in PRESETS {
-        let r = R::new(x, y + 2, 24, 24);
+        let r = R::new(x, y + 4, m.swatch, m.swatch);
         let c = C::hex(p.accent);
         if w.accent == p.accent {
-            ui.cv.outline(R::new(r.x - 3, r.y - 3, r.w + 6, r.h + 6), t.text, 2);
+            ui.cv.outline(R::new(r.x - 4, r.y - 4, r.w + 8, r.h + 8), t.text_hi, 2);
         }
         ui.cv.notched(r, 2, c);
         ui.zone(r, Act::Accent(p.accent), Cur::Pointer);
-        x += 34;
+        x += m.swatch + m.gap + 4;
     }
-    let tw = 96;
-    ui.button(R::new(b.right() - 2 * tw - 8, y, tw, 28), l("тёмная", "dark", "escuro"), "", Tone::Plain, !w.light, true, Act::Light(false));
-    ui.button(R::new(b.right() - tw, y, tw, 28), l("светлая", "light", "claro"), "", Tone::Plain, w.light, true, Act::Light(true));
-    nav(ui, w, b, l("дальше", "next", "avançar"), true);
+    let tw = m.btn * 5 / 2;
+    btn(ui, m, R::new(b.right() - 2 * tw - m.gap, y + 4, tw, row - 8), l("тёмная", "dark", "escuro"), "", Kind::Plain, !w.light, Act::Light(false));
+    btn(ui, m, R::new(b.right() - tw, y + 4, tw, row - 8), l("светлая", "light", "claro"), "", Kind::Plain, w.light, Act::Light(true));
+    nav(ui, w, m, b, l("дальше", "next", "avançar"), "right");
 }
 
-fn modules_page(ui: &mut Ui, w: &W, b: R) {
+fn modules_page(ui: &mut Ui, w: &W, m: M, b: R) {
     let t = ui.t;
-    let mut y = head(ui, b, l("Что поставить", "What to install", "O que instalar"), l("Модули независимы: без любого из них шелл работает, а поставить или убрать можно и потом — yami setup.", "Modules are independent: the shell runs without any of them, and you can add or remove them later: yami setup.", "Os módulos são independentes: o shell funciona sem eles, e dá para mudar depois: yami setup."));
-    let col = (b.w - 20) / 2;
+    let top = head(ui, m, b, 3, l("Что поставить", "What to install", "O que instalar"), l("Ничего не отмечено: выбери только нужное. Шелл работает без любого модуля, менять выбор можно потом: yami setup.", "Nothing is ticked: pick only what you need. The shell runs without any module, and the choice can change later: yami setup.", "Nada está marcado: escolha só o que precisa. O shell funciona sem qualquer módulo, e dá para mudar depois: yami setup."));
+    let col = (b.w - m.gap * 2) / 2;
     let titles = [l("программы", "apps", "aplicativos"), l("система", "system", "sistema"), l("дополнительно", "extras", "extras")];
-    let mut rows = [0i32; 2];
+    let shown = |g: u8| w.mods.iter().filter(|x| x.group == g && (x.id != "games" || w.steam)).count() as i32;
+    let cap = 24;
+    let height = |n: i32| cap + n * (m.row + m.gap);
+    let total = height(shown(0)).max(height(shown(1)) + m.gap + height(shown(2)));
+    let start = middle(m, b, top, total);
+    let mut rows = [start, start];
     for g in 0..3u8 {
-        let c = usize::from(g == 2 || g == 1 && w.mods.iter().filter(|m| m.group == 0).count() > 5);
-        let c = if g == 0 { 0 } else { c.max(usize::from(g > 0)) };
-        let x = b.x + c as i32 * (col + 20);
-        let mut ry = y + rows[c];
-        ui.cv.text_in(ui.f, PX, R::new(x, ry, col, 20), titles[g as usize], t.text_faint);
-        ry += 24;
-        for (i, m) in w.mods.iter().enumerate().filter(|(_, m)| m.group == g && (m.id != "games" || w.steam)) {
+        let c = usize::from(g > 0);
+        let x = b.x + c as i32 * (col + m.gap * 2);
+        ui.cv.text_in(ui.f, m.small, R::new(x, rows[c], col, 20), titles[g as usize], t.text_dim);
+        rows[c] += cap;
+        for (i, x_) in w.mods.iter().enumerate().filter(|(_, x_)| x_.group == g && (x_.id != "games" || w.steam)) {
             let replaces;
-            let desc = if m.id == "login" && !w.dm.is_empty() {
+            let desc = if x_.id == "login" && !w.dm.is_empty() {
                 replaces = match () {
                     _ if yami_px::i18n::pt_br() => format!("nossa tela de login, no lugar de {}", w.dm),
                     _ if yami_px::i18n::translated() => format!("our own login screen, replaces {}", w.dm),
@@ -434,91 +607,128 @@ fn modules_page(ui: &mut Ui, w: &W, b: R) {
                 };
                 replaces.as_str()
             } else {
-                l(m.ru, m.en, m.pt)
+                l(x_.ru, x_.en, x_.pt)
             };
-            ui.toggle(R::new(x, ry, col, 40), m.name, desc, m.on, Act::Module(i));
-            ry += 42;
+            pick(ui, m, R::new(x, rows[c], col, m.row), x_.name, desc, x_.on, Act::Module(i));
+            rows[c] += m.row + m.gap;
         }
-        rows[c] = ry - y + 8;
+        rows[c] += m.gap;
     }
-    y += rows[0].max(rows[1]);
-    let _ = y;
-    nav(ui, w, b, l("дальше", "next", "avançar"), true);
+    nav(ui, w, m, b, l("дальше", "next", "avançar"), "right");
 }
 
-fn restyle_page(ui: &mut Ui, w: &W, b: R) {
-    let y = head(ui, b, l("Что перекрасить", "What to restyle", "O que recolorir"), l("Другие программы получат твою палитру. Снимешь галочку — yami их не тронет.", "Other programs get your palette. Untick one and yami leaves it alone.", "Outros programas recebem sua paleta. Desmarque e o yami não mexe neles."));
-    let col = (b.w - 2 * 16) / 3;
+fn restyle_page(ui: &mut Ui, w: &W, m: M, b: R) {
+    let top = head(ui, m, b, 4, l("Что перекрасить", "What to restyle", "O que recolorir"), l("Другие программы получат твою палитру. Снимешь галочку, и yami их не тронет.", "Other programs get your palette. Untick one and yami leaves it alone.", "Outros programas recebem sua paleta. Desmarque e o yami não mexe neles."));
+    let col = (b.w - 2 * m.gap * 2) / 3;
+    let h = m.btn + m.gap;
+    let rows = RESTYLE.len().div_ceil(3) as i32;
+    let y = middle(m, b, top, rows * (h + m.gap));
     for (i, (_, name)) in RESTYLE.iter().enumerate() {
         let (cx, cy) = (i as i32 % 3, i as i32 / 3);
-        ui.toggle(R::new(b.x + cx * (col + 16), y + cy * 46, col, 40), name, "", w.restyle[i], Act::Restyle(i));
+        pick(ui, m, R::new(b.x + cx * (col + m.gap * 2), y + cy * (h + m.gap), col, h), name, "", w.restyle[i], Act::Restyle(i));
     }
-    nav(ui, w, b, l("дальше", "next", "avançar"), true);
+    nav(ui, w, m, b, l("дальше", "next", "avançar"), "right");
 }
 
-fn confirm(ui: &mut Ui, w: &W, b: R) {
+fn confirm(ui: &mut Ui, w: &W, m: M, b: R) {
     let t = ui.t;
-    let mut y = head(ui, b, l("Всё готово к установке", "Ready to install", "Pronto para instalar"), l("Модули собираются из исходников: обычно это несколько минут. Ничего не сломается, и всё можно вернуть.", "The modules are built from source, usually a few minutes. Nothing breaks, and everything can be undone.", "Os módulos são compilados do código-fonte, em geral alguns minutos. Nada quebra, e tudo pode ser desfeito."));
-    let picked: Vec<&str> = w.mods.iter().filter(|m| m.on).map(|m| m.name).collect();
-    let text = if picked.is_empty() { l("только шелл: ничего не добавлять", "only the shell: add nothing", "só o shell: não adicionar nada").to_string() } else { picked.join(" · ") };
-    ui.cv.pxbox(R::new(b.x, y, b.w, 70), &BoxStyle::new(t.surface, t.border));
-    ui.cv.text_wrap(ui.f, PX, R::new(b.x + 14, y + 10, b.w - 28, 50), &text, t.text, 2);
-    y += 90;
+    let top = head(ui, m, b, 5, l("Всё готово к установке", "Ready to install", "Pronto para instalar"), l("Модули собираются из исходников: обычно это несколько минут. Ничего не сломается, и всё можно вернуть.", "The modules are built from source, usually a few minutes. Nothing breaks, and everything can be undone.", "Os módulos são compilados do código-fonte, em geral alguns minutos. Nada quebra, e tudo pode ser desfeito."));
+    let picked: Vec<&str> = w.mods.iter().filter(|x| x.on).map(|x| x.name).collect();
+    let line = ui.f.line(m.text);
+    let chip = line + m.gap * 2;
+    let rows = if picked.len() > 4 { 2 } else { 1 };
+    let lines_box = chip * rows + m.gap * (rows + 1) + 24 + m.gap * 2;
+    let field = if !w.no_root && !w.no_password { m.gap * 3 + 24 + m.btn + 28 } else if w.no_root { m.gap * 3 + 2 * line + 8 } else { 0 };
+    let mut y = middle(m, b, top, lines_box + field);
+    let card = R::new(b.x, y, b.w, lines_box);
+    ui.cv.pxbox(card, &BoxStyle::new(t.surface, t.border));
+    ui.cv.text_in(ui.f, m.small, R::new(card.x + m.gap * 2, card.y + m.gap, card.w, 22), l("будет установлено", "will be installed", "será instalado"), t.text_dim);
+    let (mut x, mut cy) = (card.x + m.gap * 2, card.y + m.gap + 28);
+    if picked.is_empty() {
+        ui.cv.text_in(ui.f, m.text, R::new(x, cy, card.w - m.gap * 4, chip), l("только шелл: ничего не добавлять", "only the shell: add nothing", "só o shell: não adicionar nada"), t.text);
+    }
+    for name in &picked {
+        let cw = ui.f.width(m.text, name) + m.gap * 3;
+        if x + cw > card.right() - m.gap * 2 {
+            x = card.x + m.gap * 2;
+            cy += chip + m.gap;
+        }
+        let r = R::new(x, cy, cw, chip);
+        ui.cv.pxbox(r, &BoxStyle::new(t.selection.alpha(0.45), t.ember));
+        ui.cv.text_center(ui.f, m.text, r, name, t.text_hi);
+        x += cw + m.gap;
+    }
+    y += lines_box + m.gap * 3;
     if w.no_root {
-        ui.cv.text_wrap(ui.f, PX, R::new(b.x, y, b.w, 40), l("sudo нет: нужные пакеты покажу одной командой в настройках → обновления", "there is no sudo: the packages you need are shown as one command in settings → updates", "não há sudo: os pacotes necessários aparecem como um comando em configurações → atualizações"), t.text_dim, 2);
+        ui.cv.text_wrap(ui.f, m.text, R::new(b.x, y, b.w, 2 * line + 8), l("sudo нет: нужные пакеты покажу одной командой в настройках → обновления", "there is no sudo: the packages you need are shown as one command in settings → updates", "não há sudo: os pacotes necessários aparecem como um comando em configurações → atualizações"), t.text_dim, 2);
     } else if !w.no_password {
-        ui.cv.text_in(ui.f, PX, R::new(b.x, y, b.w, 20), l("пароль администратора — для пакетов (пусто: только домашняя папка)", "administrator password, for the packages (empty: home folder only)", "senha de administrador, para os pacotes (vazio: só a pasta pessoal)"), t.text_dim);
-        y += 26;
-        ui.field(R::new(b.x, y, b.w, 34), &w.field, l("пароль", "password", "senha"), true, true, Act::Pass);
-        y += 42;
+        ui.cv.text_in(ui.f, m.small, R::new(b.x, y, b.w, 20), l("пароль администратора для пакетов (пусто: только домашняя папка)", "administrator password, for the packages (empty: home folder only)", "senha de administrador, para os pacotes (vazio: só a pasta pessoal)"), t.text_dim);
+        y += 24;
+        pass_field(ui, m, R::new(b.x, y, b.w, m.btn), &w.field, l("пароль", "password", "senha"));
+        y += m.btn + 6;
         if w.wrong {
-            ui.cv.text_in(ui.f, PX, R::new(b.x, y, b.w, 20), l("неверный пароль", "wrong password", "senha incorreta"), t.ember);
+            ui.cv.text_in(ui.f, m.small, R::new(b.x, y, b.w, 20), l("неверный пароль", "wrong password", "senha incorreta"), t.ember);
         }
     }
-    nav(ui, w, b, l("установить", "install", "instalar"), true);
+    nav(ui, w, m, b, l("установить", "install", "instalar"), "check");
 }
 
-fn install(ui: &mut Ui, w: &W, b: R) {
+fn install(ui: &mut Ui, w: &W, m: M, b: R) {
     let t = ui.t;
     let title = if w.failed.is_some() { l("Не получилось", "It did not work", "Não deu certo") } else { l("Устанавливаю", "Installing", "Instalando") };
     let sub = if w.failed.is_some() { l("Ничего не сломалось: прежние программы на месте.", "Nothing is broken: the old programs are still in place.", "Nada quebrou: os programas antigos continuam no lugar.") } else { l("Обычно это несколько минут. Прежние программы работают, пока всё не соберётся.", "Usually a few minutes. The old programs keep working until everything is built.", "Em geral alguns minutos. Os programas antigos continuam funcionando até tudo ser compilado.") };
-    let mut y = head(ui, b, title, sub);
+    let mut y = head(ui, m, b, 0, title, sub);
     if let Some((k, n, s)) = &w.step {
-        ui.cv.text_in(ui.f, PX, R::new(b.x, y, b.w - 80, 22), s, t.text);
+        let lh = ui.f.line(m.text);
+        ui.cv.text_in(ui.f, m.text, R::new(b.x, y, b.w - 160, lh + 4), s, t.text);
         let done = if *n == 100 { format!("{k}%") } else { format!("{k}/{n}") };
-        ui.text_right(PX, R::new(b.x, y, b.w, 22), &done, t.text_faint);
-        y += 28;
-        ui.cv.gauge(R::new(b.x, y, b.w, 12), 40, *k as f32 / (*n).max(1) as f32, t.red, t.surface_hi, 2);
-        y += 26;
+        ui.text_right(m.text, R::new(b.x, y, b.w, lh + 4), &done, t.text_hi);
+        y += lh + m.gap;
+        ui.cv.gauge(R::new(b.x, y, b.w, m.check / 2 + 4), 48, *k as f32 / (*n).max(1) as f32, t.red, t.surface_hi, 2);
+        y += m.check / 2 + 4 + m.gap * 2;
     }
     // перерисовка — по строкам установщика: без постоянной анимации сборке достаётся весь процессор
-    let log = R::new(b.x, y, b.w, b.bottom() - if w.failed.is_some() { 84 } else { 44 } - y);
+    let tail = if w.failed.is_some() { m.btn + m.gap * 2 + 2 * ui.f.line(m.text) + 8 } else { 0 };
+    let log = R::new(b.x, y, b.w, b.bottom() - tail - y);
     ui.cv.pxbox(log, &BoxStyle::new(t.code_bg, t.border));
-    ui.cv.push_clip(log.inset(8));
-    for (i, line) in w.lines.iter().enumerate() {
-        ui.cv.text(ui.f, PX, log.x + 10, log.y + 8 + i as i32 * 18, line, t.text_dim);
+    ui.cv.push_clip(log.inset(m.gap));
+    let lh = ui.f.line(m.small) + 4;
+    let fits = ((log.h - m.gap * 2) / lh).max(1) as usize;
+    for (i, line) in w.lines.iter().skip(w.lines.len().saturating_sub(fits)).enumerate() {
+        ui.cv.text(ui.f, m.small, log.x + m.gap + 2, log.y + m.gap + i as i32 * lh, line, t.text_dim);
     }
     ui.cv.pop_clip();
     if let Some(why) = &w.failed {
-        ui.cv.text_wrap(ui.f, PX, R::new(b.x, b.bottom() - 78, b.w, 40), why, t.ember, 2);
-        ui.button(R::new(b.x, b.bottom() - 34, 130, 34), l("назад", "back", "voltar"), "left", Tone::Plain, false, true, Act::Back);
-        ui.button(R::new(b.right() - 180, b.bottom() - 34, 180, 34), l("повторить", "try again", "tentar de novo"), "check", Tone::Primary, false, true, Act::Retry);
+        let lh = ui.f.line(m.text);
+        ui.cv.text_wrap(ui.f, m.text, R::new(b.x, b.bottom() - m.btn - m.gap - 2 * lh - 8, b.w, 2 * lh + 8), why, t.ember, 2);
+        let bw = m.btn * 4;
+        btn(ui, m, R::new(b.x, b.bottom() - m.btn, bw * 3 / 4, m.btn), l("назад", "back", "voltar"), "left", Kind::Plain, false, Act::Back);
+        btn(ui, m, R::new(b.right() - bw, b.bottom() - m.btn, bw, m.btn), l("повторить", "try again", "tentar de novo"), "right", Kind::Primary, false, Act::Retry);
     }
 }
 
-fn done(ui: &mut Ui, w: &W, b: R) {
+fn done(ui: &mut Ui, w: &W, m: M, b: R) {
     let t = ui.t;
-    let face = font::px(48);
-    ui.cv.text_in(ui.f, face, R::new(b.x, b.y + 8, b.w, 60), l("Готово", "All set", "Tudo pronto"), t.text);
-    ui.cv.text_wrap(ui.f, PX, R::new(b.x, b.y + 80, b.w, 40), l("Вот что стоит запомнить. Поменять клавиши можно в настройках.", "Here is what is worth remembering. Keys can be changed in the settings.", "Isto vale lembrar. As teclas podem ser alteradas nas configurações."), t.text_dim, 2);
     let rows = [("Mod+Space", l("запуск программ", "launcher", "lançador")), ("Mod+S", l("настройки", "settings", "configurações")), ("Mod+V", l("буфер обмена", "clipboard", "área de transferência")), ("Mod+E", l("файлы", "files", "arquivos")), ("Print", l("скриншот", "screenshot", "captura de tela")), ("Mod+Shift+/", l("все клавиши", "all keys", "todas as teclas"))];
-    let mut y = b.y + 136;
-    let chosen = |id: &str| w.mods.iter().any(|m| m.id == id && m.on);
-    for (k, v) in rows.into_iter().filter(|(k, _)| (*k != "Mod+E" || chosen("files")) && (*k != "Print" || chosen("shot"))) {
-        ui.cv.pxbox(R::new(b.x, y, 150, 30), &BoxStyle::new(t.surface_hi, t.border).bevel(true));
-        ui.cv.text_center(ui.f, PX, R::new(b.x, y, 150, 30), k, t.text);
-        ui.cv.text_in(ui.f, PX, R::new(b.x + 170, y, b.w - 170, 30), v, t.text_dim);
-        y += 40;
+    let chosen = |id: &str| w.mods.iter().any(|x| x.id == id && x.on);
+    let list: Vec<_> = rows.into_iter().filter(|(k, _)| (*k != "Mod+E" || chosen("files")) && (*k != "Print" || chosen("shot"))).collect();
+    let hl = ui.f.line(m.hero);
+    let sl = ui.f.line(m.text);
+    let key_h = m.btn - 4;
+    let total = hl + 12 + sl + m.gap * 4 + list.len() as i32 * (key_h + m.gap);
+    let mut y = middle(m, b, b.y, total);
+    ui.cv.text_in(ui.f, m.hero, R::new(b.x, y, b.w, hl + 4), l("Готово", "All set", "Tudo pronto"), t.text_hi);
+    y += hl + 12;
+    ui.cv.text_in(ui.f, m.text, R::new(b.x, y, b.w, sl), l("Вот что стоит запомнить. Клавиши можно поменять в настройках.", "Here is what is worth remembering. Keys can be changed in the settings.", "Isto vale lembrar. As teclas podem ser alteradas nas configurações."), t.text_dim);
+    y += sl + m.gap * 4;
+    let kw = m.btn * 4;
+    for (k, v) in list {
+        let r = R::new(b.x, y, kw, key_h);
+        ui.cv.pxbox(r, &BoxStyle::new(t.surface_hi, t.border).bevel(true));
+        ui.cv.text_center(ui.f, m.text, r, k, t.text_hi);
+        ui.cv.text_in(ui.f, m.text, R::new(r.right() + m.gap * 2, y, b.w - kw - m.gap * 2, key_h), v, t.text);
+        y += key_h + m.gap;
     }
-    ui.button(R::new(b.right() - 180, b.bottom() - 34, 180, 34), l("начать работу", "start working", "começar a usar"), "check", Tone::Primary, false, true, Act::Finish);
+    let bw = m.btn * 4;
+    btn(ui, m, R::new(b.right() - bw, b.bottom() - m.btn, bw, m.btn), l("начать работу", "start working", "começar a usar"), "check", Kind::Primary, false, Act::Finish);
 }

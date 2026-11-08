@@ -634,7 +634,7 @@ pub fn run() {
     crate::ipc::serve(tx.clone());
     dbus::spawn(tx.clone(), app.st.set.agent_notif, app.st.set.agent_tray);
     // первый вход после установки: окно настройки (оно само снимет метку)
-    if crate::config::state_dir().join("yami/first-run").exists() && crate::proc::have("yami-setup") {
+    if crate::config::state_dir().join("first-run").exists() && crate::proc::have("yami-setup") {
         App::spawn(&["yami-setup".to_string()]);
     }
     // окна паролей, показ экрана и автоподключение — отдельная служба; второй экземпляр выйдет сам
