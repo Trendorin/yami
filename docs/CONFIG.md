@@ -8,13 +8,13 @@ of the file is kept), unknown keys are ignored: `yami-shell config check` lists 
 
 | File | Owner | Edit by hand |
 |---|---|---|
-| `~/.config/yami-shell.json` | the shell; yami-files, yami-view and `tools/theme.py` read the look from it | yes, live |
+| `~/.config/yami-shell.json` | the shell; yami-files, yami-view and `yami recolor` read the look from it | yes, live |
 | `~/.config/yami-files.json` | yami-files | yes (read at start) |
 | `~/.config/niri/config.kdl` | the installer | better not: it is replaced on reinstall |
 | `~/.config/niri/user.kdl` | **you** | yes: included last, wins over everything above |
 | `~/.config/niri/yami-binds.kdl` | the shell (settings → keys) | no, rewritten |
 | `~/.config/niri/yami-fx.kdl` | the shell (windows, look, games) | no, rewritten |
-| `~/.config/niri/yami-colors.kdl`, `yami-cursor.kdl` | `tools/theme.py` | no, rewritten |
+| `~/.config/niri/yami-colors.kdl`, `yami-cursor.kdl` | `yami recolor` | no, rewritten |
 | `~/.config/niri/yami-outputs.kdl` | the shell (settings → screens) | no, rewritten |
 | `~/.config/niri/yami-local.kdl` | the installer (this machine's own niri settings; empty now) | no |
 | `/var/lib/yami-greet/look/` | the shell: what the login screen is drawn from (`look.json`: palette, language, monitors, layouts; `wall.png`: the wallpaper), yours since the install | no, rewritten |
@@ -109,7 +109,7 @@ file for one run. The files are reread when they change.
 | `animations` | `true` | Bayer dissolve, panel motion; off everywhere when false |
 | `lite` | `false` | lite mode for weak and virtual machines (old laptops, VMs, software rendering): no blur, no shell or niri animations, opaque inactive windows; the settings above stay as they are and come back when it is off. A fresh install turns it on by itself on a VM, without GPU acceleration, on pre-2011 Intel graphics or with ≤ 4 GB and ≤ 4 threads (`config lite-auto`); `yami doctor` says why |
 | `animSpeed` | `1.0` | duration multiplier: 0.5 faster, 2 slower |
-| `light` | `false` | light theme: paper instead of graphite, the accent deepened until it reads; theme.py switches GTK (adw-gtk3, `prefer-light`), Qt, KDE, kitty, btop, the cursor and the light icon variant with it |
+| `light` | `false` | light theme: paper instead of graphite, the accent deepened until it reads; `yami recolor` switches GTK (adw-gtk3, `prefer-light`), Qt, KDE, kitty, btop, the cursor and the light icon variant with it |
 | `reveal` | `"dither"` | how panels appear: `dither` (Bayer 4×4), `scan` (interlaced lines), `noise`, `wipe` (diagonal with a dithered edge), `blocks` (Bayer, double cells) |
 | `revealGrain` | `1` | cell size of the reveal, 1–4 |
 | `animClose` | `true` | panels close with the reveal backwards; off: they vanish at once |
@@ -129,7 +129,7 @@ file for one run. The files are reread when they change.
 | `iconTint` | `false` | pixel icons in four tones of the palette instead of their own colours |
 | `fetchFull` | `false` | fastfetch with the hardware (kernel, packages, CPU, GPU, memory, disk, display); off: who, OS, wm, shell, terminal, uptime |
 | `lang` | `""` | `ru`, `en`, `pt-BR`, or empty to follow `LC_ALL`, `LC_MESSAGES`, then `$LANG`; `pt_BR.UTF-8` and `pt` are also accepted |
-| `themeApps` | all of them | the other programs theme.py recolours (settings → color → apps, the installer's `--restyle`): `gtk` (gtk.css, settings.ini, gsettings), `qt` (qt6ct, the KDE colour scheme, kdeglobals), `kitty` (its colours and font; off takes the `include yami.conf` line out of `kitty.conf`), `fastfetch` (its `config.jsonc` while that is yami's; your own one is kept and yami's look goes to `yami.jsonc` next to it), `btop`, `firefox` (menus), `mangohud` (only a config yami wrote), `foot` (`foot/yami-colors.ini` and an `include=~/…` line at the end of `foot.ini` under its own `[main]`, so it wins over colours set above; new windows), `cava` (a gradient in the `[color]` section of its config, open cava reloads at once), `starship` (a `[palettes.yami]` table that also retints `red`, `green` and the other names, and `palette = "yami"` unless you chose another palette). A program left out is not touched. Up to 2.6 it was `appThemes` (foot, cava and starship only), read once and carried over |
+| `themeApps` | all of them | the other programs `yami recolor` recolours (settings → color → apps, the installer's `--restyle`): `gtk` (gtk.css, settings.ini, gsettings), `qt` (qt6ct, the KDE colour scheme, kdeglobals), `kitty` (its colours and font; off takes the `include yami.conf` line out of `kitty.conf`), `fastfetch` (its `config.jsonc` while that is yami's; your own one is kept and yami's look goes to `yami.jsonc` next to it), `btop`, `firefox` (menus), `mangohud` (only a config yami wrote), `foot` (`foot/yami-colors.ini` and an `include=~/…` line at the end of `foot.ini` under its own `[main]`, so it wins over colours set above; new windows), `cava` (a gradient in the `[color]` section of its config, open cava reloads at once), `starship` (a `[palettes.yami]` table that also retints `red`, `green` and the other names, and `palette = "yami"` unless you chose another palette). A program left out is not touched. Up to 2.6 it was `appThemes` (foot, cava and starship only), read once and carried over |
 
 ### Apps in the palette colours
 
@@ -261,7 +261,7 @@ monitors to `/var/lib/yami-greet/look`; the login screen reads them at its next 
 | `gameGamemode` | `true` | the focused game is registered with gamemoded (no `gamemoderun %command%` needed) |
 
 MangoHud gets a config in the palette and the pixel font (`~/.config/MangoHud/MangoHud.conf`) as
-long as its first line is yami's; delete that line and theme.py never touches it again.
+long as its first line is yami's; delete that line and `yami recolor` never touches it again.
 
 ### Services
 
@@ -291,15 +291,18 @@ the screen-share picker and automount belong to [yami-agents](#yami-agents).
 `yami update` and settings → updates work on their own clone, `~/.local/share/yami/src` (your
 working copy is never touched). A release is the newest `vX.Y.Z` tag; with `updateChannel`
 `main` every commit of the branch is offered. Installing runs `install.sh --update` from the
-new tree: it rebuilds from source, keeps every setting and needs no sudo; the previous binaries
-go to `~/.local/lib/yami/prev` for `yami update rollback`. `yami update list` shows the last
+new tree: it rebuilds from source, keeps every setting and needs no sudo. Nothing is replaced until every part has
+built, and a module whose source did not change is not rebuilt. Before it starts, a rollback point goes to
+`~/.local/state/yami/snapshots` (the last three are kept, `yami update snapshots` lists them): the programs and every
+file the installer rewrites. A run that fails after it began changing things puts it all back by itself;
+`yami update rollback` goes back to the newest point (your settings, screens and `user.kdl` are left as they are now). `yami update list` shows the last
 eight releases with their signatures, `yami update to X.Y.Z` builds and installs one of them (only
 what passes `updateVerify`). Before switching to an older version the settings are copied to
 `~/.local/state/yami/settings-newer.json`; keys the older version dropped come back from it on the
 next switch to a version at least as new. A switch to a whole version also rebuilds yami-niri at
 that version's level (from the next login).
 
-An update runs without sudo. When the components chosen at install time (`tools`, `games`, …)
+An update runs without sudo. When the components chosen at install time (`shot`, `games`, …)
 want packages the system lacks — a new version brought a feature with a helper program — the
 installer writes them to `~/.local/state/yami/packages-needed`; `yami update need` prints one
 `sudo` command (`--run` runs it), `yami doctor` and settings → updates show it too, the tab with an

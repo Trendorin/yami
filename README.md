@@ -200,10 +200,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Trendorin/yami/main/install.
 
 or from a checkout: `git clone https://github.com/Trendorin/yami yami && yami/install.sh`.
 
-It installs only the base: niri, the shell and what the desktop cannot start without. Run it as
-yourself, not with sudo: it asks for the password once, where it is needed. Then log out and pick
-the **Niri** session. A full-screen setup window meets you there and asks the language, the look
-and which [modules](#modules) to add. Open it again at any time with `yami setup`.
+It installs only the base: niri, the shell, a terminal and what the desktop cannot start without. Run it as
+yourself, not with sudo: it asks for the password once, where it is needed, and before anything else it says
+how long it will take and how much disk it needs. Then log out and pick the **Niri** session (no login screen
+on this system: type `niri-session` in the console). A full-screen setup window meets you there and asks the
+language, the look and which [modules](#modules) to add. Open it again at any time with `yami setup`. Running the
+same command again later updates and repairs what is there and keeps your choices.
 
 No flag is needed for a normal install; these are for the rest:
 
@@ -221,7 +223,7 @@ No flag is needed for a normal install; these are for the rest:
 | `--restyle LIST` | what yami restyles: `all`, `none` or a list of `gtk` `qt` `cursor` `kitty` `fastfetch` `btop` `firefox` `mangohud` `foot` `cava` `starship`; a program left out is never touched (later: settings → color → apps) |
 | `--no-sudo` | home directory only: no packages, no system files |
 | `--dry-run` | print the plan, change nothing |
-| `--no-count` | do not add this machine to the «installs» badge (one anonymous download, [details](docs/SECURITY.md#install-count)) |
+| `--no-count` | do not add this machine to the «installs» badge (one anonymous request, [details](docs/SECURITY.md#install-count)); `DO_NOT_TRACK=1` does the same |
 | `--uninstall` | remove yami and its modules, restore the backups and the previous login manager |
 | `--update` | rebuild from this tree keeping every setting, no sudo (what `yami update apply` runs) |
 | `--no-anim` | disable the installer animations |
@@ -229,8 +231,8 @@ No flag is needed for a normal install; these are for the rest:
 What the base install does:
 
 1. Detects the distribution from `/etc/os-release` and installs niri, portals, polkit, PipeWire,
-   NetworkManager, BlueZ, power-profiles-daemon, Noto fonts, cliphist and grim with its native
-   package manager. Names a repository does not carry are reported, not fatal. Enables Bluetooth
+   NetworkManager, BlueZ, power-profiles-daemon, Noto fonts, cliphist, grim, kitty, btop and the night
+   light with its native package manager, in one transaction. Names a repository does not carry are reported, not fatal. Enables Bluetooth
    and power profiles, and NetworkManager when nothing else manages the network.
 2. Builds the shell and the setup window with `cargo build --release --locked` (Rust ≥ 1.89; rustup
    is used when the distribution's toolchain is older) into `~/.local/bin`.
@@ -253,7 +255,7 @@ install -Dm755 target/release/yami-shell ~/.local/bin/yami-shell
 
 Runtime libraries: `libxkbcommon`, `libpam`. Optional helpers: `pactl`/`parec` (volume, mixer,
 equalizer), `playerctl` (media), `nmcli` (Wi-Fi), BlueZ (Bluetooth), `cliphist` and
-`wl-clipboard` (clipboard), `python3` with Pillow (palette export to other apps).
+`wl-clipboard` (clipboard). Nothing is written in Python any more: the palette export is part of the shell.
 
 ## Modules
 
@@ -271,9 +273,9 @@ removes them, and any of them works without the yami shell: take one into your o
 | [yami-greet](https://github.com/Trendorin/yami-greet) | the login screen | greetd, niri |
 | [yami-niri](https://github.com/Trendorin/yami-niri) | niri with tearing for games and a realtime thread | a build from source |
 
-Besides these the setup window offers packages of your distribution: `drives` (udisks2, gvfs),
-`apps` (kitty, fastfetch, pavucontrol, btop), `tools` (night light, text and QR from screenshots)
-and `games` (GameMode, MangoHud).
+Their system packages come with them: drives and phones (udisks2, gvfs) with yami-files and yami-agents,
+text and QR recognition with yami-shot. With Steam on the machine the setup window also offers `games`
+(GameMode, MangoHud).
 
 Every module draws through [yami-px](https://github.com/Trendorin/yami-px) and reads one look: `~/.config/yami/style.json`
 for all of them, `style.<module>.json` for what one does differently. Outside yami a module is
@@ -361,7 +363,8 @@ yami update                   # what is new; apply | list | to X.Y.Z | rollback 
 Settings → updates (or `yami update`) checks the repository once a day and shows a card when a
 release is out; installing is always your click. The updater keeps its own clone in
 `~/.local/share/yami/src`, builds the new version from source with `install.sh --update`
-(settings kept, no sudo) and keeps the previous binaries for `yami update rollback`. Channels:
+(settings kept, no sudo). Nothing changes until every part has built, a failed update puts everything back by
+itself, and `yami update rollback` returns the programs and configs from before the last update. Channels:
 **releases** (`vX.Y.Z` tags) or **every commit** of `main`. The tab shows a small console with the
 update log and a progress bar while it runs. An update needs no sudo, so when a new version wants
 packages (a new feature's helper) the tab shows them with an **install** button that runs one

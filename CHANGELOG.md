@@ -16,6 +16,13 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 - yami-agents: the polkit window, passwords of encrypted drives, the screen-share picker and automount are one service, each part switched on its own (`yami-agents status`).
 - The installer's terminal side says what it is about to do in plain words and asks nothing else.
 - yami no longer touches drivers: the NVIDIA profile and every trace of the old name are gone.
+- Python is gone: recolouring other programs, the wallpaper and the cursors are part of the shell (`yami-shell recolor`), the installer no longer needs Python or Pillow, the developer tools are Rust (`yami-dev`).
+- The installer in the terminal says up front how long it will take and how much disk it needs, shows what is compiling with a real progress bar and an estimate, and explains a failure in one sentence with what to do. Packages go in one transaction.
+- Running the installer again over an installed yami is a repair: it keeps your modules and settings instead of quietly forgetting them. On a system without a login screen it says to start `niri-session`.
+- Modules: the `apps`, `drives` and `tools` groups are gone. The terminal, btop and the night light come with the base; udisks2 and gvfs with yami-files and yami-agents; text and QR recognition with yami-shot. `niri-portals.conf` now follows what is installed.
+- Updates are all or nothing: nothing is replaced until every part has built, an unchanged module is not rebuilt, and a run that fails half way puts programs and configs back by itself. `yami update rollback` returns programs and configs from the last rollback point (`yami update snapshots`).
+- The setup window does not offer to replace another login manager by default, says why an install failed and can try again, works without sudo (doas), and restores its source tree if it is gone.
+- The install counter is one anonymous request to a fixed address, in the background, once per machine; `DO_NOT_TRACK=1` turns it off. See docs/SECURITY.md.
 - The bar at the bottom of the screen: settings → bar → look → «screen edge» (`barPos` = `bottom`). Popups, tray and window menus and the OSD open above it, a bottom dock stands above it, the line is drawn on the side of the desktop.
 
 ## 2.7.0

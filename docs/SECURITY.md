@@ -92,17 +92,18 @@ Please do not post it in public issues: send a [private report on GitHub](https:
 ## Install count
 
 yami has no telemetry: the shell never reports anything, and updates are a `git fetch` of the
-public repository. The «installs» badge in the README counts one thing: the installer downloads a
-tiny file, `yami-installs.txt`, from the latest GitHub release **once per machine** and throws it
-away. GitHub counts downloads of release files; `.github/workflows/stats.yml` adds those counts up
-daily and writes the badge to the `stats` branch.
+public repository. The «installs» badge in the README counts one thing: after an install has finished, the
+installer asks GitHub for a one-line file, `yami-installs.txt`, on the fixed `installs` release, **once per machine**,
+and throws the answer away. GitHub counts downloads of release files; `.github/workflows/stats.yml` adds those
+counts up daily and writes the badge to the `stats` branch.
 
-- The request carries nothing about you or the machine: no id, no version, no settings. GitHub
-  sees what it sees on any download (your IP address), as with the `git clone` the installer
-  already does.
+- The request carries nothing about you or the machine: no id, no version, no settings, a fixed
+  User-Agent `yami`. GitHub sees what it sees on any download (your IP address), as with the `git clone`
+  the installer already does.
+- It runs in the background with a short timeout: it cannot delay the install or make it fail.
 - Once means once: a marker `~/.local/state/yami/counted` keeps later updates silent. Machines
-  installed before the counter are counted once, on their next update.
-- Opt out: `install.sh --no-count`, or `YAMI_NO_COUNT=1` in the environment (also skipped in CI
-  and `--dry-run`). Creating the marker file by hand does the same.
+  installed before the counter are counted once, on their next update. A failed install is not counted.
+- Opt out: `install.sh --no-count`, `YAMI_NO_COUNT=1` or the common `DO_NOT_TRACK=1` in the environment: no request is
+  made at all (also skipped in CI and `--dry-run`). Creating the marker file by hand does the same.
 - It counts installs, not people and not active machines: a reinstall after deleting
   `~/.local/state/yami` counts again, an uninstall does not subtract.
