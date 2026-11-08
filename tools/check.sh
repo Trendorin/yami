@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One command before every commit: build without warnings, i18n (static + every panel rendered
-# in English), the English and Russian docs in step, shell and Python syntax, niri config,
+# in English), the English and Russian docs in step, shell syntax, niri config,
 # installer dry run in a throwaway HOME.
 # Touches nothing outside the repo and the temp dir. Usage: tools/check.sh [--fast]
 #   --fast  skip the installer dry run
@@ -43,9 +43,10 @@ done
 ((vbad)) && bad "crate versions differ from VERSION (tools/release.sh sets them)" || ok "every crate is $want"
 
 step "i18n"
-python3 -I "$ROOT/tools/check-i18n.py" || bad "static i18n"
+DEV="$ROOT/shell/target/release/yami-dev"
+"$DEV" check-i18n || bad "static i18n"
 # README, CHANGELOG, docs/* and their .ru.md twins: one skeleton, links, anchors
-python3 -I "$ROOT/tools/check-docs.py" && ok "docs: English and Russian in step" || bad "docs EN/RU (tools/check-docs.py)"
+"$DEV" check-docs && ok "docs: English and Russian in step" || bad "docs EN/RU (yami-dev check-docs)"
 if [[ -x $BIN ]]; then
   # every panel drawn offscreen in English: any Russian text left on screen fails
   "$BIN" shot --defaults --lang en -o "$TMP/en" | grep untranslated
@@ -72,7 +73,6 @@ done
 if command -v shellcheck >/dev/null; then
   shellcheck -S error -x "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh || bad "shellcheck"
 fi
-python3 -I -c 'import ast,sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' "$ROOT"/tools/*.py || bad "python syntax"
 ok "scripts parsed"
 
 # checks of a local checkout that are not part of the repository

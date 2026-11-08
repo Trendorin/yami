@@ -12,6 +12,8 @@ trap 'rm -rf "$TMP"' EXIT
 fail=0
 bad() { printf '\e[31m  ✗ %s\e[0m\n' "$1"; fail=1; }
 ok() { printf '\e[32m  ✓ %s\e[0m\n' "$1"; }
+DEV="$ROOT/shell/target/release/yami-dev"
+[[ -x $DEV ]] || cargo build --release --locked -p yami-dev --manifest-path "$ROOT/shell/Cargo.toml" || exit 1
 printf '{"preset":"plain"}\n' >"$TMP/plain.json"
 printf '{"preset":"yami","palette":"ash"}\n' >"$TMP/yami.json"
 list=("$@")
@@ -35,7 +37,7 @@ for m in "${list[@]}"; do
   (cd "$d" && cargo test --release --quiet >"$TMP/test.log" 2>&1) && ok "tests" || { tail -20 "$TMP/test.log"; bad "tests"; }
   for f in "$d"/*.sh; do [[ -f $f ]] && { bash -n "$f" || bad "syntax: $f"; }; done
   [[ $m == yami-px ]] && continue
-  python3 -I "$ROOT/tools/check-i18n.py" "$d/src" >/dev/null && ok "i18n" || { python3 -I "$ROOT/tools/check-i18n.py" "$d/src" | head; bad "i18n"; }
+  "$DEV" check-i18n "$d/src" >/dev/null && ok "i18n" || { "$DEV" check-i18n "$d/src" | head; bad "i18n"; }
   exe="$d/target/release/$m"
   for look in plain yami; do
     for lang in en ru pt-BR; do

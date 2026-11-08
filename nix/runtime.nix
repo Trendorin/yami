@@ -3,7 +3,6 @@
 # module; these are commands in PATH. Shared by the NixOS and the Home Manager module.
 pkgs: {
   base = with pkgs; [
-    (python3.withPackages (ps: [ ps.pillow ])) # theme.py: the palette for other apps, wallpaper, cursor
     wl-clipboard
     cliphist
     grim

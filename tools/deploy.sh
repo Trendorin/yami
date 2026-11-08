@@ -89,6 +89,8 @@ if ((WITH_MODULES)); then
     systemctl --user restart xdg-desktop-portal || true
   fi
 fi
+# these binaries did not come from the installer: the next update must not take them for its own
+rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/yami/built"
 # the shell itself: yami-shell without arguments (CLI commands like `update apply` have them)
 pid="$(pgrep -ax yami-shell | awk 'NF == 2 { print $1; exit }' || true)"
 if ((started)) && [[ -n $pid ]]; then

@@ -12,7 +12,7 @@
 # devices) and the apps listed in ~/.config/yami/shots-hide (desktop ids, one per line; a local
 # file, never in the repository) hidden from the launcher; it puts the workspace, language,
 # do-not-disturb, wallpaper, names, widgets, bar, the log and those apps back after.
-# Refuses while a game or a fullscreen window has focus. Needs niri, grim, python3 with Pillow.
+# Refuses while a game or a fullscreen window has focus. Needs niri, grim.
 # Usage: tools/readme-shots.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,19 +31,21 @@ f="$(niri msg --json focused-window 2>/dev/null || true)"
 if grep -qiE '"app_id":"(steam_app_[0-9]+|gamescope|[^"]*\.exe)"' <<<"$f" || grep -q '"is_fullscreen":true' <<<"$f"; then
   die "$(t "в фокусе игра или окно на весь экран — не снимаю" "a game or a fullscreen window has focus: not shooting")"
 fi
-# README целиком в «пепле» (шапка рисуется readme-art.py '#a8a29c'): в другой палитре не снимаем
+# README целиком в «пепле» (шапка рисуется yami-dev readme-art '#a8a29c'): в другой палитре не снимаем
 acc="$(yami config get accent | tr -d '"')"
 pal="$(yami config get palette | tr -d '"')"
 if [[ $pal != ash || ( -n $acc && ${acc,,} != "#a8a29c" ) ]]; then
   die "$(t "README снимается в палитре «пепел» (сейчас: $pal ${acc:-}) — переключи её в настройках" "README shots use the ash palette (now: $pal ${acc:-}): switch to it in settings")"
 fi
-ws() { niri msg --json workspaces | python3 -I -c "$1"; }
-out="$(niri msg --json focused-output | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["name"])')"
-size="$(niri msg --json focused-output | python3 -I -c 'import json,sys; l=json.load(sys.stdin)["logical"]; print("%dx%d" % (l["width"], l["height"]))')"
+DEV="$ROOT/shell/target/release/yami-dev"
+[[ -x $DEV ]] || cargo build --release --locked -p yami-dev --manifest-path "$ROOT/shell/Cargo.toml" || exit 1
+dev() { "$DEV" shots "$@"; }
+out="$(niri msg --json focused-output | dev out-name)"
+size="$(niri msg --json focused-output | dev out-size)"
 GREET="$ROOT/../yami-modules/yami-greet/target/release/yami-greet"
 [[ -x $GREET ]] || die "$(t "нет $GREET — собери модуль yami-greet" "no $GREET: build the yami-greet module")"
-back="$(ws 'import json,sys; print(next(w["idx"] for w in json.load(sys.stdin) if w["is_focused"]))')"
-empty="$(ws "import json,sys; print(max(w['idx'] for w in json.load(sys.stdin) if w['output']=='$out' and w['active_window_id'] is None))")"
+back="$(niri msg --json workspaces | dev ws-focused)"
+empty="$(niri msg --json workspaces | dev ws-empty "$out")"
 lang0="$(yami config get lang)"
 dnd0="$(yami config get dnd)"
 names0="$(yami config get audioNames)"
@@ -81,35 +83,7 @@ trap restore EXIT
 # демо-папка: свои картинки проекта (обои всех семи палитр), ничего из домашней папки
 made=1
 mkdir -p "$demo"/{Documents,Downloads,Music,Projects,Pictures}
-python3 -I - "$demo" "$ROOT" <<'PY'
-import re, sys
-from pathlib import Path
-d, root = Path(sys.argv[1]), Path(sys.argv[2])
-sys.path.insert(0, str(root / "tools"))
-import theme  # noqa: E402
-from PIL import Image  # noqa: E402
-# 闇 как в fastfetch (theme.KANJI: полосы от светлого к акценту, тень в пиксель) на обоях палитры
-k = theme.KANJI
-choices = (root / "installer/choices.sh").read_text()
-for pid, hx in zip(re.search(r"PAL_ID=\(([^)]*)\)", choices)[1].split(), re.search(r"PAL_HEX=\(([^)]*)\)", choices)[1].split()):
-    p = theme.derive("#" + hx)
-    im = theme.wallpaper_img(p)
-    bands = [p["bright"], theme.mix(p["bright"], p["accent"], 0.5), p["accent"], theme.mix(p["accent"], p["deep"], 0.5)]
-    shadow = theme.mix(p["deep"], p["bg"], 0.45)
-    on = lambda x, y: 0 <= y < len(k) and 0 <= x < len(k[0]) and k[y][x] == "#"
-    cell, (w, h) = 8, im.size
-    x0, y0 = (w - len(k[0]) * cell) // 2, (h - len(k) * cell) // 2
-    for y in range(len(k) + 1):
-        for x in range(len(k[0]) + 1):
-            c = bands[min(y * 4 // len(k), 3)] if on(x, y) else shadow if on(x - 1, y - 1) and not on(x, y) else None
-            if c:
-                im.paste(tuple(int(c.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)), (x0 + x * cell, y0 + y * cell, x0 + (x + 1) * cell, y0 + (y + 1) * cell))
-    im.resize((w * 4, h * 4), Image.NEAREST).save(d / f"{pid}.png")
-(d / "notes.md").write_text("# yami\n\nPixel-art desktop for niri.\n")
-(d / "todo.txt").write_text("ship 2.1.0\n")
-(d / "Projects/yami.tar.gz").write_bytes(b"\x1f\x8b" + bytes(4000))
-(d / "Music/night.flac").write_bytes(bytes(9000))
-PY
+dev demo "$demo"
 
 cfg="$TMP/cfg"
 mkdir -p "$cfg"
@@ -117,72 +91,30 @@ for f in yami-shell.json yami-files.json user-dirs.dirs; do
   [[ -f ${XDG_CONFIG_HOME:-$HOME/.config}/$f ]] && cp "${XDG_CONFIG_HOME:-$HOME/.config}/$f" "$cfg/"
 done
 # диски и флешки — не в кадр
-python3 -I - "$cfg/yami-files.json" <<'PY'
-import json, sys
-from pathlib import Path
-p = Path(sys.argv[1])
-try:
-    d = json.loads(p.read_text())
-except (OSError, ValueError):
-    d = {}
-d["devices"] = False
-p.write_text(json.dumps(d))
-PY
+dev files-no-devices "$cfg/yami-files.json"
 # звуковые устройства — простыми именами вместо моделей: микрофон и наушники
 names() { # lang
-  pactl -f json list sinks 2>/dev/null | python3 -I -c '
-import json, sys
-ru = sys.argv[1] == "ru"
-mic, out = ("USB-микрофон", "Наушники") if ru else ("USB microphone", "Headphones")
-names, n = {}, 0
-for s in json.load(sys.stdin):
-    t = (s.get("name", "") + " " + s.get("description", "")).lower()
-    if "mic" in t:
-        names[s["name"]] = mic
-    else:
-        n += 1
-        names[s["name"]] = out if n == 1 else f"{out} {n}"
-print(json.dumps(names, ensure_ascii=False))' "$1"
+  pactl -f json list sinks 2>/dev/null | dev audio-names "$1"
 }
 
 # перед каждым кадром: мы всё ещё на пустом столе и на нём только наши окна (yami-files,
 # yami-view) — иначе в кадр попадёт чужое (ты переключил стол, открылось окно), бросаем всё
 guard() {
   niri msg --json workspaces >"$TMP/ws.json" && niri msg --json windows >"$TMP/win.json" || die "niri"
-  python3 -I - "$TMP/ws.json" "$TMP/win.json" "$empty" "$out" <<'PY' || die "$(t "на пустом столе что-то изменилось — съёмка прервана, картинки не тронуты" "the empty workspace changed: shooting stopped, pictures untouched")"
-import json, sys
-ws, wins, idx, out = json.load(open(sys.argv[1])), json.load(open(sys.argv[2])), int(sys.argv[3]), sys.argv[4]
-w = next((w for w in ws if w["idx"] == idx and w["output"] == out), None)
-ok = w is not None and w["is_focused"] and all(x.get("app_id") in ("yami-files", "yami-view") for x in wins if x.get("workspace_id") == w["id"])
-sys.exit(0 if ok else 1)
-PY
+  dev guard "$TMP/ws.json" "$TMP/win.json" "$empty" "$out" || die "$(t "на пустом столе что-то изменилось — съёмка прервана, картинки не тронуты" "the empty workspace changed: shooting stopped, pictures untouched")"
 }
 shoot() { sleep "${2:-1.2}"; guard; grim -o "$out" "$TMP/$1.png"; guard; }
 # панель по центру экрана с полями (видно затемнённый стол вокруг)
 crop() { # name w h
-  python3 -I - "$TMP/$1.png" "$2" "$3" "$4" <<'PY'
-import sys
-from PIL import Image
-src, w, h, dst = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
-im = Image.open(src)
-m = 28
-x, y = (im.width - w) // 2 - m, (im.height - h) // 2 - m
-im.crop((x, y, x + w + 2 * m, y + h + 2 * m)).save(dst, optimize=True)
-PY
+  dev crop "$TMP/$1.png" "$2" "$3" "$4"
 }
-full() { python3 -I -c 'import sys; from PIL import Image; Image.open(sys.argv[1]).convert("RGB").save(sys.argv[2], optimize=True)' "$TMP/$1.png" "$2"; }
+full() { dev rgb "$TMP/$1.png" "$2"; }
 
 say "$(t "пустой рабочий стол $empty, не беспокоить, пиксельные обои" "empty workspace $empty, do not disturb, the pixel wallpaper")"
 yami config set dnd true >/dev/null
 yami config set wallpaper '""' >/dev/null
 # the network widget names the interface: a temperature graph in its place, same spot and size
-yami config set widgets "$(python3 -I -c '
-import json, sys
-ws = json.loads(sys.argv[1])
-for w in ws:
-    if w.get("kind") == "net":
-        w.update(kind="graph", source="temp", style="line")
-print(json.dumps(ws))' "$widgets0")" >/dev/null
+yami config set widgets "$(dev widgets-no-net "$widgets0")" >/dev/null
 # a plain bar: what the README is about, nothing of this machine
 yami config set barLeft '["launcher", "sep", "workspaces"]' >/dev/null
 yami config set barCenter '["tasks"]' >/dev/null
@@ -225,7 +157,7 @@ for lang in en ru; do
   yami msg settings
   yami msg "popup sound"
   shoot "sound" 1
-  python3 -I -c 'import sys; from PIL import Image; im=Image.open(sys.argv[1]); im.crop((im.width-560, 0, im.width, 300)).save(sys.argv[2], optimize=True)' "$TMP/sound.png" "$OUT/popup-sound-$lang.png"
+  dev crop-top-right "$TMP/sound.png" 560 300 "$OUT/popup-sound-$lang.png"
   yami msg "popup sound"
   # свой XDG_CONFIG_HOME: вид и папки XDG те же, а закладок GTK нет
   XDG_CONFIG_HOME="$cfg" yami-files "$demo" >/dev/null 2>&1 &

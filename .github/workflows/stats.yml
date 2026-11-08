@@ -1,7 +1,7 @@
-# Installs for the README badge: install.sh downloads `yami-installs.txt` from the latest release
-# once per machine (docs/SECURITY.md, «Install count»), and GitHub counts release downloads. The
-# badge is the sum over every release: machines that installed yami, each once. Nothing else is
-# collected. Writes badge.json (a shields.io endpoint) to the `stats` branch, so main gets no daily
+# Installs for the README badge: install.sh downloads `yami-installs.txt` from the fixed `installs`
+# release once per machine (docs/SECURITY.md, «Install count»), and GitHub counts release downloads.
+# The badge is the sum over every release (older versions fetched it from the latest one): machines
+# that installed yami, each once. Nothing else is collected. Writes badge.json (a shields.io endpoint) to the `stats` branch, so main gets no daily
 # commits. The optional STATS_TOKEN (read-only «Administration») only adds GitHub's clone traffic
 # to the log, for comparison; the badge does not use it.
 name: stats
@@ -24,42 +24,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          python3 -I - <<'PY'
-          import base64, json, os, urllib.request, urllib.error
-          repo, gh, stats = os.environ["REPO"], os.environ["GH_TOKEN"], os.environ.get("STATS_TOKEN", "")
-          def api(path, token, method="GET", body=None):
-              req = urllib.request.Request(f"https://api.github.com/repos/{repo}{path}", method=method,
-                                           data=None if body is None else json.dumps(body).encode(),
-                                           headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"})
-              try:
-                  with urllib.request.urlopen(req, timeout=30) as r:
-                      return json.load(r)
-              except urllib.error.HTTPError as e:
-                  if e.code == 404:
-                      return None
-                  raise
-          installs, page = 0, 1
-          while True:
-              rel = api(f"/releases?per_page=100&page={page}", gh) or []
-              for r in rel:
-                  installs += sum(a["download_count"] for a in r.get("assets", []) if a["name"] == "yami-installs.txt")
-              if len(rel) < 100:
-                  break
-              page += 1
-          if stats:
-              c = api("/traffic/clones", stats) or {}
-              print(f"for comparison, unique cloners over 14 days (bots and CI included): {c.get('uniques', '?')}")
-          badge = json.dumps({"schemaVersion": 1, "label": "installs", "message": str(installs), "color": "a8a29c"}) + "\n"
-          content = base64.b64encode(badge.encode()).decode()
+          set -euo pipefail
+          # every copy of the counter file, on any release, in one query
+          installs="$(gh api --paginate "repos/$REPO/releases?per_page=100" --jq '.[].assets[] | select(.name == "yami-installs.txt") | .download_count' | awk '{ n += $1 } END { print n + 0 }')"
+          if [ -n "${STATS_TOKEN:-}" ]; then
+            GH_TOKEN="$STATS_TOKEN" gh api "repos/$REPO/traffic/clones" --jq '"for comparison, unique cloners over 14 days (bots and CI included): \(.uniques)"' || true
+          fi
+          badge="$(jq -cn --arg n "$installs" '{schemaVersion: 1, label: "installs", message: $n, color: "a8a29c"}')"
+          content="$(printf '%s\n' "$badge" | base64 -w0)"
           # the stats branch: an orphan with one file, made on the first run
-          if api("/git/ref/heads/stats", gh) is None:
-              blob = api("/git/blobs", gh, "POST", {"content": content, "encoding": "base64"})
-              tree = api("/git/trees", gh, "POST", {"tree": [{"path": "badge.json", "mode": "100644", "type": "blob", "sha": blob["sha"]}]})
-              commit = api("/git/commits", gh, "POST", {"message": "stats: badge", "tree": tree["sha"], "parents": []})
-              api("/git/refs", gh, "POST", {"ref": "refs/heads/stats", "sha": commit["sha"]})
-          else:
-              cur = api("/contents/badge.json?ref=stats", gh)
-              if base64.b64decode(cur["content"]).decode() != badge:
-                  api("/contents/badge.json", gh, "PUT", {"message": f"stats: {installs} installs", "content": content, "sha": cur["sha"], "branch": "stats"})
-          print(f"installs: {installs}")
-          PY
+          if ! gh api "repos/$REPO/git/ref/heads/stats" >/dev/null 2>&1; then
+            blob="$(gh api "repos/$REPO/git/blobs" -f content="$content" -f encoding=base64 --jq .sha)"
+            tree="$(jq -cn --arg b "$blob" '{tree: [{path: "badge.json", mode: "100644", type: "blob", sha: $b}]}' | gh api "repos/$REPO/git/trees" --input - --jq .sha)"
+            commit="$(jq -cn --arg t "$tree" '{message: "stats: badge", tree: $t, parents: []}' | gh api "repos/$REPO/git/commits" --input - --jq .sha)"
+            gh api "repos/$REPO/git/refs" -f ref=refs/heads/stats -f sha="$commit" >/dev/null
+          else
+            cur="$(gh api "repos/$REPO/contents/badge.json?ref=stats")"
+            if [ "$(jq -r .content <<<"$cur" | tr -d '\n')" != "$content" ]; then
+              gh api -X PUT "repos/$REPO/contents/badge.json" -f message="stats: $installs installs" -f content="$content" -f branch=stats -f sha="$(jq -r .sha <<<"$cur")" >/dev/null
+            fi
+          fi
+          echo "installs: $installs"

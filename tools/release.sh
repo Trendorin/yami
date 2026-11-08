@@ -64,24 +64,25 @@ Built from source on your machine (Arch, Fedora, Debian/Ubuntu, openSUSE, Void, 
   local newest latest=false
   newest="$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n1)"
   [[ $newest == "v$v" ]] && latest=true
-  # the install counter (docs/SECURITY.md, «Install count»): install.sh downloads this file from
-  # the latest release once per machine; never --clobber, a re-upload would zero its download count.
-  # It goes in with the release itself, so a release is never public without it
+  if gh release view "v$v" >/dev/null 2>&1; then
+    gh release edit "v$v" --title "yami $v" --notes "$body" --latest="$latest" >/dev/null
+  else
+    gh release create "v$v" --verify-tag --title "yami $v" --notes "$body" --latest="$latest" >/dev/null
+  fi
+  counter_release
+  say "$(t "релиз на GitHub: yami $v" "GitHub release: yami $v")"
+}
+
+# the install counter (docs/SECURITY.md, «Install count»): one small file on one release that is never
+# «latest», made once. install.sh downloads it once per machine; never re-upload it, that zeroes the count
+counter_release() {
+  gh release view installs >/dev/null 2>&1 && return 0
   local f; f="$(mktemp -d)/yami-installs.txt"
   printf '%s\n' "yami install counter: install.sh downloads this file once per machine, so its download" \
     "count is the number of installs. Nothing is sent with it. See docs/SECURITY.md, «Install count»." >"$f"
-  if gh release view "v$v" >/dev/null 2>&1; then
-    gh release edit "v$v" --title "yami $v" --notes "$body" --latest="$latest" >/dev/null
-    if ! gh release view "v$v" --json assets -q '.assets[].name' 2>/dev/null | grep -qx yami-installs.txt; then
-      gh release upload "v$v" "$f" >/dev/null && say "$(t "счётчик установок прикреплён" "install counter attached")" ||
-        say "$(t "счётчик не прикрепился" "the counter was not attached")"
-    fi
-  else
-    gh release create "v$v" --verify-tag --title "yami $v" --notes "$body" --latest="$latest" "$f" >/dev/null
-    say "$(t "счётчик установок прикреплён" "install counter attached")"
-  fi
+  gh release create installs --title "install counter (not a release)" --notes "The download count of this file is the «installs» badge in the README. See docs/SECURITY.md." --prerelease --latest=false "$f" >/dev/null &&
+    say "$(t "счётчик установок создан" "install counter created")" || say "$(t "счётчик не создался" "the counter was not created")"
   rm -rf "${f%/*}"
-  say "$(t "релиз на GitHub: yami $v" "GitHub release: yami $v")"
 }
 
 if [[ ${1:-} == --publish ]]; then
@@ -117,29 +118,14 @@ signed=0
 [[ -n "$(git config user.signingkey || true)" ]] && signed=1
 ((signed)) || ! has_keys || die "$(t "в $KEYS есть ключи, а подписывать нечем: клиенты не поставят выпуск (tools/release.sh --keygen)" "$KEYS has keys but no signing key is set: clients would refuse the release (tools/release.sh --keygen)")"
 
-# the English and Russian docs must match before anything is changed (tools/check-docs.py)
-python3 -I tools/check-docs.py || die "$(t "документы EN и RU расходятся: поправь и запусти снова" "the EN and RU docs differ: fix them and run again")"
+# the English and Russian docs must match before anything is changed (yami-dev check-docs)
+dev() { cargo run --release -q -p yami-dev --manifest-path shell/Cargo.toml -- "$@"; }
+dev check-docs || die "$(t "документы EN и RU расходятся: поправь и запусти снова" "the EN and RU docs differ: fix them and run again")"
 
 # changelog, in both files: «Unreleased» («Не выпущено») becomes the release. Nothing is changed
 # unless both have lines there (or already the section): the notes are written as you go, in two
 # languages, and check-docs would stop an English placeholder in the Russian file anyway
-python3 -I - "$ver" <<'PY' || die "$(t "в «Unreleased» CHANGELOG.md или «Не выпущено» CHANGELOG.ru.md пусто: допиши, что изменилось" "«Unreleased» in CHANGELOG.md or «Не выпущено» in CHANGELOG.ru.md is empty: write what changed")"
-import re, sys
-from pathlib import Path
-ver = sys.argv[1]
-todo = []
-for name, head in (("CHANGELOG.md", "Unreleased"), ("CHANGELOG.ru.md", "Не выпущено")):
-    p = Path(name)
-    s = p.read_text()
-    if f"\n## {ver}\n" in s:
-        continue
-    m = re.search(rf"\n## {head}\n(.*?)(?=\n## |\Z)", s, re.S)
-    if not m or not m.group(1).strip():
-        sys.exit(3)
-    todo.append((p, s[: m.start()] + f"\n## {head}\n\n## {ver}\n\n{m.group(1).strip()}\n" + s[m.end():]))
-for p, s in todo:
-    p.write_text(s)
-PY
+dev changelog "$ver" || die "$(t "в «Unreleased» CHANGELOG.md или «Не выпущено» CHANGELOG.ru.md пусто: допиши, что изменилось" "«Unreleased» in CHANGELOG.md or «Не выпущено» in CHANGELOG.ru.md is empty: write what changed")"
 if [[ -t 0 && -n ${EDITOR:-} ]]; then "$EDITOR" CHANGELOG.md CHANGELOG.ru.md; fi
 
 say "$(t "версия" "version") $cur → $ver"

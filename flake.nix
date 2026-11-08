@@ -22,7 +22,6 @@
           ./config
           ./fonts
           ./system/greet
-          ./tools/theme.py
           (lib.fileset.difference ./shell (lib.fileset.maybeMissing ./shell/target))
         ];
       };
@@ -91,7 +90,6 @@
             cargo
             rustc
             clippy
-            python3
             shellcheck
           ];
           # yami-play finds libmpv at run time
