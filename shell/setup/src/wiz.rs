@@ -111,9 +111,39 @@ pub struct W {
     pub failed: Option<String>,
     pub running: bool,
     pub wrong: bool,
+    /// стиль на момент открытия: только смена стиля трогает проявление, значки и матовость
+    pub was_plain: bool,
+}
+
+fn read_json(p: &std::path::Path) -> Option<serde_json::Value> {
+    serde_json::from_str(&std::fs::read_to_string(p).ok()?).ok()
 }
 
 impl W {
+    /// то, что уже стоит и выбрано, — из записи об установке и настроек шелла
+    pub fn fill_from_system(&mut self) {
+        let first = yami_px::paths::state_dir().join("yami/first-run").exists();
+        if let Some(list) = read_json(&yami_px::paths::state_dir().join("yami/install.json")).and_then(|v| v["components"].as_str().map(str::to_string)) {
+            if !first {
+                for m in self.mods.iter_mut() {
+                    m.on = list.split_whitespace().any(|c| c == m.id);
+                }
+            }
+        }
+        let Some(s) = read_json(&yami_px::paths::shell_settings()) else { return };
+        self.plain = s["preset"].as_str() == Some("plain");
+        self.was_plain = self.plain;
+        self.light = s["light"].as_bool().unwrap_or(false);
+        let accent = s["accent"].as_str().and_then(yami_px::theme::parse_hex);
+        let preset = PRESETS.iter().find(|p| Some(p.id) == s["palette"].as_str()).map(|p| p.accent);
+        self.accent = accent.or(preset).unwrap_or(self.accent);
+        if let Some(a) = s["themeApps"].as_array().filter(|_| !first) {
+            for (i, (id, _)) in RESTYLE.iter().enumerate() {
+                self.restyle[i] = *id == "cursor" || a.iter().any(|x| x.as_str() == Some(id));
+            }
+        }
+    }
+
     pub fn new(look: Look) -> W {
         W {
             page: Page::Hello,
@@ -133,21 +163,37 @@ impl W {
             failed: None,
             running: false,
             wrong: false,
+            was_plain: false,
         }
     }
 
     /// настройки вида, которые мастер выбрал: для него самого и для файла настроек шелла
     pub fn style_json(&self) -> serde_json::Value {
-        let reveal = if self.plain { "fade" } else { "dither" };
+        // акцент из пресетов — по имени: так он отмечен и в настройках шелла
+        let (palette, accent) = match PRESETS.iter().find(|p| p.accent == self.accent) {
+            Some(p) => (p.id.to_string(), String::new()),
+            None => (String::new(), format!("#{:06x}", self.accent)),
+        };
         serde_json::json!({
             "preset": if self.plain { "plain" } else { "yami" },
-            "accent": format!("#{:06x}", self.accent),
+            "palette": palette,
+            "accent": accent,
             "light": self.light,
             "lang": self.lang,
-            "reveal": reveal,
-            "iconPixel": !self.plain,
-            "glass": if self.plain { 1.0 } else { 0.55 },
         })
+    }
+
+    /// сверх style_json — что идёт в настройки шелла, только если стиль сменили
+    pub fn settings_json(&self) -> serde_json::Value {
+        let mut v = self.style_json();
+        if self.plain != self.was_plain {
+            if let Some(o) = v.as_object_mut() {
+                o.insert("reveal".into(), if self.plain { "fade" } else { "dither" }.into());
+                o.insert("iconPixel".into(), (!self.plain).into());
+                o.insert("glass".into(), if self.plain { 1.0 } else { 0.55 }.into());
+            }
+        }
+        v
     }
 
     pub fn turn(&mut self, p: Page) {
@@ -276,7 +322,7 @@ fn hello(ui: &mut Ui, w: &W, b: R) {
     let y = b.y + 176;
     ui.cv.text_in(ui.f, PX, R::new(b.x, y, b.w, 20), l("язык", "language", "idioma"), t.text_faint);
     let bw = (b.w - 2 * 12) / 3;
-    for (i, (id, name)) in [("ru", "Русский"), ("en", "English"), ("pt-BR", "Português")].into_iter().enumerate() {
+    for (i, (id, name)) in [("ru", "Русский"), ("en", "English"), ("pt-BR", "Português")].into_iter().enumerate() { // i18n-ok
         let on = yami_px::i18n::normalize(&w.lang) == id;
         ui.button(R::new(b.x + i as i32 * (bw + 12), y + 28, bw, 56), name, "", Tone::Plain, on, true, Act::Lang(id));
     }

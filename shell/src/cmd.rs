@@ -76,6 +76,7 @@ fn help(y: &Sty, me: &str) {
     y.section(&crate::tf!("сеанс", "session", "sessão"));
     y.row("open <panel>", &crate::tf!("launcher clipboard settings[:вкладка] power lock screenshot …", "launcher clipboard settings[:tab] power lock screenshot …", "launcher clipboard settings[:tab] power lock screenshot …"));
     y.row("msg <cmd>", &crate::tf!("прямая команда шеллу (yami help msg)", "a raw command to the running shell (yami help msg)", "um comando direto para o shell em execução (yami help msg)"));
+    y.row("setup", &crate::tf!("окно настройки: вид, модули — поставить или убрать", "the setup window: look, modules to add or remove", "a janela de configuração: visual, módulos para adicionar ou remover"));
     y.row("restart", &crate::tf!("перезапустить шелл (подождёт, если играешь)", "restart the shell (waits while you play)", "reiniciar o shell (aguarda enquanto você joga)"));
     y.row("status", &crate::tf!("что работает: шелл, портал, niri, службы D-Bus", "what is running: shell, portal, niri, D-Bus services", "o que está em execução: shell, portal, niri e serviços D-Bus"));
     y.row("run", &crate::tf!("запустить шелл (так делает niri)", "run the shell (niri does this)", "iniciar o shell (o niri faz isso)"));

@@ -271,8 +271,41 @@ impl App {
                     self.settings_changed();
                 }
                 "reveal" => {
-                    s.reveal = cycle(&[("dither", ""), ("scan", ""), ("noise", ""), ("wipe", ""), ("blocks", "")], &s.reveal).into();
+                    s.reveal = cycle(&[("dither", ""), ("scan", ""), ("noise", ""), ("wipe", ""), ("blocks", ""), ("fade", ""), ("none", "")], &s.reveal).into();
                     self.settings_changed();
+                }
+                // стиль тянет за собой то, что без него выглядит чужим: проявление, значки, матовость
+                "preset" => {
+                    let plain = s.preset != "plain";
+                    s.preset = if plain { "plain" } else { "yami" }.into();
+                    s.reveal = if plain { "fade" } else { "dither" }.into();
+                    s.icon_pixel = !plain;
+                    s.glass = if plain { 1.0 } else { 0.55 };
+                    self.settings_changed();
+                }
+                "corners" => {
+                    s.corners = cycle(&[("", ""), ("notch", ""), ("round", ""), ("square", "")], &s.corners).into();
+                    self.settings_changed();
+                }
+                "shadow" => {
+                    s.shadow = cycle(&[("", ""), ("hard", ""), ("soft", ""), ("none", "")], &s.shadow).into();
+                    self.settings_changed();
+                }
+                "radius" => {
+                    s.radius = match s.radius {
+                        -1 => 0,
+                        0 => 4,
+                        4 => 6,
+                        6 => 8,
+                        8 => 12,
+                        12 => 16,
+                        _ => -1,
+                    };
+                    self.settings_changed();
+                }
+                "open_setup" => {
+                    self.close_modal();
+                    crate::app::App::spawn(&["yami-setup".to_string()]);
                 }
                 "dock_anim" => {
                     s.dock_anim = cycle(&[("grow", ""), ("wave", ""), ("lift", ""), ("none", "")], &s.dock_anim).into();

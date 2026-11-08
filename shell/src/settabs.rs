@@ -237,8 +237,17 @@ pub(crate) fn pixel_level(s: &crate::config::Settings) -> usize {
 pub(crate) fn tab_look(ui: &mut Ui, st: &State, b: R) {
     let s = &st.set;
     let half = (b.w - 20) / 2;
+    // стиль — общий для шелла и всех модулей (style.json); свой у модуля — style.<модуль>.json
+    let mut y = title(ui, b.x, b.y, b.w, "стиль всех модулей");
+    opt_btn(ui, R::new(b.x, y, half, 26), "стиль", if s.preset == "plain" { "нейтральный" } else { "пиксельный" }, Act::SCycle("preset"));
+    opt_btn(ui, R::new(b.x + half + 20, y, half, 26), "углы", corners_name(&s.corners), Act::SCycle("corners"));
+    y += 34;
+    opt_btn(ui, R::new(b.x, y, half, 26), "тень", shadow_name(&s.shadow), Act::SCycle("shadow"));
+    let rad = if s.radius < 0 { "как у стиля".to_string() } else { format!("{} px", s.radius) };
+    opt_btn(ui, R::new(b.x + half + 20, y, half, 26), "радиус углов", &rad, Act::SCycle("radius"));
+    y += 38;
     // пиксельность и лёгкий режим — первыми: их ищут, когда стиль надоел или стол тормозит
-    let mut y = title(ui, b.x, b.y, b.w, "пиксельность и нагрузка");
+    y = title(ui, b.x, y, b.w, "пиксельность и нагрузка");
     let lvl = pixel_level(s);
     ui.slider(R::new(b.x, y, half, 40), "пиксельность", lvl as f32 / 3.0, PIXEL_LEVELS[lvl], 4, Act::SSlider("pixel_level", 0.0, 3.0, 3));
     ui.toggle(R::new(b.x + half + 20, y, half, 40), "лёгкий режим", "слабый ПК, виртуалка: без размытия и анимаций", s.lite, Act::SBool("lite"));
@@ -265,9 +274,29 @@ pub(crate) fn tab_look(ui: &mut Ui, st: &State, b: R) {
     crate::iconsets::draw_cursors(ui, st, b, y);
 }
 
+fn corners_name(id: &str) -> &'static str {
+    match id {
+        "notch" => "срезанные",
+        "round" => "скруглённые",
+        "square" => "прямые",
+        _ => "как у стиля",
+    }
+}
+
+fn shadow_name(id: &str) -> &'static str {
+    match id {
+        "hard" => "жёсткая",
+        "soft" => "мягкая",
+        "none" => "нет",
+        _ => "как у стиля",
+    }
+}
+
 /// подпись узора проявления (gfx::Reveal)
 pub(crate) fn reveal_name(id: &str) -> &'static str {
     match id {
+        "fade" => "плавно",
+        "none" => "сразу",
         "scan" => "развёртка",
         "noise" => "шум",
         "wipe" => "диагональ",
@@ -511,4 +540,6 @@ pub(crate) fn tab_about(ui: &mut Ui, st: &State, b: R) {
     y += 10;
     // шкала памяти: шелл против бюджета 64 МБ
     ui.cv.gauge(R::new(b.x, y, b.w, 12), 32, (st.rss / 64.0).min(1.0), t.red, t.surface.lerp(t.border, 0.3), 2);
+    y += 30;
+    ui.button(R::new(b.x, y, 300, 30), "модули: поставить или убрать", "gear", Tone::Primary, false, crate::proc::have("yami-setup"), Act::SCycle("open_setup"));
 }

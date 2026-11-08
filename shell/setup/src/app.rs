@@ -111,6 +111,8 @@ pub fn run(wiz: W) -> i32 {
         w: 0, h: 0, scale: 1.0, pool: None, zones: vec![], configured: false, dirty: true, frame_pending: false, anim: false, ptr: None, press: None, scratch: vec![], fonts, icons: Icons::new(""), wiz, tx, quit: false,
     };
     app.wiz.no_password = !run::needs_password();
+    app.wiz.fill_from_system();
+    app.apply_look();
     let _ = queue.roundtrip(&mut app);
     let _ = WaylandSource::new(conn.clone(), queue).insert(handle.clone());
     loop {
@@ -191,11 +193,10 @@ impl App {
     fn save_look(&self) {
         let path = yami_px::paths::shell_settings();
         let mut v = std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()).unwrap_or_else(|| serde_json::json!({}));
-        if let (Some(o), Some(new)) = (v.as_object_mut(), self.wiz.style_json().as_object()) {
+        if let (Some(o), Some(new)) = (v.as_object_mut(), self.wiz.settings_json().as_object()) {
             for (k, val) in new {
                 o.insert(k.clone(), val.clone());
             }
-            o.remove("palette");
         }
         let _ = yami_px::paths::write_atomic(&path, &(serde_json::to_string_pretty(&v).unwrap_or_default() + "\n"));
     }
