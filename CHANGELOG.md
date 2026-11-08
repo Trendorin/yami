@@ -9,6 +9,8 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+- The bar at the bottom of the screen: settings → bar → look → «screen edge» (`barPos` = `bottom`). Popups, tray and window menus and the OSD open above it, a bottom dock stands above it, the line is drawn on the side of the desktop.
+
 ## 2.7.0
 
 - Switch between players (#24): the bar and the music popup follow the player that started playing last, so a YouTube tab no longer pushes Spotify out; with several players the name in the popup is a button that switches to the next one (right click: back), and `yami msg media player` does it from a key. Play/pause, next and previous keys go to the player the bar shows.

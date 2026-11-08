@@ -66,7 +66,7 @@ impl App {
                 let (bus, path, menu, is_menu) = (it.bus.clone(), it.path.clone(), it.menu.clone(), it.is_menu);
                 // меню программы: под значком в баре или под её строкой во всплывашке трея
                 let in_popup = kind == Some(SKind::Popup);
-                self.tray_anchor = Some(if in_popup { (out.clone(), ax - zone.w / 2 + 8, ay + 2) } else { (out.clone(), ax - 20, self.bar_bottom(&out) + 2) });
+                self.tray_anchor = Some(if in_popup { (out.clone(), ax - zone.w / 2 + 8, ay + 2) } else { (out.clone(), ax - 20, if crate::bar::low(&self.st.set) { ay } else { self.bar_bottom(&out) + 2 }) });
                 if button == RMB || (button == LMB && is_menu) {
                     if !menu.is_empty() {
                         crate::dbus::tray_menu(&svc, &bus, &menu, self.tx.clone());

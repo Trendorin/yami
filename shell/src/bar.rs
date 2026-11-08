@@ -1,4 +1,4 @@
-// Верхний бар: тёмная матовая панель, тонкая линия снизу.
+// Бар: тёмная матовая панель у верхнего или нижнего края (bar_pos), тонкая линия со стороны стола.
 // Модули и их порядок — в настройках (bar_left / bar_center / bar_right).
 
 use crate::app::{App, SKind, State, BAR_H};
@@ -15,8 +15,8 @@ const H: i32 = BAR_H;
 /// тень плашки бара (плавает или уже экрана), px
 pub const SHADE: i32 = 3;
 
-/// где бар на мониторе шириной ow: (отступ сверху, отступ по бокам, высота поверхности). Якорь
-/// всегда сверху-слева-справа, ширина — отступами по бокам: так бар остаётся первым у niri и не
+/// где бар на мониторе шириной ow: (отступ от своего края, отступ по бокам, высота поверхности).
+/// Якорь — свой край (верх или низ, bar_pos) и оба бока, ширина — отступами по бокам: так бар остаётся первым у niri и не
 /// сужается чужими исключёнными зонами. Полоса во всю ширину — вплотную к краю, как раньше;
 /// плашка (плавает или уже экрана) — с тенью, поверхность выше на её размер
 pub fn geo(s: &Settings, ow: i32) -> (i32, i32, i32) {
@@ -63,6 +63,11 @@ mod tests {
     }
 }
 
+/// бар у нижнего края экрана
+pub fn low(s: &Settings) -> bool {
+    s.bar_pos == "bottom"
+}
+
 /// бар — полоса во всю ширину вплотную к краю (не плашка)
 pub fn strip(s: &Settings) -> bool {
     !s.bar_float && s.num("bar_width_pc") >= 100
@@ -74,7 +79,8 @@ pub fn draw(ui: &mut Ui, st: &State, out: &str, w: i32) {
     let w = if strip(set) {
         ui.cv.blur_rect(R::new(0, 0, w, H), 0);
         ui.cv.fill(R::new(0, 0, w, H), t.glass_panel());
-        ui.cv.fill(R::new(0, H - 1, w, 1), t.border);
+        // линия — со стороны стола: снизу у верхнего бара, сверху у нижнего
+        ui.cv.fill(R::new(0, if low(set) { 0 } else { H - 1 }, w, 1), t.border);
         w
     } else {
         // плашка: рамка со всех сторон, фаска на углах, жёсткая тень (место под неё — справа и снизу)
@@ -661,12 +667,27 @@ fn tasks(ui: &mut Ui, st: &State, out: &str, area: R) {
 impl App {
     /// поверхность бара на мониторе
     pub fn mk_bar(&mut self, out: &str) {
-        use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
-        let (ow, _) = self.output_size(out);
-        let (top, side, h) = geo(&self.st.set, ow);
-        let id = self.mk(SKind::Bar, out, Layer::Top, "yami-bar", Anchor::TOP | Anchor::LEFT | Anchor::RIGHT, (0, h), (top, side, 0, side), H, KeyboardInteractivity::None);
+        use smithay_client_toolkit::shell::wlr_layer::{KeyboardInteractivity, Layer};
+        let p = self.bar_place(out);
+        let id = self.mk(SKind::Bar, out, Layer::Top, "yami-bar", p.anchor, (0, p.h), p.margin, H, KeyboardInteractivity::None);
         if let Some(s) = self.surfs.get_mut(&id) {
-            s.anchor_side = format!("{top} {side} {h}");
+            s.anchor_side = p.key;
+            // mk считает верх по отступу сверху, а у нижнего бара он снизу
+            s.margin = p.origin;
+            s.applied = p.origin;
+        }
+    }
+
+    /// якорь, отступы и левый верхний угол поверхности бара на мониторе
+    fn bar_place(&self, out: &str) -> BarPlace {
+        use smithay_client_toolkit::shell::wlr_layer::Anchor;
+        let (ow, oh) = self.output_size(out);
+        let (m, side, h) = geo(&self.st.set, ow);
+        let key = format!("{} {m} {side} {h} {oh}", self.st.set.bar_pos);
+        if low(&self.st.set) {
+            BarPlace { anchor: Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT, margin: (0, side, m, side), h, origin: (side, oh - m - h), key }
+        } else {
+            BarPlace { anchor: Anchor::TOP | Anchor::LEFT | Anchor::RIGHT, margin: (m, side, 0, side), h, origin: (side, m), key }
         }
     }
 
@@ -677,20 +698,19 @@ impl App {
         let mut moved = false;
         for id in self.find(&SKind::Bar) {
             let out = self.surfs.get(&id).map(|s| s.output.clone()).unwrap_or_default();
-            let (ow, _) = self.output_size(&out);
-            let (top, side, h) = geo(&self.st.set, ow);
-            let key = format!("{top} {side} {h}");
+            let p = self.bar_place(&out);
             let Some(s) = self.surfs.get_mut(&id) else { continue };
-            if s.anchor_side == key {
+            if s.anchor_side == p.key {
                 continue;
             }
-            s.anchor_side = key;
-            s.layer.set_size(0, h as u32);
-            s.layer.set_margin(top, side, 0, side);
+            s.anchor_side = p.key;
+            s.layer.set_anchor(p.anchor);
+            s.layer.set_size(0, p.h as u32);
+            s.layer.set_margin(p.margin.0, p.margin.1, p.margin.2, p.margin.3);
             s.layer.set_exclusive_zone(H);
             s.layer.commit();
-            s.margin = (side, top);
-            s.applied = (side, top);
+            s.margin = p.origin;
+            s.applied = p.origin;
             s.dirty = true;
             moved = true;
         }
@@ -725,15 +745,40 @@ impl App {
         }
     }
 
-    /// нижний край бара на мониторе (0 — бара нет): всплывашки, меню, док сверху, виджеты и
-    /// заголовки окон — ниже него
+    /// сколько бар занимает сверху (0 — бара нет или он снизу): док сверху, виджеты, заголовки
+    /// окон и всё, что встаёт под верхний край, — ниже этого
     pub fn bar_bottom(&self, out: &str) -> i32 {
+        if low(&self.st.set) {
+            return 0;
+        }
+        self.bar_span(out)
+    }
+
+    /// сколько бар занимает снизу (0 — бара нет или он сверху): док, OSD и всплывашки — выше
+    pub fn bar_reserve_bottom(&self, out: &str) -> i32 {
+        if !low(&self.st.set) {
+            return 0;
+        }
+        self.bar_span(out)
+    }
+
+    /// от своего края экрана до дальнего края бара (0 — бара на мониторе нет)
+    fn bar_span(&self, out: &str) -> i32 {
         if self.st.bar_hidden || !self.bar_on(out) {
             return 0;
         }
         let (ow, _) = self.output_size(out);
         geo(&self.st.set, ow).0 + H
     }
+}
+
+struct BarPlace {
+    anchor: smithay_client_toolkit::shell::wlr_layer::Anchor,
+    /// сверху, справа, снизу, слева — как у set_margin
+    margin: (i32, i32, i32, i32),
+    h: i32,
+    origin: (i32, i32),
+    key: String,
 }
 
 /// бар на экране out (barOutputs = list, present — экраны сейчас): список пуст — везде; ни одного
