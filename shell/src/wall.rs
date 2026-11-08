@@ -82,6 +82,8 @@ pub struct Job {
     tone: String,
     dim: f32,
     accent: bool,
+    /// схема палитры из обоев (#31): tonal | vibrant | content | muted | mono
+    scheme: String,
     /// тона палитры от фона к тексту
     ramp: [u32; 6],
 }
@@ -100,6 +102,7 @@ impl Job {
             tone: s.wall_tone.clone(),
             dim: s.wall_dim.clamp(0.0, 0.8),
             accent: accent_from_image(s),
+            scheme: s.wall_scheme.clone(),
             ramp: [t.bg.0, t.dim.0, t.blood.0, t.red.0, t.ember.0, t.text.0],
         }
     }
@@ -107,7 +110,7 @@ impl Job {
     pub fn key(&self) -> String {
         let m = std::fs::metadata(&self.path).and_then(|m| m.modified()).ok();
         // и «палитра из обоев»: включили её на той же картинке — акцент надо вычислить заново
-        format!("{:?}|{m:?}|{}|{}x{}|{}|{}|{}|{}|{:x?}|{}", self.path, self.own, self.w, self.h, self.cell, self.fit, self.tone, self.dim, self.ramp, self.accent)
+        format!("{:?}|{m:?}|{}|{}x{}|{}|{}|{}|{}|{:x?}|{}|{}", self.path, self.own, self.w, self.h, self.cell, self.fit, self.tone, self.dim, self.ramp, self.accent, self.scheme)
     }
 }
 
@@ -123,7 +126,7 @@ pub fn prepare(j: &Job) -> (Option<Img>, Option<u32>) {
         return (Some(crate::icons::from_rgba(&i)), None);
     }
     let src = src.to_rgba8();
-    let accent = if j.accent { dominant(&image::imageops::thumbnail(&src, 64, 64)) } else { None };
+    let accent = if j.accent { dominant(&image::imageops::thumbnail(&src, 64, 64), &j.scheme) } else { None };
     let (sw, sh) = src.dimensions();
     let (tw, th) = ((j.w / j.cell).max(1), (j.h / j.cell).max(1));
     let filt = image::imageops::FilterType::Triangle;
@@ -209,9 +212,13 @@ fn dim(i: &mut RgbaImage, bg: C, k: f32) {
     }
 }
 
+/// схемы палитры из обоев (#31): id и имя
+pub const SCHEMES: [(&str, &str); 5] = [("tonal", "тональная"), ("vibrant", "яркая"), ("content", "как на картинке"), ("muted", "приглушённая"), ("mono", "монохром")];
+
 /// главный цвет картинки: самый весомый тон среди насыщенных и не тёмных пикселей,
-/// доведённый до яркости, на которой акцент читается на тёмных панелях
-fn dominant(i: &RgbaImage) -> Option<u32> {
+/// доведённый до яркости, на которой акцент читается на тёмных панелях. Схема решает, какой тон
+/// весомее (яркая — самый насыщенный) и насколько его довести
+fn dominant(i: &RgbaImage, scheme: &str) -> Option<u32> {
     let mut bins = [(0f32, [0f32; 3]); 24];
     for p in i.pixels() {
         let [r, g, b] = [p.0[0] as f32 / 255.0, p.0[1] as f32 / 255.0, p.0[2] as f32 / 255.0];
@@ -221,7 +228,7 @@ fn dominant(i: &RgbaImage) -> Option<u32> {
             continue;
         }
         let h = hue(r, g, b, mx, mn);
-        let wt = s * s * mx;
+        let wt = if scheme == "vibrant" { s * s * s * s * mx } else { s * s * mx };
         let bin = &mut bins[((h / 15.0) as usize).min(23)];
         bin.0 += wt;
         for (c, v) in bin.1.iter_mut().zip([r, g, b]) {
@@ -240,8 +247,14 @@ fn dominant(i: &RgbaImage) -> Option<u32> {
     let [r, g, b] = sum.1.map(|v| v / sum.0);
     let (mx, mn) = (r.max(g).max(b), r.min(g).min(b));
     let h = hue(r, g, b, mx, mn);
-    let s = ((mx - mn) / mx.max(1e-3)).clamp(0.55, 0.9);
-    let v = mx.clamp(0.7, 0.92);
+    let s0 = (mx - mn) / mx.max(1e-3);
+    let (s, v) = match scheme {
+        "vibrant" => (s0.clamp(0.8, 1.0), mx.clamp(0.85, 0.96)),
+        "content" => (s0.clamp(0.3, 0.95), mx.clamp(0.6, 0.95)),
+        "muted" => (s0.clamp(0.22, 0.38), mx.clamp(0.66, 0.82)),
+        "mono" => (0.06, mx.clamp(0.7, 0.85)),
+        _ => (s0.clamp(0.55, 0.9), mx.clamp(0.7, 0.92)),
+    };
     Some(hsv(h, s, v))
 }
 
@@ -529,6 +542,7 @@ impl App {
             "fit" => s.wall_fit = next_of(FITS, &s.wall_fit).into(),
             "tone" => s.wall_tone = next_of(TONES, &s.wall_tone).into(),
             "accent" => s.wall_accent = !s.wall_accent,
+            "scheme" => s.wall_scheme = next_of(&SCHEMES, &s.wall_scheme).into(),
             _ => return false,
         }
         self.settings_changed();

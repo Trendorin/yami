@@ -64,6 +64,7 @@ pub fn stamp() -> u64 {
 pub fn note(t: &Tpl) -> String {
     match t.state.as_str() {
         "ok" => crate::tf!("записан: {}", "written: {}", "gravado: {}", t.output),
+        "off" => crate::tf!("выключен — {} не пишется", "off: {} is not written", "desligado: {} não é gravado", t.output),
         "hand" => crate::tf!("изменён руками — не перезаписан", "changed by hand: not overwritten", "alterado à mão: não sobrescrito"),
         "unknown" => crate::tf!("нет таких цветов: {} — файл не записан", "no such colours: {}; the file is not written", "cores inexistentes: {}; o arquivo não foi gravado", t.keys.join(", ")),
         "nooutput" => crate::tf!("нет строки «yami-output: ~/путь» — некуда писать", "no “yami-output: ~/path” line: nowhere to write", "sem a linha “yami-output: ~/caminho”: não há onde gravar"),
@@ -84,20 +85,28 @@ pub fn app_notes(s: &Status) -> Vec<String> {
     v
 }
 
-/// строки шаблонов под кнопками вкладки: имя, итог, «перезаписать» у изменённого руками
+/// строки шаблонов под кнопками вкладки (#31): имя и переключатель, ниже итог целиком (путь
+/// не обрезается: переносится на вторую строку), «перезаписать» у изменённого руками
 pub fn draw(ui: &mut Ui, st: &State, b: R, mut y: i32) -> i32 {
     let t = ui.t;
     for (i, tp) in st.restyle.tpls.iter().enumerate() {
-        let r = R::new(b.x, y, b.w, 24);
-        ui.cv.fill(R::new(r.x, r.cy() - 2, 4, 4), if tp.state == "ok" { t.ok } else { t.warn });
-        let nw = ui.text(PX, r.x + 12, r.y + 6, &tp.file, t.text);
+        let on = !st.set.templates_off.contains(&tp.file);
+        let dot = match tp.state.as_str() {
+            "ok" => t.ok,
+            "off" => t.text_faint,
+            _ => t.warn,
+        };
+        ui.cv.fill(R::new(b.x, y + 8, 4, 4), dot);
         let bw = if tp.state == "hand" { 150 } else { 0 };
-        let nx = r.x + 12 + nw.max(120) + 12;
-        ui.text_in(PX, R::new(nx, r.y, r.right() - nx - bw - 8, r.h), &note(tp), if tp.state == "ok" { t.text_faint } else { t.text_dim });
+        let tw = 90;
+        ui.text_in(PX, R::new(b.x + 12, y, b.w - 12 - tw - bw - 16, 20), &tp.file, if on { t.text } else { t.text_dim });
+        ui.toggle(R::new(b.right() - bw - tw - (if bw > 0 { 8 } else { 0 }), y - 2, tw, 24), "вкл", "", on, Act::STplToggle(i));
         if bw > 0 {
-            ui.button(R::new(r.right() - bw, r.y, bw, 24), "перезаписать", "reboot", Tone::Plain, false, true, Act::STplForce(i));
+            ui.button(R::new(b.right() - bw, y - 2, bw, 24), "перезаписать", "reboot", Tone::Plain, false, true, Act::STplForce(i));
         }
-        y += 28;
+        y += 22;
+        y += ui.wrap(PX, R::new(b.x + 12, y, b.w - 12, 36), &note(tp), if tp.state == "ok" || tp.state == "off" { t.text_faint } else { t.text_dim }, 2);
+        y += 10;
     }
     y
 }
@@ -112,6 +121,7 @@ impl App {
             if let Some(f) = force {
                 c.arg("--force").arg(f);
             }
+            let _q = crate::proc::RECOLOR.lock();
             let _ = c.status();
             let _ = tx.send(Msg::Restyled);
         });

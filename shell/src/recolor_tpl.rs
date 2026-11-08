@@ -183,6 +183,11 @@ fn one(cx: &Cx, f: &Path, name: &str, cols: &HashMap<String, String>, sums: &mut
         return row;
     };
     row.insert("output".into(), cx.tilde(&out).into());
+    // выключен в настройках → цвет → программы: не пишется, файл на месте
+    if cx.st.get("templatesOff").and_then(|v| v.as_array()).is_some_and(|a| a.iter().any(|x| x.as_str() == Some(name))) {
+        mark(&mut row, "off");
+        return row;
+    }
     let real = real_path(&out);
     let real_s = real.display().to_string();
     if !out.is_absolute() || !roots.iter().any(|r| real_s.starts_with(r.as_str())) {

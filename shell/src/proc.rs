@@ -96,6 +96,16 @@ pub(crate) fn reap_inherited() {
 
 /// `yami-shell recolor`, тихо и с пониженным приоритетом: на слабой машине перекраска (обои, курсор,
 /// темы программ) не должна отнимать процессор у стола
+/// перекраски идут по одной: два recolor разом пишут одни файлы, и старая палитра могла лечь
+/// последней (#33: cava оставалась на прошлых обоях). Каждый читает palette.json, когда дошла очередь
+pub static RECOLOR: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// перекраска в очереди (RECOLOR); итог — как у status()
+pub fn recolor_run(args: &[&std::ffi::OsStr]) -> bool {
+    let _q = RECOLOR.lock();
+    recolor().args(args).status().is_ok_and(|s| s.success())
+}
+
 pub fn recolor() -> std::process::Command {
     let mut c = std::process::Command::new(yami_px::paths::self_exe());
     c.arg("recolor").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());

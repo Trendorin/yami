@@ -180,6 +180,12 @@ pub struct Settings {
     pub wall_dim: f32,
     /// акцент (а с ним вся палитра) берётся из своих обоев
     pub wall_accent: bool,
+    /// схема палитры из обоев (wall.rs SCHEMES)
+    pub wall_scheme: String,
+    /// свои шаблоны, которые выключены (имена файлов в ~/.config/yami/templates)
+    pub templates_off: Vec<String>,
+    /// GTK 4 / libadwaita тоже в цветах палитры (при включённом gtk в themeApps)
+    pub theme_gtk4: bool,
     /// обои выбирает skwd-wall (skwd.rs): рисует skwd-paper — свои прячутся, нет — картинку рисует шелл
     pub wall_skwd: bool,
     /// акцент и светлая / тёмная тема — из палитры skwd-wall
@@ -543,6 +549,9 @@ impl Default for Settings {
             wall_tone: String::new(),
             wall_dim: 0.0,
             wall_accent: false,
+            wall_scheme: "tonal".into(),
+            templates_off: vec![],
+            theme_gtk4: true,
             wall_skwd: false,
             wall_skwd_colors: true,
             bar_left: v(&["launcher", "sep", "workspaces", "sep", "mode"]),
@@ -769,6 +778,9 @@ impl Settings {
         }
         if !crate::notif::OSD_POS.iter().any(|(k, _)| *k == self.osd_pos) {
             self.osd_pos = "bottom".into();
+        }
+        if !crate::wall::SCHEMES.iter().any(|x| x.0 == self.wall_scheme) {
+            self.wall_scheme = "tonal".into();
         }
         // анимации: только известные группы и узоры, длительность в разумных пределах
         self.anims.retain(|k, _| ANIM_GROUPS.iter().any(|g| g.0 == k));

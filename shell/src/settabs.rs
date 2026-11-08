@@ -47,6 +47,12 @@ pub(crate) fn tab_color(ui: &mut Ui, st: &State, b: R) {
     let ph = if s.wall_skwd && s.wall_skwd_colors { "палитру ведёт skwd-wall" } else { "акцент из картинки, с новыми обоями — заново" };
     ui.toggle(R::new(b.x, y, b.w, 40), "палитра из обоев", ph, s.wall_accent, Act::SWall("accent"));
     y += 50;
+    // схема (#31): какой тон картинки брать и насколько его довести
+    if s.wall_accent && !(s.wall_skwd && s.wall_skwd_colors) {
+        let name = crate::wall::SCHEMES.iter().find(|x| x.0 == s.wall_scheme).map_or("тональная", |x| x.1);
+        opt_btn(ui, R::new(b.x, y, b.w, 26), "схема палитры из обоев", name, Act::SWall("scheme"));
+        y += 34;
+    }
     y = title(ui, b.x, y, b.w, "свой цвет");
     let ok = parse_hex(&st.hex.text).is_some();
     let focused = st.field_focus == Some("hex");
@@ -57,7 +63,13 @@ pub(crate) fn tab_color(ui: &mut Ui, st: &State, b: R) {
     }
     ui.button(R::new(b.x + 250, y + 2, 110, 26), "применить", "check", Tone::Primary, false, ok, Act::SCycle("hex_apply"));
     ui.text_in(PX, R::new(b.x + 370, y, b.w - 370, 30), if s.wall_accent { "сейчас: из обоев" } else if s.accent.is_empty() { "сейчас: пресет" } else { "сейчас: свой" }, t.text_faint);
-    y += 46;
+    y += 36;
+    // #33: при палитре из обоев свой цвет без этой строки казался бы пропавшим
+    if s.wall_accent {
+        ui.text_in(PX, R::new(b.x, y, b.w, 18), "свой цвет или пресет снимут палитру из обоев", t.text_faint);
+        y += 22;
+    }
+    y += 10;
     y = title(ui, b.x, y, b.w, "оттенки");
     // по два ползунка в ряд: цвет фона слева, прозрачность справа
     let hw = (b.w - 24) / 2;
@@ -104,6 +116,11 @@ fn app_themes(ui: &mut Ui, st: &State, b: R, tw: i32) {
         }
     }
     if crate::config::THEME_APPS.len() % 2 == 1 {
+        y += 46;
+    }
+    // #31: Nautilus и другие приложения libadwaita — в своём виде, остальной GTK — в палитре
+    if s.theme_apps.iter().any(|a| a == "gtk") {
+        ui.toggle(R::new(b.x, y, b.w, 40), "GTK 4 тоже", "libadwaita: Nautilus, приложения GNOME; выкл — их собственный вид", s.theme_gtk4, Act::SBool("theme_gtk4"));
         y += 46;
     }
     ui.wrap(PX, R::new(b.x, y, b.w, 40), "выключенную программу yami не трогает; всегда в палитре: шелл, экран входа, рамки niri, свои шаблоны. Курсор — окна → курсор", t.text_faint, 2);

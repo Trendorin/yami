@@ -36,6 +36,7 @@
 ```sh
 yami open settings:updates                # панель: launcher clipboard settings[:вкладка] power lock walls screenshot cal sound media net bt sys profile tray
 yami palette | yami palette ash | yami palette '#3a9fd0' | yami palette wallpaper
+yami palette show | yami palette export NAME   # все цвета с HEX ({{имена}} для шаблонов); палитра как сохранённая тема
 yami wallpaper ~/Pictures/x.png           # без пути: пиксельные обои палитры
 yami restart                              # перезапустить шелл (отказывается, пока в фокусе игра; --force)
 yami status                               # шелл, портал, niri, последняя проверка обновлений
@@ -125,7 +126,10 @@ yami-shell binds list | print | write     # сочетания клавиш
 | `wallPixel` | `1` | пиксельные клетки твоей картинки: 1 как есть, 2…8 → клетки 2, 3, 4, 6, 8, 12, 16 px |
 | `wallTone` | `""` | окраска твоей картинки: `""` как есть, `tint` оттенки акцента, `palette` тона палитры с байеровским сглаживанием |
 | `wallDim` | `0.0` | затемнить обои к цвету фона, 0…0.8 |
-| `wallAccent` | `false` | брать акцент из твоей картинки, заново с каждой новой; за ним идёт вся палитра (фон, панели, рамки, 16 цветов терминала, все перекрашиваемые программы и шаблоны). Настройки → цвет → «палитра из обоев» или `yami palette wallpaper`; выбор цвета руками выключает это |
+| `wallAccent` | `false` | брать акцент из твоей картинки, заново с каждой новой; за ним идёт вся палитра (фон, панели, рамки, 16 цветов терминала, все перекрашиваемые программы и шаблоны). Настройки → цвет → «палитра из обоев» или `yami palette wallpaper`; выбор цвета руками (и `yami config set accent`) выключает это |
+| `wallScheme` | `tonal` | как цвет обоев становится акцентом: `tonal`, `vibrant` (самый насыщенный тон), `content` (как на картинке), `muted`, `mono` |
+| `templatesOff` | `[]` | выключенные свои шаблоны (имена файлов в `~/.config/yami/templates`) |
+| `themeGtk4` | `true` | приложения GTK 4 / libadwaita (Nautilus, приложения GNOME) тоже в палитре; выключено — их собственный вид, остальной GTK по-прежнему перекрашен |
 | `wallKanji` | `true` | знак 闇 в углу обоев |
 | `wallSkwd` | `false` | обои берутся из [skwd-wall](https://github.com/liixini/skwd-wall): шелл читает то, что он пишет (`~/.cache/skwd-wall-v2/last-wallpaper.json`, `colors.json`; учитываются `SKWD_WALL_V2_CACHE` и `paths.cache`), и ничего не меняет в его настройках. На мониторе, где рисует skwd-wall (картинки — skwd-paper, видео и сцены — skwd-wall-vk, переходы; видно по его слою у niri), шелл прячет свои обои; иначе (режим «только выбор» skwd-wall) шелл рисует выбранную картинку сам своими клетками и тонами, видео или сцену — по кадру-превью. Экраны блокировки и входа показывают ту же картинку. `rules.kdl` получает правило слоя, которое ставит фон обзора skwd-paper позади рабочих столов |
 | `wallSkwdColors` | `true` | с `wallSkwd`: акцент — `primary` skwd-wall, а тема следует его фону (светлому или тёмному), так что палитра из его редактора тем перекрашивает весь райс |

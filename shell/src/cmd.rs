@@ -82,6 +82,7 @@ fn help(y: &Sty, me: &str) {
     y.row("run", &crate::tf!("запустить шелл (так делает niri)", "run the shell (niri does this)", "iniciar o shell (o niri faz isso)"));
     y.section(&crate::tf!("вид", "look", "visual"));
     y.row("palette [name|#hex]", &crate::tf!("палитры или сменить: blood ash sakura …", "list palettes or switch: blood ash sakura …", "listar paletas ou trocar: blood ash sakura …"));
+    y.row("palette show | export NAME", &crate::tf!("все цвета палитры с HEX; сохранить её как тему", "every colour of the palette with its hex; keep it as a theme", "todas as cores da paleta com o hex; guardá-la como tema"));
     y.row("wallpaper [path]", &crate::tf!("свои обои; без пути — пиксельные из палитры", "own picture; no path: the palette's pixel art", "imagem personalizada; sem caminho: pixel art da paleta"));
     y.row("icons [name|auto|add path]", &crate::tf!("наборы значков: список, сменить, поставить свой из архива или папки", "icon sets: list, switch, install your own from an archive or a folder", "conjuntos de ícones: listar, trocar, instalar o seu de um arquivo ou pasta"));
     y.row("cursor [name|size N|add path]", &crate::tf!("курсоры: yami, любой установленный, system; размер; свой набор", "cursors: yami, any installed one, system; size; your own set", "cursores: yami, qualquer instalado, system; tamanho; o seu conjunto"));
@@ -223,6 +224,24 @@ fn palette(y: &Sty, args: &[&str]) -> i32 {
             println!("\n   {}\n", y.dim(&crate::tf!("сменить: yami palette ash  ·  свой цвет: yami palette '#3a9fd0'  ·  из обоев: yami palette wallpaper", "switch: yami palette ash  ·  own colour: yami palette '#3a9fd0'  ·  from the wallpaper: yami palette wallpaper", "trocar: yami palette ash  ·  cor personalizada: yami palette '#3a9fd0'  ·  do papel de parede: yami palette wallpaper")));
             0
         }
+        Some(&"show") => {
+            // палитра как она есть (#31): все цвета palette.json с именами и HEX — то, что получают
+            // программы и свои шаблоны ({{имя}})
+            let p = crate::config::state_dir().join("palette.json");
+            let Some(m) = std::fs::read_to_string(&p).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()).and_then(|v| v.as_object().cloned()) else {
+                eprintln!(" {} {}", y.bad("✕"), crate::tf!("палитры ещё нет: её пишет шелл", "no palette yet: the shell writes it", "ainda não há paleta: o shell a grava"));
+                return 1;
+            };
+            y.section(&crate::tf!("палитра", "palette", "paleta"));
+            for (k, v) in &m {
+                let Some(h) = v.as_str().filter(|h| h.starts_with('#')) else { continue };
+                let rgb = crate::theme::parse_hex(h).unwrap_or(0);
+                println!("   {} {}  {}", y.swatch(rgb), y.bold(&format!("{k:<14}")), y.dim(h));
+            }
+            println!("\n   {}\n", y.dim(&crate::tf!("в шаблонах: {{{{имя}}}} · сохранить как тему: yami palette export ИМЯ", "in templates: {{{{name}}}} · keep as a theme: yami palette export NAME", "nos modelos: {{{{nome}}}} · guardar como tema: yami palette export NOME")));
+            0
+        }
+        Some(&"export") => crate::bundle::run(y, "theme-save", &args[1..]),
         Some(&"wallpaper") => {
             // акцент из обоев (#26): его достаёт шелл, когда перечитает настройки, и пересчитывает с каждой новой картинкой
             s.wall_accent = true;

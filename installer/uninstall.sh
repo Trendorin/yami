@@ -54,6 +54,14 @@ uninstall() {
     note "$(t "в $src твоя работа над патчами — оставил" "your patch work is in $src: kept" "seus patches estão em $src: preservados")"
   fi
   rm -f "$CFG/qt6ct/qss/yami.qss" "$CFG/qt6ct/colors/yami.conf"
+  # GTK: our yami.css and its import line; a gtk.css yami wrote whole before 3.0 goes too
+  local g
+  for g in "$CFG/gtk-3.0" "$CFG/gtk-4.0"; do
+    rm -f "$g/yami.css"
+    [[ -f $g/gtk.css ]] || continue
+    if head -1 "$g/gtk.css" | grep -q '^/\* YAMI'; then rm -f "$g/gtk.css"
+    else sed -i '/^@import url("yami.css");$/d; /^\/\* yami: its colours live in yami.css/d' "$g/gtk.css"; fi
+  done
   fc-cache -f >/dev/null 2>&1
   if [[ -f "$CFG/kitty/kitty.conf" ]]; then
     sed -i '/^# YAMI/d; /^include yami.conf$/d' "$CFG/kitty/kitty.conf"

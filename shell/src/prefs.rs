@@ -124,7 +124,7 @@ impl App {
         if changed || !config::state_dir().join("wallpaper.png").exists() {
             let tx = self.tx.clone();
             std::thread::spawn(move || {
-                let _ = crate::proc::recolor().arg(&p).status();
+                crate::proc::recolor_run(&[p.as_os_str()]);
                 let _ = tx.send(Msg::Theme);
             });
         }
@@ -137,7 +137,7 @@ impl App {
         let p = config::state_dir().join("palette.json");
         let tx = self.tx.clone();
         std::thread::spawn(move || {
-            let _ = crate::proc::recolor().arg(&p).status();
+            crate::proc::recolor_run(&[p.as_os_str()]);
             let _ = tx.send(Msg::Theme);
         });
     }
@@ -203,7 +203,7 @@ impl App {
         let _ = config::write_atomic(&config::settings_path(), &j);
         self.set_saved = j;
         std::thread::spawn(|| {
-            let _ = crate::proc::recolor().arg("--cursor").status();
+            crate::proc::recolor_run(&["--cursor".as_ref()]);
         });
     }
 
@@ -213,7 +213,7 @@ impl App {
         let _ = config::write_atomic(&config::settings_path(), &j);
         self.set_saved = j;
         std::thread::spawn(|| {
-            let _ = crate::proc::recolor().arg("--fonts").status();
+            crate::proc::recolor_run(&["--fonts".as_ref()]);
         });
     }
 

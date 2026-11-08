@@ -177,8 +177,57 @@ pub fn kde(cx: &Cx, p: &P) -> Res {
 }
 
 // ── GTK 3/4 ─────────────────────────────────────────────────────────────────
+/// наш стиль GTK — в своём файле yami.css; в gtk.css только строка @import (твой gtk.css остаётся
+/// твоим). gtk.css, целиком написанный yami до 3.0, заменяется одной этой строкой
+const GTK_IMPORT: &str = "@import url(\"yami.css\");";
+
+fn gtk_attach(dir: &Path, css: &str) -> Res {
+    write(&dir.join("yami.css"), css)?;
+    let f = dir.join("gtk.css");
+    let cur = std::fs::read_to_string(&f).unwrap_or_default();
+    if cur.lines().any(|l| l.trim() == GTK_IMPORT) {
+        return Ok(());
+    }
+    let text = if cur.trim().is_empty() || cur.starts_with("/* YAMI") {
+        format!("/* yami: its colours live in yami.css; write your own rules below. */\n{GTK_IMPORT}\n")
+    } else {
+        // @import — до остальных правил
+        format!("{GTK_IMPORT}\n{cur}")
+    };
+    if std::fs::symlink_metadata(&f).is_ok_and(|m| m.file_type().is_symlink()) {
+        std::fs::write(&f, text)?;
+    } else {
+        write(&f, &text)?;
+    }
+    Ok(())
+}
+
+/// GTK выключили (или только GTK 4): наша строка и yami.css уходят, твои правила остаются
+fn gtk_detach(dir: &Path) -> Res {
+    let _ = std::fs::remove_file(dir.join("yami.css"));
+    let f = dir.join("gtk.css");
+    let Ok(cur) = std::fs::read_to_string(&f) else { return Ok(()) };
+    if cur.starts_with("/* YAMI") {
+        let _ = std::fs::remove_file(&f);
+        return Ok(());
+    }
+    let keep: Vec<&str> = cur.lines().filter(|l| l.trim() != GTK_IMPORT && !l.starts_with("/* yami: its colours live in yami.css")).collect();
+    if keep.len() == cur.lines().count() {
+        return Ok(());
+    }
+    if keep.iter().all(|l| l.trim().is_empty()) {
+        let _ = std::fs::remove_file(&f);
+    } else {
+        std::fs::write(&f, keep.join("\n") + "\n")?;
+    }
+    Ok(())
+}
+
 pub fn gtk(cx: &Cx, p: &P) -> Res {
     if !cx.on("gtk") {
+        for v in gtk_dirs() {
+            gtk_detach(&cx.cfg.join(format!("gtk-{v}")))?;
+        }
         return Ok(());
     }
     let side = mix(p.g("bg"), p.g("panel"), 0.5);
@@ -204,8 +253,15 @@ pub fn gtk(cx: &Cx, p: &P) -> Res {
     css += &format!("entry, spinbutton, dropdown > button, combobox > box > button {{ background: {}; border: 1px solid {}; }}\n", p.g("codeBg"), p.g("border"));
     css += &format!("entry:focus-within {{ border-color: {}; outline: none; }}\n", p.g("accent"));
     css += &format!("window.csd, window.dialog, messagedialog, dialog-host > dialog {{ border: 1px solid {edge}; box-shadow: 4px 4px 0 alpha(black, {:.2}); }}\n", 0.6 * k);
+    // GTK 4 (libadwaita: Nautilus, приложения GNOME) можно оставить в их собственном виде (#31)
+    let gtk4 = cx.st.get("themeGtk4").and_then(|v| v.as_bool()).unwrap_or(true);
     for v in gtk_dirs() {
-        write(&cx.cfg.join(format!("gtk-{v}/gtk.css")), &css)?;
+        let dir = cx.cfg.join(format!("gtk-{v}"));
+        if v == "4.0" && !gtk4 {
+            gtk_detach(&dir)?;
+        } else {
+            gtk_attach(&dir, &css)?;
+        }
     }
     gtk_mode(cx, light)?;
     // акцент libadwaita/GNOME — ближайший из их набора по оттенку

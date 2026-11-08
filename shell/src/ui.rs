@@ -53,6 +53,8 @@ pub enum Act {
     SThemeApp(&'static str),
     /// свой шаблон, изменённый руками, — перезаписать (#27)
     STplForce(usize),
+    /// свой шаблон: включить или выключить (#31, templatesOff)
+    STplToggle(usize),
     SSlider(&'static str, f32, f32, i32),
     SCycle(&'static str),
     /// настройки → анимации: группа (config::ANIM_GROUPS) и что в ней менять (animtab.rs)

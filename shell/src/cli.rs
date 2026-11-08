@@ -125,6 +125,11 @@ pub fn config(args: &[String]) -> i32 {
             let val: Value = serde_json::from_str(v).unwrap_or_else(|_| Value::String(v.to_string()));
             let mut cur = serde_json::to_value(Settings::load()).unwrap_or_default();
             cur[*k] = val;
+            // свой акцент при палитре из обоев (#33): обои его перекрасили бы — режим снимается
+            if *k == "accent" && cur["wallAccent"] == Value::Bool(true) {
+                cur["wallAccent"] = Value::Bool(false);
+                eprintln!("wallAccent turned off: an accent of your own replaces the palette from the wallpaper");
+            }
             match serde_json::from_value::<Settings>(cur) {
                 Ok(s) => {
                     if !save(&s) {

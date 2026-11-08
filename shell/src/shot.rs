@@ -289,6 +289,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             // #27: итог перекраски — свой fastfetch, своя палитра starship, шаблоны с разным итогом
             if st.color_page == 2 {
                 let tpl = |file: &str, output: &str, state: &str, keys: &[&str]| crate::restyle::Tpl { file: file.into(), output: output.into(), state: state.into(), keys: keys.iter().map(|k| k.to_string()).collect() };
+                st.set.templates_off = vec!["dunst".into()];
                 st.restyle = crate::restyle::Status {
                     fetch: Some("~/.config/fastfetch/yami.jsonc".into()),
                     starship: Some("catppuccin_mocha".into()),
@@ -296,6 +297,8 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                         tpl("equibop.css", "~/.config/equibop/themes/yami.css", "ok", &[]),
                         tpl("waybar.css", "~/.config/waybar/colors.css", "hand", &[]),
                         tpl("rofi.rasi", "~/.config/rofi/yami.rasi", "unknown", &["acccent"]),
+                        tpl("vesktop-a-very-long-template-name.css", "~/.config/vesktop/themes/a/very/deep/folder/with/a/long/name/yami.theme.css", "ok", &[]),
+                        tpl("dunst", "~/.config/dunst/dunstrc.d/yami.conf", "off", &[]),
                     ],
                 };
             }

@@ -425,7 +425,7 @@ impl App {
         let _ = crate::config::write_atomic(&crate::config::settings_path(), &j);
         self.set_saved = j;
         std::thread::spawn(|| {
-            let _ = crate::proc::recolor().arg("--icons").status();
+            crate::proc::recolor_run(&["--icons".as_ref()]);
         });
     }
 }
@@ -440,7 +440,7 @@ pub fn cli(y: &crate::cmd::Sty, cursor: bool, args: &[&str]) -> i32 {
         if crate::config::write_atomic(&crate::config::settings_path(), &s.to_json()).is_err() {
             return 1;
         }
-        let _ = crate::proc::recolor().arg(flag).status();
+        crate::proc::recolor_run(&[flag.as_ref()]);
         0
     };
     match args {

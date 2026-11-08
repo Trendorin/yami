@@ -43,6 +43,17 @@ impl App {
                     _ => {}
                 }
             }
+            Act::STplToggle(i) => {
+                if let Some(f) = self.st.restyle.tpls.get(*i).map(|t| t.file.clone()) {
+                    match s.templates_off.iter().position(|x| *x == f) {
+                        Some(k) => drop(s.templates_off.remove(k)),
+                        None => s.templates_off.push(f),
+                    }
+                    // recolor читает настройки с диска
+                    self.save_now();
+                    self.templates_run(None);
+                }
+            }
             Act::STplForce(i) => {
                 if let Some(f) = self.st.restyle.tpls.get(*i).map(|t| t.file.clone()) {
                     self.templates_run(Some(f));
@@ -105,6 +116,12 @@ impl App {
                         self.sync_titles();
                     }
                     "wall_kanji" => s.wall_kanji = !s.wall_kanji,
+                    "theme_gtk4" => {
+                        s.theme_gtk4 = !s.theme_gtk4;
+                        self.theme_rerun();
+                        self.dirty(&SKind::Modal);
+                        return true;
+                    }
                     "wall_skwd" | "wall_skwd_colors" => {
                         if *k == "wall_skwd" {
                             s.wall_skwd = !s.wall_skwd;
@@ -157,7 +174,7 @@ impl App {
                         self.settings_changed();
                         self.save_now();
                         std::thread::spawn(|| {
-                            let _ = crate::proc::recolor().arg("--fetch").status();
+                            crate::proc::recolor_run(&["--fetch".as_ref()]);
                         });
                         self.dirty(&SKind::Modal);
                         return true;
