@@ -53,10 +53,6 @@ pub enum Modal {
     Launcher,
     Power,
     Settings,
-    /// пароль для polkit (auth.rs)
-    Auth,
-    /// что показать при показе экрана (screen.rs)
-    Screen,
     /// ответ из уведомления (reply.rs)
     Reply,
     /// выбор обоев (walls.rs)
@@ -155,10 +151,7 @@ pub enum Msg {
     Net(net::NetState),
     Bt(net::BtState),
     Pam(bool),
-    Auth(crate::auth::Ev),
     Prof(crate::profile::Prof),
-    /// портал спрашивает, что показать: типы источников и сокет для ответа
-    ScreenPick(u32, std::os::unix::net::UnixStream),
     Clip(Vec<String>),
     /// миниатюра картинки из буфера (launcher.rs thumbs_start)
     ClipThumb(String, Option<crate::gfx::Img>),
@@ -194,10 +187,6 @@ pub enum Msg {
     SkwdLayers(Vec<String>),
     /// проверка обновлений (update.rs)
     Update(crate::update::Info),
-    /// тома gio после события udev (automount.rs)
-    Volumes(Vec<crate::automount::Vol>),
-    /// том подключён сам: его локальная папка или ошибка
-    AutoMounted(crate::automount::Vol, Result<Option<String>, String>),
 }
 
 pub struct Res {
@@ -234,12 +223,9 @@ pub struct State {
     pub stab_h: std::cell::Cell<i32>,
     pub hex: Field,
     pub field_focus: Option<&'static str>,
-    /// запросы polkit: первый — в окне, остальные ждут
-    pub auth: Vec<crate::auth::Req>,
     pub prof: crate::profile::Prof,
     pub disp: crate::displays::Disp,
     pub bar_ed: crate::settings::BarEd,
-    pub screen_pick: Option<crate::screen::Pick>,
     pub sel_widget: u32,
     pub editing: bool,
     pub notifs: notif::Notifs,
@@ -330,8 +316,6 @@ pub struct State {
     pub upd: crate::update::Upd,
     /// выбор обоев: папка, клетки, миниатюры видимых строк
     pub walls: crate::walls::Walls,
-    /// автоподключение флешек и телефонов (automount.rs)
-    pub am: crate::automount::Am,
 }
 
 pub struct Press {
@@ -451,11 +435,9 @@ impl State {
             stab_h: Default::default(),
             hex: Field::default(),
             field_focus: None,
-            auth: Vec::new(),
             prof: Default::default(),
             disp: Default::default(),
             bar_ed: Default::default(),
-            screen_pick: None,
             sel_widget: 0,
             editing: false,
             notifs: notif::Notifs::default(),
@@ -524,7 +506,6 @@ impl State {
             trash_full: false,
             upd: crate::update::Upd::load(),
             walls: Default::default(),
-            am: Default::default(),
             set,
         }
     }
@@ -652,7 +633,10 @@ pub fn run() {
     }
     crate::ipc::serve(tx.clone());
     dbus::spawn(tx.clone(), app.st.set.agent_notif, app.st.set.agent_tray);
-    crate::auth::spawn(tx.clone(), app.st.set.agent_polkit);
+    // окна паролей, показ экрана и автоподключение — отдельная служба; второй экземпляр выйдет сам
+    if crate::proc::have("yami-agents") {
+        App::spawn(&["yami-agents".to_string()]);
+    }
     crate::agents::write_portals(&app.st.set);
     crate::profile::refresh(None, tx.clone());
     // копия theme.py рядом с состоянием — сразу свежая, а не после следующей смены палитры
@@ -668,7 +652,6 @@ pub fn run() {
     crate::keys::write(&app.st.set);
     app.setup_idle();
     app.side_sync();
-    app.automount_sync();
     // «стол» при входе включится, когда придёт список окон (см. on_msg)
 
     handle
@@ -698,7 +681,7 @@ pub fn run() {
         use std::os::unix::process::CommandExt;
         let args: Vec<String> = std::env::args().skip(1).collect();
         drop(app);
-        let e = std::process::Command::new(yami_px::paths::self_exe()).args(args).env("YAMI_RESTARTED", "1").exec();
+        let e = std::process::Command::new(yami_px::paths::self_exe()).args(args).exec();
         eprintln!("restart: {e}");
         std::process::exit(1);
     }

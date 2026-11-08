@@ -60,11 +60,6 @@ pub fn serve(tx: Sender<Msg>) {
                 }
                 let _ = s.set_read_timeout(None);
                 let line = line.trim();
-                // портал ждёт выбора экрана: соединение уходит шеллу, ответ — когда выберут
-                if let Some(t) = line.strip_prefix("pick-screen") {
-                    let _ = tx.send(Msg::ScreenPick(t.trim().parse().unwrap_or(3), s));
-                    continue;
-                }
                 if !line.is_empty() {
                     let _ = tx.send(Msg::Ipc(line.to_string()));
                 }

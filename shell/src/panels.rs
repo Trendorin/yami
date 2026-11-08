@@ -14,8 +14,7 @@ use smithay_client_toolkit::shell::{
 impl App {
     // ── модальные панели: лаунчер, питание, настройки ───────────────────────
     pub fn toggle_modal(&mut self, m: Modal, clip: bool) {
-        // окно пароля не уступает место другим панелям
-        if self.st.locked || matches!(self.st.modal, Some(Modal::Auth | Modal::Screen)) {
+        if self.st.locked {
             return;
         }
         let same = self.st.modal == Some(m) && (m != Modal::Launcher || self.st.launcher.clip == clip);
@@ -37,8 +36,6 @@ impl App {
             Modal::Launcher => launcher::SIZE,
             Modal::Power => crate::power::SIZE,
             Modal::Settings => crate::settings::SIZE,
-            Modal::Auth => crate::auth::SIZE,
-            Modal::Screen => (0, 0),
             Modal::Reply => crate::reply::SIZE,
             Modal::Walls => crate::walls::SIZE,
         };
@@ -52,7 +49,7 @@ impl App {
                 }
             }
             Modal::Power => self.st.power_cur = 0,
-            Modal::Auth | Modal::Screen | Modal::Reply | Modal::Walls => {}
+            Modal::Reply | Modal::Walls => {}
             Modal::Settings => {
                 self.tab_probe();
                 self.st.hex.set(&self.st.set.accent.clone());
@@ -66,8 +63,6 @@ impl App {
             Modal::Launcher => "yami-launcher",
             Modal::Power => "yami-power",
             Modal::Settings => "yami-settings",
-            Modal::Auth => "yami-auth",
-            Modal::Screen => "yami-screen",
             Modal::Reply => "yami-reply",
             Modal::Walls => "yami-walls",
         }, Anchor::empty(), (w, h + 12), (0, 0, 0, 0), -1, KeyboardInteractivity::Exclusive);
@@ -113,16 +108,6 @@ impl App {
         // следующее окно снова откроется по центру
         self.modal_at = None;
         self.keys_capture(None);
-        if self.st.modal == Some(Modal::Auth) {
-            self.auth_cancel();
-        }
-        // окно выбора экрана закрыли мимо кнопок — порталу «отмена»
-        if self.st.modal == Some(Modal::Screen) {
-            if let Some(p) = self.st.screen_pick.take() {
-                use std::io::Write;
-                let _ = (&p.stream).write_all(b"cancel\n");
-            }
-        }
         if self.st.modal == Some(Modal::Walls) {
             self.walls_free();
         }

@@ -9,6 +9,7 @@
 // Зашифрованные (LUKS, BitLocker) не трогаем: пароль спросит yami-files (--unlock).
 
 use crate::app::{App, Msg};
+use crate::notify;
 use std::collections::{HashMap, HashSet};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::process::{Command, Stdio};
@@ -76,8 +77,6 @@ impl Vol {
 
 #[derive(Default)]
 pub struct Am {
-    /// источник событий в цикле (нет — автоподключение выключено или netlink недоступен)
-    pub(crate) src: Option<calloop::RegistrationToken>,
     /// когда посмотреть тома; сколько повторов ещё осталось
     due: Option<Instant>,
     again: usize,
@@ -85,13 +84,10 @@ pub struct Am {
     seen: Option<HashSet<String>>,
     /// взгляд идёт в нити
     busy: bool,
-    /// карточка → что открыть по «открыть»: путь или зашифрованный раздел (для yami-files)
-    pub(crate) notes: HashMap<u32, String>,
-    next_note: u32,
     /// неудачные попытки по тому (телефон заблокирован): ещё раз, пока не кончатся
     tries: HashMap<String, u8>,
-    /// вставили при заблокированном экране: подключим после разблокировки
-    held: bool,
+    /// таймер взгляда уже идёт
+    armed: bool,
 }
 
 /// сокет событий udev с фильтром в ядре; None — нет netlink (контейнер) или ошибка
@@ -220,7 +216,7 @@ fn mount(v: &Vol) -> Result<Option<String>, String> {
         c.args(["--", &v.root]);
     }
     c.stdout(Stdio::null());
-    let mut ch = crate::proc::owned(&mut c).spawn().map_err(|_| crate::i18n::tr("нет gio (пакет glib2)").to_string())?;
+    let mut ch = owned(&mut c).spawn().map_err(|_| crate::i18n::tr("нет gio (пакет glib2)").to_string())?;
     let t = Instant::now();
     let ok = loop {
         match ch.try_wait() {
@@ -248,50 +244,106 @@ fn mount(v: &Vol) -> Result<Option<String>, String> {
     Ok(uri.as_deref().and_then(local))
 }
 
+/// дочерний процесс умирает вместе с нитью, которая его ждёт (замена бинаря на месте)
+fn owned(c: &mut Command) -> &mut Command {
+    use std::os::unix::process::CommandExt;
+    // SAFETY: prctl безопасен между fork и exec
+    unsafe {
+        c.pre_exec(|| {
+            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM);
+            Ok(())
+        })
+    }
+}
+
+/// заперт ли экран: шелл yami ставит метку; у остальных спрашиваем logind
+fn session_locked() -> bool {
+    if let Some(d) = std::env::var_os("XDG_RUNTIME_DIR") {
+        if std::path::PathBuf::from(d).join("yami-locked").exists() {
+            return true;
+        }
+    }
+    let Ok(id) = std::env::var("XDG_SESSION_ID") else { return false };
+    let Ok(out) = Command::new("loginctl").args(["show-session", &id, "-p", "LockedHint", "--value"]).stdin(Stdio::null()).stderr(Stdio::null()).output() else { return false };
+    String::from_utf8_lossy(&out.stdout).trim() == "yes"
+}
+
+/// игра на весь экран: новое окно поверх неё не открываем
+fn fullscreen_in_front() -> bool {
+    if std::env::var_os("NIRI_SOCKET").is_none() {
+        return false;
+    }
+    let Ok(o) = Command::new("niri").args(["msg", "-j", "focused-window"]).stderr(Stdio::null()).output() else { return false };
+    serde_json::from_slice::<serde_json::Value>(&o.stdout).is_ok_and(|v| v["is_fullscreen"].as_bool() == Some(true))
+}
+
+fn open_path(p: &str) {
+    let _ = Command::new("xdg-open").arg(p).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map(|mut c| std::thread::spawn(move || c.wait()));
+}
+
+/// открыть зашифрованный диск и подключить: пароль через stdin udisksctl, не в argv и не на диск.
+/// Ok — куда подключён, Err — почему нет
+pub fn unlock(dev: &str, pass: &str) -> Result<String, String> {
+    use std::io::Write;
+    let mut ch = Command::new("udisksctl").args(["unlock", "--no-user-interaction", "-b", dev, "--key-file", "/dev/stdin"]).env("LC_ALL", "C").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(|_| crate::i18n::tr("нет udisksctl (пакет udisks2)").to_string())?;
+    if let Some(mut i) = ch.stdin.take() {
+        let _ = i.write_all(pass.as_bytes());
+    }
+    let out = ch.wait_with_output().map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).lines().last().unwrap_or("").to_string());
+    }
+    // «Unlocked /dev/sdb1 as /dev/dm-3.»
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    let mapped = text.split(" as ").nth(1).map(|s| s.trim().trim_end_matches('.').to_string()).ok_or_else(|| text.clone())?;
+    let m = Command::new("udisksctl").args(["mount", "--no-user-interaction", "-b", &mapped]).env("LC_ALL", "C").stdin(Stdio::null()).output().map_err(|e| e.to_string())?;
+    if !m.status.success() {
+        return Err(String::from_utf8_lossy(&m.stderr).lines().last().unwrap_or("").to_string());
+    }
+    // «Mounted /dev/dm-3 at /run/media/user/disk»
+    let t = String::from_utf8_lossy(&m.stdout).to_string();
+    Ok(t.split(" at ").nth(1).map(|s| s.trim().trim_end_matches('.').to_string()).unwrap_or_default())
+}
+
 impl App {
-    /// включить или выключить слежку по настройке (при старте и после смены настроек)
+    /// начать слежку, если она включена
     pub fn automount_sync(&mut self) {
-        let on = self.st.set.automount;
-        if on == self.st.am.src.is_some() {
+        if !self.cfg.automount {
             return;
         }
-        match self.st.am.src.take() {
-            Some(tok) => self.handle.remove(tok),
-            None => {
-                let Some(fd) = open() else { return };
-                let src = calloop::generic::Generic::new(fd, calloop::Interest::READ, calloop::Mode::Level);
-                self.st.am.src = self
-                    .handle
-                    .insert_source(src, |_, fd, app: &mut App| {
-                        drain(fd);
-                        app.automount_poke();
-                        Ok(calloop::PostAction::Continue)
-                    })
-                    .ok();
-                // первый взгляд — чуть позже старта: запомнить, что уже вставлено
-                if self.st.am.seen.is_none() {
-                    self.st.am.due = Some(Instant::now() + Duration::from_secs(5));
-                }
-            }
+        let Some(fd) = open() else { return };
+        let src = calloop::generic::Generic::new(fd, calloop::Interest::READ, calloop::Mode::Level);
+        let _ = self.handle.insert_source(src, |_, fd, app: &mut App| {
+            drain(fd);
+            app.automount_poke();
+            Ok(calloop::PostAction::Continue)
+        });
+        // первый взгляд — чуть позже старта: запомнить, что уже вставлено
+        self.automount_at(Instant::now() + Duration::from_secs(5));
+    }
+
+    /// подошло время — спросить gio в нити. Таймер живёт, только пока есть, чего ждать
+    fn automount_at(&mut self, t: Instant) {
+        self.am.due = Some(self.am.due.map_or(t, |d| d.min(t)));
+        if !std::mem::replace(&mut self.am.armed, true) {
+            self.arm(Duration::from_millis(300), |app| {
+                app.automount_tick();
+                let go_on = app.am.due.is_some();
+                app.am.armed = go_on;
+                go_on
+            });
         }
     }
 
     /// событие udev: посмотреть тома через секунду (пачка событий — один взгляд) и ещё дважды
     fn automount_poke(&mut self) {
-        self.st.am.due = Some(Instant::now() + Duration::from_millis(1200));
-        self.st.am.again = AGAIN.len();
+        self.am.due = None;
+        self.am.again = AGAIN.len();
+        self.automount_at(Instant::now() + Duration::from_millis(1200));
     }
 
-    /// экран разблокировали: тома, вставленные под блокировкой, — подключить сейчас
-    pub(crate) fn automount_unlocked(&mut self) {
-        if std::mem::take(&mut self.st.am.held) {
-            self.automount_poke();
-        }
-    }
-
-    /// из tick: подошло время — спросить gio в нити
-    pub(crate) fn automount_tick(&mut self) {
-        let am = &mut self.st.am;
+    fn automount_tick(&mut self) {
+        let am = &mut self.am;
         if am.busy || !am.due.is_some_and(|d| Instant::now() >= d) {
             return;
         }
@@ -304,41 +356,37 @@ impl App {
         am.busy = true;
         let tx = self.tx.clone();
         std::thread::spawn(move || {
-            let _ = tx.send(Msg::Volumes(scan()));
+            let locked = session_locked();
+            let _ = tx.send(Msg::Volumes(scan(), locked));
         });
     }
 
-    /// тома пришли: новые — подключить; первый взгляд после входа в систему подключает и то, что
-    /// было вставлено заранее (как GNOME), после перезапуска шелла — только запоминает
-    pub(crate) fn automount_volumes(&mut self, vols: Vec<Vol>) {
-        let am = &mut self.st.am;
+    /// тома пришли: новые — подключить; первый взгляд в сеансе подключает и то, что было вставлено
+    /// заранее (как GNOME), после перезапуска службы — только запоминает
+    pub(crate) fn automount_volumes(&mut self, vols: Vec<Vol>, screen_locked: bool) {
+        let restarted = self.restarted;
+        let am = &mut self.am;
         am.busy = false;
         let first = am.seen.is_none();
         let seen = am.seen.take().unwrap_or_default();
         // экран заблокирован: чужую флешку без хозяина не подключаем (драйвер ФС — мишень для
         // кривого образа, как и в GNOME). Новые тома не запоминаем — их подключит взгляд после
-        // разблокировки (automount_unlocked)
-        if self.st.locked && self.st.set.automount && !(first && crate::proc::restarted()) {
-            am.held = true;
+        // разблокировки: пока заперто, смотрим раз в 5 с
+        if screen_locked && !(first && restarted) {
             am.seen = Some(if first { vols.iter().filter(|v| !v.mount.is_empty()).map(Vol::key).collect() } else { seen.into_iter().filter(|k| vols.iter().any(|v| v.key() == *k)).collect() });
+            self.automount_at(Instant::now() + Duration::from_secs(5));
             return;
         }
         am.seen = Some(vols.iter().map(Vol::key).collect());
         // вынутые тома забываем вместе с их попытками
         am.tries.retain(|k, _| vols.iter().any(|v| v.key() == *k));
-        if !self.st.set.automount || first && crate::proc::restarted() {
+        if first && restarted {
             return;
         }
         for v in vols.into_iter().filter(|v| !seen.contains(&v.key())) {
             if locked(&v) && v.mount.is_empty() {
-                let dev = v.dev.clone();
                 let title = crate::tf!("зашифрованный диск: {}", "encrypted drive: {}", "disco criptografado: {}", v.name);
-                // пароль спрашивает yami-files (--unlock); без него — свой файловый менеджер человека
-                if crate::proc::have("yami-files") {
-                    self.automount_note(title, crate::i18n::tr("нажми, чтобы ввести пароль").to_string(), "drive-removable-media", format!("unlock:{dev}"));
-                } else {
-                    self.automount_note(title, crate::i18n::tr("пароль спросит твой файловый менеджер").to_string(), "drive-removable-media", String::new());
-                }
+                self.note(title, crate::i18n::tr("нажми, чтобы ввести пароль").to_string(), "drive-removable-media", format!("unlock:{} {}", v.dev, v.name));
                 continue;
             }
             if !v.wanted() {
@@ -362,10 +410,10 @@ impl App {
         };
         match res {
             Ok(path) => {
-                self.st.am.tries.remove(&v.key());
+                self.am.tries.remove(&v.key());
                 let path = path.unwrap_or_default();
-                if self.st.set.automount_open && !path.is_empty() && !self.st.game.fullscreen {
-                    App::open_dir(path);
+                if self.cfg.automount_open && !path.is_empty() && !fullscreen_in_front() {
+                    open_path(&path);
                     return;
                 }
                 let body = if path.is_empty() { String::new() } else { yami_px::paths::pretty(std::path::Path::new(&path)) };
@@ -374,12 +422,12 @@ impl App {
                     Kind::Camera => crate::tf!("камера подключена: {}", "camera connected: {}", "câmera conectada: {}", v.name),
                     _ => crate::tf!("подключено: {}", "mounted: {}", "montado: {}", v.name),
                 };
-                self.automount_note(summary, body, icon, path);
+                self.note(summary, body, icon, path);
             }
             Err(e) => {
                 // телефон или камера заблокированы: том забываем, следующий взгляд попробует снова;
                 // карточка — только когда попытки кончились
-                let am = &mut self.st.am;
+                let am = &mut self.am;
                 let k = v.key();
                 let n = am.tries.entry(k.clone()).or_insert(0);
                 *n += 1;
@@ -387,40 +435,64 @@ impl App {
                     if let Some(s) = am.seen.as_mut() {
                         s.remove(&k);
                     }
-                    let at = Instant::now() + Duration::from_secs(RETRY);
-                    am.due = Some(am.due.map_or(at, |d| d.min(at)));
+                    self.automount_at(Instant::now() + Duration::from_secs(RETRY));
                     return;
                 }
                 // телефон в режиме «только зарядка» или так и не разблокирован: подсказка вместо ошибки gvfs
                 let body = if v.kind() == Kind::Phone { format!("{e} · {}", crate::i18n::tr("разблокируй телефон и выбери «передача файлов»")) } else { e };
-                self.automount_note(crate::tf!("не подключается: {}", "could not mount: {}", "não foi possível montar: {}", v.name), body, icon, String::new());
+                self.note(crate::tf!("не подключается: {}", "could not mount: {}", "não foi possível montar: {}", v.name), body, icon, String::new());
             }
         }
     }
 
-    fn automount_note(&mut self, summary: String, body: String, icon: &str, open: String) {
-        let am = &mut self.st.am;
-        am.next_note = am.next_note.wrapping_add(1) % 100_000;
-        let id = 9_100_000 + am.next_note;
-        let actions = if open.is_empty() { vec![] } else { vec![("default".to_string(), crate::i18n::tr("открыть").to_string())] };
-        if !open.is_empty() {
-            // действия есть только у карточек в истории: старые не держим
-            let live: Vec<u32> = self.st.notifs.history.iter().map(|n| n.id).collect();
-            am.notes.retain(|k, _| live.contains(k));
-            am.notes.insert(id, open);
-        }
-        let n = crate::dbus::Incoming { id, app: "yami-files".into(), icon: icon.into(), summary, body, actions, urgency: 1, image: None, timeout: -1 };
-        self.on_notif(n);
+    /// уведомление; open — что открыть по кнопке (путь или unlock:…)
+    fn note(&mut self, summary: String, body: String, icon: &'static str, open: String) {
+        let tx = self.tx.clone();
+        let label = crate::i18n::tr("открыть").to_string();
+        std::thread::spawn(move || {
+            let has = !open.is_empty();
+            if notify::send(&summary, &body, icon, has.then_some(label.as_str()), 120) && has {
+                let _ = tx.send(Msg::Open(open));
+            }
+        });
     }
 
-    /// «открыть» у карточки устройства (true — карточка наша)
-    pub fn automount_note_action(&mut self, id: u32) -> bool {
-        let Some(what) = self.st.am.notes.remove(&id) else { return false };
-        match what.strip_prefix("unlock:") {
-            Some(dev) => App::spawn(&["yami-files".into(), "--unlock".into(), dev.into()]),
-            None => App::open_dir(what),
+    /// кнопка уведомления: открыть папку или спросить пароль диска
+    pub(crate) fn note_open(&mut self, what: String) {
+        let Some(rest) = what.strip_prefix("unlock:") else { return open_path(&what) };
+        let (dev, name) = rest.split_once(' ').unwrap_or((rest, rest));
+        let cookie = format!("unlock-{dev}");
+        if self.auth.iter().any(|r| r.cookie == cookie) {
+            return;
         }
-        true
+        self.auth.push(crate::polkit::Req { cookie, message: crate::tf!("зашифрованный диск: {}", "encrypted drive: {}", "disco criptografado: {}", name), action: dev.to_string(), user: String::new(), prompt: String::new(), echo: false, info: String::new(), fails: 0, busy: false, field: Default::default(), shake: None, unlock: Some(dev.to_string()), _guard: crate::reload::Busy::take() });
+        self.sync_panel();
+        self.dirty();
+    }
+
+    /// udisks ответил про зашифрованный диск
+    pub(crate) fn on_unlocked(&mut self, message: String, res: Result<String, String>) {
+        let Some(i) = self.auth.iter().position(|r| r.message == message && r.unlock.is_some()) else { return };
+        match res {
+            Ok(path) => {
+                self.auth.remove(i);
+                self.sync_panel();
+                if self.cfg.automount_open && !path.is_empty() && !fullscreen_in_front() {
+                    open_path(&path);
+                } else {
+                    let body = yami_px::paths::pretty(std::path::Path::new(&path));
+                    self.note(crate::tf!("подключено: {}", "mounted: {}", "montado: {}", message), body, "drive-removable-media", path);
+                }
+            }
+            Err(e) => {
+                let r = &mut self.auth[i];
+                r.busy = false;
+                r.fails += 1;
+                r.info = e;
+                r.shake = Some(Instant::now());
+            }
+        }
+        self.dirty();
     }
 }
 

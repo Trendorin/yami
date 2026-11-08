@@ -35,7 +35,6 @@ mod picons;
 mod places;
 mod portal;
 mod remote;
-mod screencast;
 mod shot;
 mod thumbs;
 mod trash;

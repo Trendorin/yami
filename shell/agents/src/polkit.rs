@@ -1,16 +1,16 @@
-// Свой агент polkit: окно пароля в стиле шелла вместо чужого Qt/GTK-диалога.
+// Агент polkit: своё окно пароля вместо чужого Qt/GTK-диалога; то же окно спрашивает пароль
+// зашифрованного диска.
 // Агент живёт на системной шине (org.freedesktop.PolicyKit1.AuthenticationAgent) для нашего
 // сеанса; пароль проверяет polkit-agent-helper-1 (сокет /run/polkit/agent-helper.socket,
 // а на старых polkit — setuid-помощник). Нить на каждый запрос — только пока он идёт.
 
-use crate::app::{App, Modal, Msg, SKind, State};
-use crate::font::PX;
-use crate::gfx::{BoxStyle, R};
-use crate::ui::{Act, Cur, Field, Tone, Ui};
+use crate::app::{Act, App, Msg, Ui};
 use calloop::channel::Sender;
 use smithay_client_toolkit::seat::keyboard::{KeyEvent, Keysym};
-use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 use std::collections::HashMap;
+use yami_px::font::PX;
+use yami_px::gfx::{BoxStyle, R};
+use yami_px::ui::{Cur, Field, Tone};
 use std::io::{BufRead, BufReader, Write};
 use std::sync::mpsc;
 use std::sync::Mutex;
@@ -58,6 +58,15 @@ pub struct Req {
     pub busy: bool,
     pub field: Field,
     pub shake: Option<Instant>,
+    /// не polkit, а зашифрованный диск: устройство
+    pub unlock: Option<String>,
+    /// пока запрос жив, процесс не перезапускается
+    pub _guard: crate::reload::Busy,
+}
+
+/// для `shot`
+pub fn mock() -> Vec<Req> {
+    vec![Req { cookie: "1".into(), message: "Authentication is required to install software".into(), action: "org.freedesktop.packagekit.package-install".into(), user: "user".into(), prompt: String::new(), echo: false, info: String::new(), fails: 1, busy: false, field: Field::default(), shake: None, unlock: None, _guard: crate::reload::Busy::take() }]
 }
 
 #[derive(Debug, zbus::DBusError)]
@@ -226,16 +235,12 @@ fn session_id(c: &Connection) -> Option<String> {
     p.get_property::<(String, zbus::zvariant::OwnedObjectPath)>("Display").ok().map(|d| d.0).filter(|s| !s.is_empty())
 }
 
-/// зарегистрироваться агентом сеанса; если агент уже есть (чужой) — уступаем ему.
-/// Выключен в настройках (службы → пароли) — окна пароля рисует другой агент (polkit-gnome, KDE)
-pub fn spawn(tx: Sender<Msg>, on: bool) {
-    if !on {
-        return;
-    }
+/// зарегистрироваться агентом сеанса; если агент уже есть (чужой) — уступаем ему
+pub fn spawn(tx: Sender<Msg>) {
     std::thread::Builder::new()
         .name("polkit".into())
         .spawn(move || {
-            let Some(c) = crate::net::system() else { return };
+            let Ok(c) = Connection::system() else { return };
             let Some(sid) = session_id(&c) else { return };
             if c.object_server().at(PATH, Agent { tx }).is_err() {
                 return;
@@ -245,16 +250,17 @@ pub fn spawn(tx: Sender<Msg>, on: bool) {
             let locale = std::env::var("LANG").unwrap_or_else(|_| "en_US.UTF-8".into());
             let r = c.call_method(Some("org.freedesktop.PolicyKit1"), "/org/freedesktop/PolicyKit1/Authority", Some("org.freedesktop.PolicyKit1.Authority"), "RegisterAuthenticationAgent", &(("unix-session", d), locale.as_str(), PATH));
             match r {
-                Ok(_) => {}
+                // соединение держит объект агента на шине: живёт, пока жив процесс
+                Ok(_) => std::mem::forget(c),
                 Err(e) => eprintln!("{}", crate::tf!("polkit: агент не зарегистрирован: {e}", "polkit: agent not registered: {e}", "polkit: agente não registrado: {e}")),
             }
         })
         .ok();
 }
 
-pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
+pub fn draw(ui: &mut Ui, auth: &[Req], w: i32, h: i32) {
     let t = ui.t;
-    let Some(r) = st.auth.first() else { return };
+    let Some(r) = auth.first() else { return };
     let mut fr = R::new(0, 0, w - 6, h - 6);
     if let Some(s) = r.shake {
         let e = s.elapsed().as_millis() as i32;
@@ -264,7 +270,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
         }
     }
     ui.frame(fr, true);
-    let more = if st.auth.len() > 1 { crate::tf!("ещё {}", "{} more", "mais {}", st.auth.len() - 1) } else { String::new() };
+    let more = if auth.len() > 1 { crate::tf!("ещё {}", "{} more", "mais {}", auth.len() - 1) } else { String::new() };
     ui.header(R::new(fr.x + 1, 1, fr.w - 2, 30), "lock", "нужен пароль", &more);
     let x = fr.x + 16;
     let iw = fr.w - 32;
@@ -297,75 +303,63 @@ impl App {
     pub fn on_auth(&mut self, e: Ev) {
         match e {
             Ev::Begin { cookie, message, action, user } => {
-                self.st.auth.push(Req { cookie, message, action, user, prompt: String::new(), echo: false, info: String::new(), fails: 0, busy: true, field: Field::default(), shake: None });
-                if self.st.auth.len() == 1 {
-                    self.auth_show();
-                }
+                self.auth.push(Req { cookie, message, action, user, prompt: String::new(), echo: false, info: String::new(), fails: 0, busy: true, field: Field::default(), shake: None, unlock: None, _guard: crate::reload::Busy::take() });
             }
             Ev::Prompt { cookie, prompt, echo } => {
-                if let Some(r) = self.st.auth.iter_mut().find(|r| r.cookie == cookie) {
+                if let Some(r) = self.auth.iter_mut().find(|r| r.cookie == cookie) {
                     (r.prompt, r.echo, r.busy) = (prompt, echo, false);
                 }
             }
             Ev::Info { cookie, text } => {
-                if let Some(r) = self.st.auth.iter_mut().find(|r| r.cookie == cookie) {
+                if let Some(r) = self.auth.iter_mut().find(|r| r.cookie == cookie) {
                     r.info = text;
                 }
             }
             Ev::Fail { cookie } => {
-                if let Some(r) = self.st.auth.iter_mut().find(|r| r.cookie == cookie) {
+                if let Some(r) = self.auth.iter_mut().find(|r| r.cookie == cookie) {
                     r.fails += 1;
                     r.field.clear();
                     r.info.clear();
                     r.shake = Some(Instant::now());
                 }
             }
-            Ev::End { cookie } => {
-                let first = self.st.auth.first().map(|r| r.cookie == cookie).unwrap_or(false);
-                self.st.auth.retain(|r| r.cookie != cookie);
-                if first && self.st.modal == Some(Modal::Auth) {
-                    if self.st.auth.is_empty() {
-                        self.close_modal();
-                    }
-                } else if first && !self.st.auth.is_empty() {
-                    self.auth_show();
-                }
-            }
+            Ev::End { cookie } => self.auth.retain(|r| r.cookie != cookie),
         }
-        self.dirty(&SKind::Modal);
+        self.sync_panel();
+        self.dirty();
     }
 
-    /// окно поверх всего (после разблокировки экрана, если он заперт)
-    pub fn auth_show(&mut self) {
-        if self.st.auth.is_empty() || self.st.locked || self.st.modal == Some(Modal::Auth) {
-            return;
-        }
-        self.close_all();
-        let out = self.focus_out();
-        self.st.modal = Some(Modal::Auth);
-        self.st.field_focus = Some("auth");
-        self.mk(SKind::Dim, &out, Layer::Overlay, "yami-dim", Anchor::all(), (0, 0), (0, 0, 0, 0), -1, KeyboardInteractivity::None);
-        self.mk(SKind::Modal, &out, Layer::Overlay, "yami-auth", Anchor::empty(), (SIZE.0, SIZE.1 + 12), (0, 0, 0, 0), -1, KeyboardInteractivity::Exclusive);
-    }
-
-    /// окно закрыли (Esc, клик мимо, «отмена»): отказ текущему запросу
+    /// окно закрыли (Esc, «отмена»): отказ текущему запросу
     pub fn auth_cancel(&mut self) {
-        if let Some(r) = self.st.auth.first() {
+        let Some(r) = self.auth.first() else { return };
+        if r.unlock.is_some() {
+            self.auth.remove(0);
+            self.sync_panel();
+        } else {
             reply(&r.cookie, None);
         }
     }
 
     pub fn auth_submit(&mut self) {
-        let Some(r) = self.st.auth.first_mut() else { return };
+        let Some(r) = self.auth.first_mut() else { return };
         if r.busy {
             return;
         }
         r.busy = true;
         r.info.clear();
-        let p = r.field.text.clone();
+        let mut p = r.field.text.clone();
         r.field.wipe();
-        reply(&r.cookie, Some(p));
-        self.dirty(&SKind::Modal);
+        if let Some(dev) = r.unlock.clone() {
+            let (tx, name) = (self.tx.clone(), r.message.clone());
+            std::thread::spawn(move || {
+                let res = crate::automount::unlock(&dev, &p);
+                yami_px::ui::wipe(&mut p);
+                let _ = tx.send(Msg::Unlocked(name, res));
+            });
+        } else {
+            reply(&r.cookie, Some(p));
+        }
+        self.dirty();
     }
 
     pub fn auth_key(&mut self, e: &KeyEvent) {
@@ -374,13 +368,13 @@ impl App {
             Keysym::Escape => self.auth_cancel(),
             _ => {
                 let mods = self.mods;
-                if let Some(r) = self.st.auth.first_mut() {
+                if let Some(r) = self.auth.first_mut() {
                     if !r.busy {
-                        App::edit_field(&mut r.field, e, &mods);
+                        crate::screen::edit_field(&mut r.field, e, &mods);
                     }
                 }
             }
         }
-        self.dirty(&SKind::Modal);
+        self.dirty();
     }
 }

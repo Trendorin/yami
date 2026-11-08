@@ -333,8 +333,6 @@ pub struct Settings {
     pub agent_notif: bool,
     /// трей (StatusNotifierWatcher)
     pub agent_tray: bool,
-    /// окно пароля polkit
-    pub agent_polkit: bool,
     /// карточек на экране сразу и сколько хранит история
     pub notif_max: u32,
     pub notif_history: u32,
@@ -346,19 +344,14 @@ pub struct Settings {
     pub media_art_net: bool,
     /// тексты песен с lrclib.net (иначе — только от плеера и файлы .lrc рядом с треком)
     pub lyrics_net: bool,
-    /// флешки, диски, телефоны и камеры подключаются сами, как только их вставили (automount.rs)
-    pub automount: bool,
-    /// подключённое само сразу открывается в файлах (иначе — карточка «открыть»)
-    pub automount_open: bool,
     /// эквалайзер всплывашки музыки и модуля `media`: стиль виджета (bars, line…) или "off" (#13)
     pub media_viz: String,
     /// что показывает всплывашка музыки: cover | lyrics | both | minimal (#13)
     pub media_view: String,
     /// свои имена звуковых устройств: имя PipeWire (`pactl list sinks`) → как показывать
     pub audio_names: std::collections::BTreeMap<String, String>,
-    /// порталы: диалог файлов yami-files и выбор экрана для трансляций (иначе GTK / GNOME)
+    /// портал: диалог файлов yami-files (иначе GTK)
     pub portal_files: bool,
-    pub portal_cast: bool,
 
     // обновления (update.rs)
     /// проверять сама раз в updateEvery часов (0 — только по кнопке)
@@ -431,7 +424,7 @@ pub const THEME_APPS: &[(&str, &str, &str)] = &[
     ("starship", "starship", "палитра приглашения"),
 ];
 /// ключи прошлых версий: их читает миграция (load), `config check` не зовёт их незнакомыми
-const RETIRED: &[&str] = &["appThemes", "shotDir", "shotCopy", "shotSave", "shotLoupe", "shotNotify", "shotDelay", "shotConfirm"];
+const RETIRED: &[&str] = &["appThemes", "shotDir", "shotCopy", "shotSave", "shotLoupe", "shotNotify", "shotDelay", "shotConfirm", "agentPolkit", "automount", "automountOpen", "portalCast"];
 
 pub const MEDIA_VIEWS: &[(&str, &str)] = &[("cover", "обложка"), ("both", "обложка и текст"), ("lyrics", "текст"), ("minimal", "коротко")];
 
@@ -609,20 +602,16 @@ impl Default for Settings {
             game_apps: String::new(),
             agent_notif: true,
             agent_tray: true,
-            agent_polkit: true,
             notif_max: 4,
             notif_history: 50,
             notif_images: true,
             notif_cast: false,
             media_art_net: true,
             lyrics_net: true,
-            automount: true,
-            automount_open: false,
             media_viz: "bars".into(),
             media_view: "cover".into(),
             audio_names: Default::default(),
             portal_files: true,
-            portal_cast: true,
             update_check: true,
             update_every: 24,
             update_channel: "release".into(),

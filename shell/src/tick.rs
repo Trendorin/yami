@@ -75,7 +75,6 @@ impl App {
             self.st.sys.want_gpu = self.st.sys.has_gpu && self.uses("gpu") && !hidden;
             self.st.sys.sample();
             self.weather_tick();
-            self.automount_tick();
             self.wall_park();
             self.bat_check();
             // память видна только в настройках: не читать её каждую секунду зря

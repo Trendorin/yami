@@ -1,6 +1,8 @@
 // Brazilian Portuguese. Keys are the English reference labels.
 #[rustfmt::skip]
 const PT_BR: &[(&str, &str)] = &[
+    ("screenshots are not installed", "as capturas de tela não estão instaladas"),
+    ("the yami-shot module is installed from the first-run setup: yami setup", "o módulo yami-shot é instalado pela configuração inicial: yami setup"),
     (" (with local edits)", " (com alterações locais)"),
     (" + wallpaper", " + papel de parede"),
     ("(or: yami update need --run)", "(ou: yami update need --run)"),

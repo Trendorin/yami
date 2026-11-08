@@ -1,15 +1,13 @@
-// Окно «что показать» для показа экрана (OBS, Discord, браузеры): портал yami-files
-// (screencast.rs) спрашивает по сокету шелла `pick-screen <типы>` и ждёт строку ответа:
-// «monitor DP-1», «window 42» или «cancel». Мониторы — карточками, окна — списком со значками.
+// Окно «что показать» для показа экрана (OBS, Discord, браузеры): бэкенд портала (screencast.rs)
+// спрашивает и ждёт ответ: «monitor DP-1», «window 42» или None (отмена). Мониторы — карточками,
+// окна — списком со значками. Список берётся у niri: только он отдаёт показ экрана этому бэкенду.
 
-use crate::app::{App, Modal, SKind, State};
-use crate::font::PX;
-use crate::gfx::{BoxStyle, R};
-use crate::ui::{Act, Cur, Tone, Ui};
-use smithay_client_toolkit::seat::keyboard::{KeyEvent, Keysym};
-use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
-use std::io::Write;
-use std::os::unix::net::UnixStream;
+use crate::app::{Act, App, Ui};
+use smithay_client_toolkit::seat::keyboard::{KeyEvent, Keysym, Modifiers};
+use std::sync::mpsc::Sender;
+use yami_px::font::PX;
+use yami_px::gfx::{BoxStyle, R};
+use yami_px::ui::{Cur, Field, Tone};
 
 const W: i32 = 560;
 /// окон в списке не больше — дальше колесо
@@ -27,7 +25,7 @@ pub struct Item {
 }
 
 pub struct Pick {
-    pub stream: UnixStream,
+    pub reply: Sender<Option<String>>,
     pub items: Vec<Item>,
     pub sel: usize,
     pub scroll: usize,
@@ -39,9 +37,55 @@ pub fn size(p: &Pick) -> (i32, i32) {
     (W, 44 + if mons { 30 + 96 + 12 } else { 0 } + if wins > 0 { 30 + wins * 32 + 8 } else { 0 } + 52)
 }
 
-pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
+/// заголовок раздела с полоской под ним
+fn title(ui: &mut Ui, x: i32, y: i32, w: i32, s: &str) -> i32 {
     let t = ui.t;
-    let Some(p) = &st.screen_pick else { return };
+    ui.cv.fill(R::new(x, y + 7, 6, 6), t.red);
+    ui.text_in(PX, R::new(x + 14, y, w - 14, 20), s, t.text);
+    ui.cv.fill(R::new(x, y + 24, w, 1), t.border);
+    y + 34
+}
+
+/// для `shot`
+pub fn mock() -> Pick {
+    let (reply, _) = std::sync::mpsc::channel();
+    let w = |t: &str, a: &str, id: u32| Item { reply: format!("window {id}"), monitor: false, title: t.into(), sub: a.into(), icon: a.into(), size: (0, 0) };
+    Pick { reply, items: vec![Item { reply: "monitor DP-1".into(), monitor: true, title: "DP-1".into(), sub: "1920×1080".into(), icon: String::new(), size: (1920, 1080) }, w("yami: a terminal", "kitty", 1), w("Mozilla Firefox", "firefox", 2)], sel: 0, scroll: 0 }
+}
+
+/// правка поля пароля; Ctrl+A/U/V — и в русской раскладке (по положению клавиши)
+pub fn edit_field(f: &mut Field, e: &KeyEvent, mods: &Modifiers) {
+    match e.keysym {
+        Keysym::BackSpace => f.backspace(mods.ctrl),
+        Keysym::Delete => f.delete(),
+        Keysym::Left => f.left(),
+        Keysym::Right => f.right(),
+        Keysym::Home => f.home(),
+        Keysym::End => f.end(),
+        _ if mods.ctrl => match e.raw_code {
+            22 => f.clear(),
+            30 => f.select_all(),
+            47 => {
+                if let Some(t) = yami_px::ui::paste() {
+                    f.insert(&t);
+                }
+            }
+            _ => {}
+        },
+        _ => {
+            if let Some(s) = e.utf8.as_deref().filter(|s| !s.is_empty() && !s.chars().any(|c| c.is_control())) {
+                f.insert(s);
+            }
+        }
+    }
+}
+
+fn niri_json(what: &str) -> serde_json::Value {
+    std::process::Command::new("niri").args(["msg", "-j", what]).output().ok().and_then(|o| serde_json::from_slice(&o.stdout).ok()).unwrap_or(serde_json::Value::Null)
+}
+
+pub fn draw(ui: &mut Ui, p: &Pick, w: i32, h: i32) {
+    let t = ui.t;
     let fr = R::new(0, 0, w - 6, h - 6);
     ui.frame(fr, true);
     ui.header(R::new(1, 1, fr.w - 2, 30), "screen", "что показать", "");
@@ -50,7 +94,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     let mut y = 42;
     let mons: Vec<(usize, &Item)> = p.items.iter().enumerate().filter(|(_, i)| i.monitor).collect();
     if !mons.is_empty() {
-        y = crate::settings::title(ui, x, y, iw, "экраны");
+        y = title(ui, x, y, iw, "экраны");
         let cw = ((iw - (mons.len() as i32 - 1) * 10) / mons.len() as i32).min(170);
         for (k, (i, it)) in mons.iter().enumerate() {
             let r = R::new(x + k as i32 * (cw + 10), y, cw, 92);
@@ -73,7 +117,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     let wins: Vec<(usize, &Item)> = p.items.iter().enumerate().filter(|(_, i)| !i.monitor).collect();
     if !wins.is_empty() {
         let more = if wins.len() > ROWS { crate::tf!("{} — колесо листает", "{} — scroll for more", "{} — role para ver mais", wins.len()) } else { String::new() };
-        y = crate::settings::title(ui, x, y, iw, "окна");
+        y = title(ui, x, y, iw, "окна");
         if !more.is_empty() {
             ui.text_right(PX, R::new(x, y - 34, iw, 20), &more, t.text_faint);
         }
@@ -95,67 +139,51 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
 
 impl App {
     /// запрос от портала: собрать мониторы и окна, показать окно выбора
-    pub fn screen_ask(&mut self, types: u32, stream: UnixStream) {
-        if let Some(old) = self.st.screen_pick.take() {
-            let _ = (&old.stream).write_all(b"cancel\n");
-        }
-        if self.st.locked {
-            let _ = (&stream).write_all(b"cancel\n");
-            return;
+    pub fn screen_ask(&mut self, types: u32, reply: Sender<Option<String>>) {
+        if let Some(old) = self.pick.take() {
+            let _ = old.reply.send(None);
         }
         let mut items = vec![];
         if types & 1 != 0 || types == 0 {
-            for o in crate::displays::load().into_iter().filter(|o| o.on) {
-                let (w, h) = o.size();
-                items.push(Item { reply: format!("monitor {}", o.name), monitor: true, title: o.name.clone(), sub: format!("{w}×{h}"), icon: String::new(), size: (w, h) });
+            let outs = niri_json("outputs");
+            for (name, o) in outs.as_object().into_iter().flatten() {
+                let Some(l) = o.get("logical").filter(|l| !l.is_null()) else { continue };
+                let (w, h) = (l["width"].as_i64().unwrap_or(0) as i32, l["height"].as_i64().unwrap_or(0) as i32);
+                items.push(Item { reply: format!("monitor {name}"), monitor: true, title: name.clone(), sub: format!("{w}×{h}"), icon: String::new(), size: (w, h) });
             }
         }
         if types & 2 != 0 {
-            let mut wins = self.st.niri.wins.clone();
-            wins.sort_by(|a, b| b.ts.partial_cmp(&a.ts).unwrap_or(std::cmp::Ordering::Equal));
-            for w in wins {
-                let icon = crate::icons::icon_for(&self.st.apps, &w.app_id);
-                let title = if w.title.is_empty() { w.app_id.clone() } else { w.title.clone() };
-                items.push(Item { reply: format!("window {}", w.id), monitor: false, title, sub: w.app_id.clone(), icon, size: (0, 0) });
+            if self.apps.is_empty() {
+                self.apps = yami_px::icons::load_apps();
+            }
+            for w in niri_json("windows").as_array().into_iter().flatten() {
+                let Some(id) = w["id"].as_u64() else { continue };
+                let app_id = w["app_id"].as_str().unwrap_or("").to_string();
+                let title = w["title"].as_str().filter(|t| !t.is_empty()).unwrap_or(&app_id).to_string();
+                let icon = yami_px::icons::icon_for(&self.apps, &app_id);
+                items.push(Item { reply: format!("window {id}"), monitor: false, title, sub: app_id, icon, size: (0, 0) });
             }
         }
         // по умолчанию — экран в фокусе
-        let focus = self.st.niri.focused_output();
+        let focus = niri_json("focused-output");
+        let focus = focus["name"].as_str().unwrap_or("");
         let sel = items.iter().position(|i| i.monitor && i.title == focus).unwrap_or(0);
-        let pick = crate::screen::Pick { stream, items, sel, scroll: 0 };
-        let (w, h) = size(&pick);
-        self.st.screen_pick = Some(pick);
-        if self.st.apps.is_empty() {
-            self.st.apps = crate::icons::load_apps();
-        }
-        // поверх всего, как окно пароля (оно важнее — не перебиваем его)
-        if self.st.modal == Some(Modal::Auth) {
-            return;
-        }
-        self.close_all();
-        let out = self.focus_out();
-        self.st.modal = Some(Modal::Screen);
-        self.mk(SKind::Dim, &out, Layer::Overlay, "yami-dim", Anchor::all(), (0, 0), (0, 0, 0, 0), -1, KeyboardInteractivity::None);
-        self.mk(SKind::Modal, &out, Layer::Overlay, "yami-screen", Anchor::empty(), (w, h + 12), (0, 0, 0, 0), -1, KeyboardInteractivity::Exclusive);
+        self.pick = Some(Pick { reply, items, sel, scroll: 0 });
+        self.sync_panel();
+        self.dirty();
     }
 
-    /// ответ порталу и закрыть окно (None — отмена)
+    /// ответ порталу и закрыть окно (false — отмена)
     pub fn screen_reply(&mut self, ok: bool) {
-        let Some(p) = self.st.screen_pick.take() else { return };
-        let line = match p.items.get(p.sel) {
-            Some(i) if ok => format!("{}\n", i.reply),
-            _ => "cancel\n".to_string(),
-        };
-        let _ = (&p.stream).write_all(line.as_bytes());
-        if self.st.modal == Some(Modal::Screen) {
-            self.close_modal();
-        }
+        let Some(p) = self.pick.take() else { return };
+        let _ = p.reply.send(p.items.get(p.sel).filter(|_| ok).map(|i| i.reply.clone()));
+        self.sync_panel();
     }
 
     pub fn screen_click(&mut self, a: &Act, double: bool) {
         match a {
             Act::ScreenSel(i) => {
-                if let Some(p) = self.st.screen_pick.as_mut() {
+                if let Some(p) = self.pick.as_mut() {
                     p.sel = *i;
                 }
                 if double {
@@ -167,19 +195,19 @@ impl App {
             Act::ScreenCancel => self.screen_reply(false),
             _ => {}
         }
-        self.dirty(&SKind::Modal);
+        self.dirty();
     }
 
     pub fn screen_wheel(&mut self, up: bool) {
-        if let Some(p) = self.st.screen_pick.as_mut() {
+        if let Some(p) = self.pick.as_mut() {
             let n = p.items.iter().filter(|i| !i.monitor).count();
             p.scroll = if up { p.scroll.saturating_sub(1) } else { (p.scroll + 1).min(n.saturating_sub(ROWS)) };
         }
-        self.dirty(&SKind::Modal);
+        self.dirty();
     }
 
     pub fn screen_key(&mut self, e: &KeyEvent) {
-        let Some(p) = self.st.screen_pick.as_mut() else { return };
+        let Some(p) = self.pick.as_mut() else { return };
         let n = p.items.len().max(1);
         match e.keysym {
             Keysym::Escape => return self.screen_reply(false),
@@ -198,6 +226,6 @@ impl App {
                 p.scroll = k + 1 - ROWS;
             }
         }
-        self.dirty(&SKind::Modal);
+        self.dirty();
     }
 }

@@ -143,8 +143,6 @@ impl App {
                     Some(Modal::Launcher) => crate::launcher::draw(&mut ui, st, w, h),
                     Some(Modal::Power) => crate::power::draw(&mut ui, st, w, h),
                     Some(Modal::Settings) => crate::settings::draw(&mut ui, st, w, h),
-                    Some(Modal::Auth) => crate::auth::draw(&mut ui, st, w, h),
-                    Some(Modal::Screen) => crate::screen::draw(&mut ui, st, w, h),
                     Some(Modal::Reply) => crate::reply::draw(&mut ui, st, w, h),
                     Some(Modal::Walls) => crate::walls::draw(&mut ui, st, w, h),
                     None => {}

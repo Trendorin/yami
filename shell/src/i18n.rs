@@ -80,6 +80,8 @@ fn pt_table() -> &'static HashMap<&'static str, &'static str> {
 include!("i18n_pt_br.rs");
 
 const PAIRS: &[(&str, &str)] = &[
+    ("скриншоты не установлены", "screenshots are not installed"),
+    ("модуль yami-shot ставится из первой настройки: yami setup", "the yami-shot module is installed from the first-run setup: yami setup"),
     // экран входа (login.rs)
     ("экран входа", "login screen"),
     ("экран входа: greetd + yami-greet", "login screen: greetd + yami-greet"),

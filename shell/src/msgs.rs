@@ -83,8 +83,6 @@ impl App {
                 self.dirty_where(|k| matches!(k, SKind::Popup | SKind::Widget(_)));
             }
             Msg::Notif(n) => self.on_notif(n),
-            Msg::Volumes(v) => self.automount_volumes(v),
-            Msg::AutoMounted(v, res) => self.automount_done(v, res),
             Msg::Update(i) => self.on_update(i),
             Msg::NotifClose(id) => {
                 self.st.notifs.remove(id, false);
@@ -120,9 +118,7 @@ impl App {
                 self.dirty_where(|k| matches!(k, SKind::Popup | SKind::Bar));
             }
             Msg::Pam(ok) => self.on_pam(ok),
-            Msg::Auth(e) => self.on_auth(e),
             Msg::Prof(p) => self.on_prof(p),
-            Msg::ScreenPick(types, s) => self.screen_ask(types, s),
             Msg::Clip(lines) => {
                 self.st.launcher.clip_lines = lines;
                 self.st.launcher.refresh(&self.st.apps, &self.st.niri.wins);

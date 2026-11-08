@@ -56,6 +56,17 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32, main: bool) {
     ui.zone(fr, Act::LockField, Cur::Text);
 }
 
+/// метка «экран заперт» для других программ сеанса: yami-agents не подключает под ней чужие флешки
+pub fn flag(on: bool) {
+    let Some(d) = std::env::var_os("XDG_RUNTIME_DIR") else { return };
+    let p = std::path::PathBuf::from(d).join("yami-locked");
+    if on {
+        let _ = std::fs::write(p, b"");
+    } else {
+        let _ = std::fs::remove_file(p);
+    }
+}
+
 impl App {
     pub fn lock_key(&mut self, e: &KeyEvent) {
         if self.st.lock_status == "проверяю…" {
@@ -94,7 +105,6 @@ impl App {
             self.sync_widgets();
             self.sync_titles();
             self.sync_dock();
-            self.auth_show();
         } else {
             self.st.lock_fails += 1;
             self.st.lock_field.wipe();
@@ -114,6 +124,7 @@ impl App {
         }
         self.close_all();
         self.st.locked = true;
+        flag(true);
         // первый кадр — на копии обоев, полная догонит
         self.wall_need();
         self.st.lock_field.wipe();
@@ -123,7 +134,10 @@ impl App {
                 self.lock = Some(l);
                 self.sync_lock_surfs();
             }
-            Err(_) => self.st.locked = false,
+            Err(_) => {
+                self.st.locked = false;
+                flag(false);
+            }
         }
     }
 
@@ -150,8 +164,8 @@ impl App {
         }
         self.drop_lock_surfs();
         self.st.locked = false;
+        crate::lock::flag(false);
         self.st.lock_field.wipe();
-        self.automount_unlocked();
         let _ = self.conn.roundtrip();
         self.dirty_all();
     }

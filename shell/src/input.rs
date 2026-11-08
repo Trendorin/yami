@@ -340,8 +340,6 @@ impl App {
                 Some(Modal::Launcher) => self.launcher_key(e),
                 Some(Modal::Power) => self.power_key(e),
                 Some(Modal::Settings) => self.settings_key(e),
-                Some(Modal::Auth) => self.auth_key(e),
-                Some(Modal::Screen) => self.screen_key(e),
                 Some(Modal::Reply) => self.reply_key(e),
                 Some(Modal::Walls) => self.walls_key(e),
                 None => {}

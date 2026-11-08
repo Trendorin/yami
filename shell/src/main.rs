@@ -9,13 +9,10 @@ pub use yami_px::{font, gfx, icons, theme};
 
 mod agents;
 mod app;
-mod auth;
-mod automount;
 mod profile;
 mod iconsets;
 mod restyle;
 mod displays;
-mod screen;
 mod audio;
 mod bar;
 mod bartab;

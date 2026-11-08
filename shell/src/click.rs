@@ -172,7 +172,7 @@ impl App {
             }
             Act::NotifAct(id, key) if key == "inline-reply" => self.reply_open(id),
             Act::NotifAct(id, key) => {
-                if !self.update_note_action(id) && !self.automount_note_action(id) {
+                if !self.update_note_action(id) {
                     crate::dbus::notif_action(id, &key);
                 }
                 self.st.notifs.remove(id, false);
@@ -225,11 +225,8 @@ impl App {
                 }
             }
             Act::EditDone => self.set_editing(false),
-            Act::LockField | Act::AuthField => {}
-            Act::AuthOk => self.auth_submit(),
-            Act::AuthCancel => self.auth_cancel(),
+            Act::LockField => {}
             Act::Prof(p) => self.prof_set(p),
-            Act::ScreenSel(_) | Act::ScreenOk | Act::ScreenCancel => self.screen_click(&a, double),
             Act::Disp(_) | Act::DispSel(_) | Act::DispDrag(_) => self.disp_click(&a),
             _ => {}
         }
@@ -256,7 +253,6 @@ impl App {
             }
             Act::DockItem(i) => self.dock_wheel(i, up),
             Act::Popup("profile") | Act::Prof(_) => self.prof_step(if up { -1 } else { 1 }),
-            Act::ScreenSel(_) => self.screen_wheel(up),
             Act::Kb => self.st.niri.act(serde_json::json!({"SwitchLayout": {"layout": if up { "Prev" } else { "Next" }}})),
             Act::CalMonth(_) | Act::Popup("cal") => {
                 self.st.cal_month += if up { -1 } else { 1 };

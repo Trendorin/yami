@@ -61,12 +61,6 @@ pub fn files_pick(mode: &str, folder: &std::path::Path, args: &[&str]) -> Option
 static INHERITED: std::sync::Mutex<Vec<i32>> = std::sync::Mutex::new(Vec::new());
 
 pub(crate) fn note_inherited() {
-    // `msg restart` и обновление — exec в том же pid с меткой в окружении (её снимаем: детям шелла
-    // она ни к чему); при входе в систему меток нет
-    if std::env::var_os("YAMI_RESTARTED").is_some() {
-        std::env::remove_var("YAMI_RESTARTED");
-        RESTARTED.store(true, std::sync::atomic::Ordering::Relaxed);
-    }
     // дети всех нитей: /proc/self/task/*/children (на старте нить одна); нет файла (ядро без
     // CONFIG_PROC_CHILDREN) — обход всего /proc
     let mut kids: Vec<i32> = vec![];
@@ -93,13 +87,6 @@ pub(crate) fn note_inherited() {
     if let Ok(mut v) = INHERITED.lock() {
         *v = kids;
     }
-}
-
-static RESTARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-/// шелл запущен заново из себя же (`msg restart`, обновление), а не при входе в систему
-pub(crate) fn restarted() -> bool {
-    RESTARTED.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 pub(crate) fn reap_inherited() {

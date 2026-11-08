@@ -1,16 +1,19 @@
 // Бэкенд xdg-desktop-portal: org.freedesktop.impl.portal.ScreenCast. OBS, Discord/Equibop,
-// браузеры просят показ экрана — окно выбора рисует шелл (пиксельное, `pick-screen` по его
-// сокету), а сам поток делает niri через свой Mutter ScreenCast API. PipeWire-удалёнку
-// приложению открывает уже сам xdg-desktop-portal по номерам узлов из ответа Start.
-// Шелла нет — показываем экран в фокусе, без вопросов.
+// браузеры просят показ экрана — окно выбора рисует этот же процесс (screen.rs), а сам поток делает
+// niri через свой Mutter ScreenCast API. PipeWire-удалёнку приложению открывает уже сам
+// xdg-desktop-portal по номерам узлов из ответа Start.
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use crate::app::Msg;
+use calloop::channel::Sender;
 use std::sync::{Arc, Mutex, OnceLock};
 use zbus::blocking::{Connection, MessageIterator, Proxy};
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value};
 
 pub static CONN: OnceLock<Connection> = OnceLock::new();
+
+/// имя бэкенда на шине (config/portal/yami-agents.portal)
+pub const NAME: &str = "org.freedesktop.impl.portal.desktop.yamiagents";
 
 const MUTTER: &str = "org.gnome.Mutter.ScreenCast";
 
@@ -30,12 +33,23 @@ type Sessions = Arc<Mutex<HashMap<String, Sess>>>;
 
 pub struct ScreenCast {
     sessions: Sessions,
+    tx: Mutex<Sender<Msg>>,
 }
 
-impl ScreenCast {
-    pub fn new() -> ScreenCast {
-        ScreenCast { sessions: Arc::new(Mutex::new(HashMap::new())) }
-    }
+/// занять имя бэкенда на шине сеанса; не вышло — показ экрана достанется другому порталу
+pub fn serve(tx: Sender<Msg>) {
+    std::thread::spawn(move || {
+        let built = zbus::blocking::connection::Builder::session()
+            .and_then(|b| b.serve_at("/org/freedesktop/portal/desktop", ScreenCast { sessions: Arc::new(Mutex::new(HashMap::new())), tx: Mutex::new(tx) }))
+            .and_then(|b| b.name(NAME))
+            .and_then(|b| b.build());
+        match built {
+            Ok(c) => {
+                let _ = CONN.set(c);
+            }
+            Err(e) => eprintln!("yami-agents: {NAME}: {e}"),
+        }
+    });
 }
 
 /// объект сеанса портала: приложение закрывает его — останавливаем поток у niri
@@ -43,7 +57,7 @@ struct Session {
     sessions: Sessions,
     key: String,
     /// пока сеанс открыт, портал не перезапускается на новый бинарь
-    _busy: crate::portal::Busy,
+    _busy: crate::reload::Busy,
 }
 
 #[zbus::interface(name = "org.freedesktop.impl.portal.Session")]
@@ -72,32 +86,6 @@ fn stop(m: &OwnedObjectPath) {
 
 fn opt_u32(o: &HashMap<String, OwnedValue>, k: &str) -> Option<u32> {
     o.get(k).and_then(|v| u32::try_from(v).ok())
-}
-
-/// выбор в шелле: «monitor DP-1», «window 42» или None (отмена)
-fn ask_shell(types: u32) -> Option<String> {
-    let dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| format!("/run/user/{}", unsafe { libc::getuid() }));
-    match std::os::unix::net::UnixStream::connect(std::path::Path::new(&dir).join("yami-shell.sock")) {
-        Ok(mut s) => {
-            writeln!(s, "pick-screen {types}").ok()?;
-            let mut line = String::new();
-            BufReader::new(s).read_line(&mut line).ok()?;
-            let line = line.trim().to_string();
-            (line.starts_with("monitor ") || line.starts_with("window ")).then_some(line)
-        }
-        // шелла нет: экран в фокусе
-        Err(_) => focused_output().map(|o| format!("monitor {o}")),
-    }
-}
-
-fn focused_output() -> Option<String> {
-    let sock = std::env::var("NIRI_SOCKET").ok()?;
-    let mut s = std::os::unix::net::UnixStream::connect(sock).ok()?;
-    writeln!(s, "\"FocusedOutput\"").ok()?;
-    let mut line = String::new();
-    BufReader::new(s).read_line(&mut line).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&line).ok()?;
-    v.pointer("/Ok/FocusedOutput/name").and_then(|n| n.as_str()).map(String::from)
 }
 
 struct Started {
@@ -170,7 +158,7 @@ impl ScreenCast {
     async fn create_session(&self, _handle: ObjectPath<'_>, session_handle: ObjectPath<'_>, _app_id: &str, _options: HashMap<String, OwnedValue>, #[zbus(object_server)] server: &zbus::ObjectServer) -> (u32, HashMap<String, OwnedValue>) {
         let key = session_handle.to_string();
         self.sessions.lock().unwrap().insert(key.clone(), Sess { types: 1, cursor: 2, mutter: None });
-        if server.at(key.as_str(), Session { sessions: self.sessions.clone(), key: key.clone(), _busy: crate::portal::Busy::take() }).await.is_err() {
+        if server.at(key.as_str(), Session { sessions: self.sessions.clone(), key: key.clone(), _busy: crate::reload::Busy::take() }).await.is_err() {
             return (2, HashMap::new());
         }
         let mut r = HashMap::new();
@@ -191,8 +179,12 @@ impl ScreenCast {
     async fn start(&self, _handle: ObjectPath<'_>, session_handle: ObjectPath<'_>, _app_id: &str, _parent_window: &str, _options: HashMap<String, OwnedValue>) -> (u32, HashMap<String, OwnedValue>) {
         let key = session_handle.to_string();
         let Some(s) = self.sessions.lock().unwrap().get(&key).cloned() else { return (2, HashMap::new()) };
+        let (ptx, prx) = std::sync::mpsc::channel();
+        if self.tx.lock().unwrap().send(Msg::PickScreen(s.types, ptx)).is_err() {
+            return (2, HashMap::new());
+        }
         let res = blocking::unblock(move || {
-            let pick = ask_shell(s.types)?;
+            let pick = prx.recv().ok()??;
             Some(record(&pick, s.cursor))
         })
         .await;

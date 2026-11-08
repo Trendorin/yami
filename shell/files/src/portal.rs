@@ -1,4 +1,4 @@
-// Бэкенд xdg-desktop-portal: org.freedesktop.impl.portal.FileChooser (и ScreenCast — screencast.rs). Браузеры (Firefox,
+// Бэкенд xdg-desktop-portal: org.freedesktop.impl.portal.FileChooser. Браузеры (Firefox,
 // LibreWolf, Chromium), Telegram, Electron и всё, что идёт через портал, вместо окна GNOME
 // получают пиксельный диалог yami-files. Сам процесс без окон (~2 МБ): на каждый запрос
 // запускает `yami-files --pick …` и ждёт выбранные пути.
@@ -103,7 +103,7 @@ fn filter_arg(f: &Filter) -> String {
     format!("{}|{}", f.0.replace('|', "/"), pats.join(";"))
 }
 
-/// чем занят портал: сеансы показа экрана (screencast.rs) и открытые диалоги
+/// чем занят портал: открытые диалоги
 pub static BUSY: AtomicUsize = AtomicUsize::new(0);
 /// пришёл SIGHUP: на месте бинаря новый, перезапуститься при первой свободе
 static RELOAD: AtomicBool = AtomicBool::new(false);
@@ -324,7 +324,6 @@ pub fn serve() -> i32 {
     }
     let built = zbus::blocking::connection::Builder::session()
         .and_then(|b| b.serve_at("/org/freedesktop/portal/desktop", Chooser))
-        .and_then(|b| b.serve_at("/org/freedesktop/portal/desktop", crate::screencast::ScreenCast::new()))
         .and_then(|b| b.serve_at("/org/freedesktop/FileManager1", FileManager))
         .and_then(|b| b.build());
     let conn = match built {
@@ -334,7 +333,6 @@ pub fn serve() -> i32 {
             return 1;
         }
     };
-    let _ = crate::screencast::CONN.set(conn.clone());
     // имена: портал и FileManager1 (второе может быть занято Dolphin — тогда без него)
     use zbus::fdo::RequestNameFlags;
     if let Err(e) = conn.request_name_with_flags(NAME, RequestNameFlags::ReplaceExisting.into()) {

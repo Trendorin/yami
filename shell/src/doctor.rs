@@ -5,7 +5,6 @@
 
 use yami_px::paths::pids;
 use crate::cmd::Sty;
-use std::path::Path;
 
 /// программа → для чего (RU, EN); true — без неё не работает основное
 const DEPS: &[(&str, &str, &str, bool)] = &[
@@ -194,10 +193,8 @@ fn services(y: &Sty, problems: &mut u32) {
             }
         }
     }
-    let helper = Path::new(crate::auth::SOCKET).exists() || crate::auth::helper().is_some();
-    if set.agent_polkit && !helper {
-        *problems += 1;
-        line(y, &y.bad("✕"), &crate::tf!("помощник polkit", "polkit helper", "auxiliar do polkit"), &crate::tf!("нет polkit-agent-helper-1: окна пароля не будет", "no polkit-agent-helper-1: no password window", "polkit-agent-helper-1 ausente: a janela de senha não será exibida"));
+    if !which("yami-agents") {
+        line(y, &y.dim("·"), "yami-agents", &crate::tf!("не установлен: окон пароля polkit и автоподключения нет (yami setup)", "not installed: no polkit password window and no automount (yami setup)", "não instalado: sem janela de senha do polkit e sem montagem automática (yami setup)"));
     }
 }
 

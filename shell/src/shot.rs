@@ -1,7 +1,7 @@
 // Снимки панелей без Wayland: рисует в память и пишет PNG. Чтобы проверить вид и перевод,
 // не трогая экран пользователя (и не открывая ничего поверх его игры).
 //
-//   yami-shell shot [ЦЕЛЬ…] [--lang ru|en] [--theme dark|light] [--defaults] [--transparent] [--frame PNG] [-o ПАПКА]
+//   yami-shell shot [ЦЕЛЬ…] [--lang ru|en] [--theme dark|light] [--defaults] [--transparent] [-o ПАПКА]
 //
 // Без цели — все панели. При --lang en печатает надписи, оставшиеся русскими, и выходит с 1.
 // Окна, программы и уведомление — мок-овые (снимок не зависит от машины), датчики — настоящие.
@@ -88,8 +88,6 @@ const TARGETS: &[&str] = &[
     "curtain",
     "curtain:badge",
     "osd:curtain",
-    "auth",
-    "screen-pick",
     "settings:shots",
     "settings:windows",
     "settings:dock",
@@ -121,8 +119,6 @@ const NATIVE: &[&str] = &["Русский"]; // i18n-ok
 
 /// --transparent: без подложки, с честной альфой (картинки для README кладутся на обои)
 static CLEAR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-/// --frame FILE: настоящий кадр экрана под оверлеем скриншота (tools/readme-shots.sh)
-static FRAME: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
 pub fn run(args: &[String]) -> i32 {
     let mut lang = String::new();
@@ -138,11 +134,8 @@ pub fn run(args: &[String]) -> i32 {
             "--defaults" => defaults = true,
             "--theme" => mode = it.next().map(|m| m == "light"),
             "--transparent" => CLEAR.store(true, std::sync::atomic::Ordering::Relaxed),
-            "--frame" => {
-                let _ = FRAME.set(it.next().map(PathBuf::from).unwrap_or_default());
-            }
             "-h" | "--help" | "list" => {
-                println!("yami-shell shot [TARGET…] [--lang ru|en] [--defaults] [--transparent] [--frame PNG] [-o DIR]\ntargets: {}", TARGETS.join(" "));
+                println!("yami-shell shot [TARGET…] [--lang ru|en] [--defaults] [--transparent] [-o DIR]\ntargets: {}", TARGETS.join(" "));
                 return 0;
             }
             t if TARGETS.contains(&t) => targets.push(t.to_string()),
@@ -559,43 +552,6 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             st.locked = true;
             (1280, 720)
         }
-        "screen-pick" => {
-            st.modal = Some(Modal::Screen);
-            let (a, _b) = std::os::unix::net::UnixStream::pair().expect("pair");
-            let it = |reply: &str, monitor: bool, title: &str, sub: &str, icon: &str, size: (i32, i32)| crate::screen::Item { reply: reply.into(), monitor, title: title.into(), sub: sub.into(), icon: icon.into(), size };
-            let p = crate::screen::Pick {
-                stream: a,
-                items: vec![
-                    it("monitor DP-1", true, "DP-1", "2560×1440", "", (2560, 1440)),
-                    it("monitor HDMI-A-1", true, "HDMI-A-1", "1080×1920", "", (1080, 1920)),
-                    it("window 1", false, "~/projects/yami", "kitty", "kitty", (0, 0)),
-                    it("window 2", false, "niri wiki — Firefox", "firefox", "firefox", (0, 0)),
-                    it("window 3", false, "Steam", "steam", "steam", (0, 0)),
-                ],
-                sel: 0,
-                scroll: 0,
-            };
-            let sz = crate::screen::size(&p);
-            st.screen_pick = Some(p);
-            sz
-        }
-        "auth" => {
-            st.modal = Some(Modal::Auth);
-            st.auth = vec![crate::auth::Req {
-                cookie: "1".into(),
-                message: "Authentication is required to change the system power profile".into(),
-                action: "net.hadess.PowerProfiles.switch-profile".into(),
-                user: "user".into(),
-                prompt: "Password: ".into(),
-                echo: false,
-                info: String::new(),
-                fails: 1,
-                busy: false,
-                field: crate::ui::Field { text: "hunter2".into(), cur: 7, all: false },
-                shake: None,
-            }];
-            crate::auth::SIZE
-        }
         // значки программ во всех видах и размерах: как есть, пиксельные, в тонах палитры
         "icons" => (16 + 96 + ICON_APPS.len() as i32 * 56, 16 + 9 * 56),
         "dock" => {
@@ -648,8 +604,6 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             "curtain" => crate::curtain::draw(&mut ui, st, "shot", w, h),
             "dock" => crate::dock::draw(&mut ui, st, w, h),
             "icons" => icons_grid(&mut ui, st),
-            "auth" => crate::auth::draw(&mut ui, st, w, h),
-            "screen-pick" => crate::screen::draw(&mut ui, st, w, h),
             _ => {}
         }
     }
@@ -677,12 +631,6 @@ fn icons_grid(ui: &mut Ui, st: &State) {
     }
 }
 
-/// кадр из --frame как непрозрачный ARGB; None — нет флага или файл не читается
-fn frame() -> Option<(i32, i32, Option<Vec<u32>>)> {
-    let img = image::open(FRAME.get()?).map_err(|e| eprintln!("shot: --frame: {e}")).ok()?.to_rgb8();
-    let px = img.pixels().map(|p| 0xff000000 | (p[0] as u32) << 16 | (p[1] as u32) << 8 | p[2] as u32).collect();
-    Some((img.width() as i32, img.height() as i32, Some(px)))
-}
 
 fn save_png(buf: &[u32], w: i32, h: i32, path: &Path) {
     let mut rgba = Vec::with_capacity(buf.len() * 4);

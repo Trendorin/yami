@@ -64,6 +64,12 @@ impl App {
                 self.theme_rerun();
                 return true;
             }
+            // части yami-agents: их файл настроек, не настройки шелла
+            Act::SBool(k) if matches!(*k, "agent_polkit" | "agent_cast" | "automount" | "automount_open") => {
+                crate::agents::AgentsCfg::flip(k);
+                crate::agents::write_portals(&self.st.set);
+                self.dirty(&SKind::Modal);
+            }
             Act::SBool(k) if k.starts_with("shot_") => {
                 // настройки скриншотов — файл yami-shot, а не настройки шелла
                 let c = &mut self.st.shot_cfg;

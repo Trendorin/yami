@@ -49,7 +49,6 @@ impl App {
         self.write_fx();
         self.side_sync();
         crate::agents::write_portals(&self.st.set);
-        self.automount_sync();
         self.sync_wall();
         crate::keys::write(&self.st.set);
         crate::login::publish(&self.st.set);
