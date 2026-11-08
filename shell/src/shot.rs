@@ -110,6 +110,16 @@ const TARGETS: &[&str] = &[
     "settings:updates-busy",
     "settings:updates-pick",
     "settings:updates-need",
+    "welcome:hello",
+    "welcome:color",
+    "welcome:niri",
+    "welcome:niri-others",
+    "welcome:modules",
+    "welcome:modules-pass",
+    "welcome:modules-busy",
+    "welcome:modules-failed",
+    "welcome:keys",
+    "welcome:done",
     "dock",
     "icons",
 ];
@@ -244,6 +254,8 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
         return;
     }
     st.modal = None;
+    st.welcome = None;
+    st.mods_here = crate::welcome::Here::all();
     st.popup = None;
     st.menu = None;
     st.osd = None;
@@ -379,6 +391,11 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                     st.keys.new_key = "Mod+Alt+M".into();
                 }
             }
+            crate::settings::SIZE
+        }
+        "welcome" => {
+            st.modal = Some(Modal::Settings);
+            crate::welcome::mock(st, arg);
             crate::settings::SIZE
         }
         "launcher" | "clipboard" => {
@@ -589,7 +606,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                 ui.cv.ox = 0;
                 ui.cv.oy = 0;
             }
-            "settings" => crate::settings::draw(&mut ui, st, w, h),
+            "settings" | "welcome" => crate::settings::draw(&mut ui, st, w, h),
             "launcher" | "clipboard" => crate::launcher::draw(&mut ui, st, w, h),
             "reply" => crate::reply::draw(&mut ui, st, w, h),
             "power" => crate::power::draw(&mut ui, st, w, h),

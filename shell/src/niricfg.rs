@@ -122,6 +122,79 @@ fn niri_default(text: &str) -> bool {
     text.trim_start().starts_with("// This config is in the KDL format: https://kdl.dev")
 }
 
+/// программы, которые спорят с yami, если конфиг niri их запускает: вид спора — для подписи
+const OTHERS: &[(&str, &str)] = &[
+    ("waybar", "bar"),
+    ("ironbar", "bar"),
+    ("yambar", "bar"),
+    ("hyprpanel", "bar"),
+    ("eww", "bar"),
+    ("quickshell", "shell"),
+    ("qs", "shell"),
+    ("noctalia-shell", "shell"),
+    ("dms", "shell"),
+    ("ags", "shell"),
+    ("mako", "notif"),
+    ("dunst", "notif"),
+    ("swaync", "notif"),
+    ("fnott", "notif"),
+    ("swaybg", "wall"),
+    ("swww-daemon", "wall"),
+    ("swayidle", "idle"),
+    ("hypridle", "idle"),
+];
+
+/// чужая программа в конфиге niri: строка spawn-at-startup с ней
+#[derive(Clone, Debug)]
+pub struct Other {
+    pub prog: &'static str,
+    pub kind: &'static str,
+    /// строка целиком, как в файле: по ней и закомментируем (номер мог уехать)
+    pub line: String,
+}
+
+/// первое слово команды в строке spawn: имя программы без пути
+fn spawned(l: &str) -> Option<&str> {
+    let t = l.trim_start();
+    let rest = t.strip_prefix("spawn-at-startup").or_else(|| t.strip_prefix("spawn-sh-at-startup"))?;
+    let cmd = rest.trim_start().strip_prefix('"')?;
+    let first = cmd.split(['"', ' ']).next()?;
+    Some(first.rsplit('/').next().unwrap_or(first))
+}
+
+/// что в конфиге niri (только в нём самом, не в его include) запускает второй бар, свои
+/// уведомления, обои или ожидание
+pub fn others() -> Vec<Other> {
+    let Ok(text) = std::fs::read_to_string(config_path()) else { return vec![] };
+    let mut v: Vec<Other> = vec![];
+    for l in text.lines() {
+        let Some(p) = spawned(l) else { continue };
+        if let Some((prog, kind)) = OTHERS.iter().find(|(n, _)| *n == p) {
+            if !v.iter().any(|o| o.prog == *prog) {
+                v.push(Other { prog, kind, line: l.to_string() });
+            }
+        }
+    }
+    v
+}
+
+/// закомментировать запуск чужой программы (копия файла — рядом); вернуть — убрать «// yami: »
+pub fn comment_out(o: &Other) -> Result<String, String> {
+    let cfg = std::fs::canonicalize(config_path()).unwrap_or_else(|_| config_path());
+    let text = std::fs::read_to_string(&cfg).map_err(|e| e.to_string())?;
+    if !text.lines().any(|l| l == o.line) {
+        return Err(crate::tf!("строки с {} в конфиге уже нет", "the {} line is no longer in the config", "a linha do {} já não está na configuração", o.prog));
+    }
+    let new: Vec<String> = text.lines().map(|l| if l == o.line { format!("// yami: {l}") } else { l.to_string() }).collect();
+    let saved = backup(&cfg, &text)?;
+    crate::config::write_atomic(&cfg, &(new.join("\n") + "\n")).map_err(|e| e.to_string())?;
+    if let Err(e) = validate(&cfg) {
+        let _ = crate::config::write_atomic(&cfg, &text);
+        return Err(e);
+    }
+    Ok(crate::tf!("{} больше не запускается со входом (копия: {})", "{} no longer starts at login (a copy: {})", "{} não inicia mais com o login (cópia: {})", o.prog, yami_px::paths::pretty(&saved)))
+}
+
 /// конфиг, который yami до 3.0 писал целиком (его перезаписывало каждое обновление)
 fn old_yami(text: &str) -> bool {
     text.contains("YAMI // niri") && text.contains("\"yami-binds.kdl\"")
@@ -443,6 +516,15 @@ mod tests {
         assert_eq!(parse_version("niri 26.04-yami.6 (78cbb03a)"), Some((26, 4)));
         assert_eq!(parse_version("niri 25.11 (abc)"), Some((25, 11)));
         assert_eq!(relative(Path::new("/h/.config/niri"), Path::new("/h/.config/yami/niri/yami.kdl")), "../yami/niri/yami.kdl");
+    }
+
+    #[test]
+    fn spawned_programs() {
+        assert_eq!(super::spawned(r#"spawn-at-startup "waybar""#), Some("waybar"));
+        assert_eq!(super::spawned(r#"  spawn-at-startup "/usr/bin/mako" "--x""#), Some("mako"));
+        assert_eq!(super::spawned(r#"spawn-sh-at-startup "qs -c noctalia-shell""#), Some("qs"));
+        assert_eq!(super::spawned(r#"// spawn-at-startup "waybar""#), None);
+        assert_eq!(super::spawned("binds {"), None);
     }
 
     #[test]

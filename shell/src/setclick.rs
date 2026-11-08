@@ -11,6 +11,9 @@ use crate::widgets::{self, ANIMS, COLORS, SIZES, SOURCES, STYLES};
 impl App {
     /// клики внутри настроек; true — обработано
     pub fn settings_click(&mut self, a: &Act) -> bool {
+        if self.welcome_click(a) {
+            return true;
+        }
         let s = &mut self.st.set;
         match a {
             Act::STab(id) => {
@@ -312,10 +315,8 @@ impl App {
                     };
                     self.settings_changed();
                 }
-                "open_setup" => {
-                    self.close_modal();
-                    crate::app::App::spawn(&["yami-setup".to_string()]);
-                }
+                "open_setup" => self.welcome_open("modules"),
+                "open_welcome" => self.welcome_open("hello"),
                 "dock_anim" => {
                     s.dock_anim = cycle(&[("grow", ""), ("wave", ""), ("lift", ""), ("none", "")], &s.dock_anim).into();
                     self.settings_changed();

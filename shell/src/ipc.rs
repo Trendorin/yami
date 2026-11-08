@@ -88,6 +88,8 @@ impl crate::app::App {
             "power" => self.toggle_modal(Modal::Power, false),
             "settings" => self.toggle_modal(Modal::Settings, false),
             "walls" => self.walls_open(false),
+            "welcome" => self.welcome_open("hello"),
+            c if c.starts_with("welcome ") => self.welcome_open(c["welcome ".len()..].trim()),
             "lock" => self.lock_now(),
             "bar" => self.toggle_bar(),
             "stacking" => {

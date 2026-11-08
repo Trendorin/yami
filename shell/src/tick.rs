@@ -98,6 +98,7 @@ impl App {
             }
             self.check_settings_file();
             self.need_tick();
+            self.welcome_tick();
             self.skwd_tick();
             // ночной свет упал сам — значок в баре гаснет
             let n = self.st.night.running();

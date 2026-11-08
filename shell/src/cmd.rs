@@ -76,7 +76,7 @@ fn help(y: &Sty, me: &str) {
     y.section(&crate::tf!("сеанс", "session", "sessão"));
     y.row("open <panel>", &crate::tf!("launcher clipboard settings[:вкладка] power lock screenshot …", "launcher clipboard settings[:tab] power lock screenshot …", "launcher clipboard settings[:tab] power lock screenshot …"));
     y.row("msg <cmd>", &crate::tf!("прямая команда шеллу (yami help msg)", "a raw command to the running shell (yami help msg)", "um comando direto para o shell em execução (yami help msg)"));
-    y.row("setup", &crate::tf!("окно настройки: вид, модули — поставить или убрать", "the setup window: look, modules to add or remove", "a janela de configuração: visual, módulos para adicionar ou remover"));
+    y.row("setup [step]", &crate::tf!("первая настройка заново: язык, вид, бар, клавиши, niri, модули (шаг: modules, niri…)", "the first-run setup again: language, look, bar, keys, niri, modules (step: modules, niri…)", "a configuração inicial de novo: idioma, visual, barra, atalhos, niri, módulos (passo: modules, niri…)"));
     y.row("restart", &crate::tf!("перезапустить шелл (подождёт, если играешь)", "restart the shell (waits while you play)", "reiniciar o shell (aguarda enquanto você joga)"));
     y.row("status", &crate::tf!("что работает: шелл, портал, niri, службы D-Bus", "what is running: shell, portal, niri, D-Bus services", "o que está em execução: shell, portal, niri e serviços D-Bus"));
     y.row("run", &crate::tf!("запустить шелл (так делает niri)", "run the shell (niri does this)", "iniciar o shell (o niri faz isso)"));
@@ -168,6 +168,7 @@ pub fn msg_ok(cmd: &str) -> bool {
     match head {
         "launcher" | "clipboard" | "power" | "lock" | "bar" | "stacking" | "minimize" | "restore" | "edit" | "reload" | "quit" | "ping" | "restart" | "profile" | "night" | "walls" => one(&mut w),
         "settings" => w.next().is_none_or(|t| crate::settings::find(t).is_some()) && one(&mut w),
+        "welcome" => w.next().is_none_or(|t| crate::welcome::has_step(t)) && one(&mut w),
         "popup" => w.next().is_some_and(|k| crate::popups::KINDS.contains(&k)) && one(&mut w),
         "screenshot" => w.next().is_none_or(|m| matches!(m, "area" | "window" | "screen")) && w.next().is_none_or(|d| d.parse::<u32>().is_ok()) && one(&mut w),
         "curtain" => w.next().is_none_or(|a| matches!(a, "on" | "off" | "toggle")) && one(&mut w),
@@ -261,7 +262,7 @@ fn version(y: &Sty) -> i32 {
     let commit: String = st.commit.chars().take(8).collect();
     row("yami", format!("{}{}", if st.version.is_empty() { env!("CARGO_PKG_VERSION") } else { &st.version }, if commit.is_empty() { String::new() } else { format!("  {}", y.dim(&commit)) }));
     row("yami-shell", env!("CARGO_PKG_VERSION").into());
-    for b in ["yami-setup", "yami-files", "yami-view", "yami-play", "yami-shot", "yami-agents", "yami-greet"] {
+    for b in ["yami-files", "yami-view", "yami-play", "yami-shot", "yami-agents", "yami-greet"] {
         // каждое из них ставится по выбору (компоненты установщика): нет — не беда
         row(b, out(b).map(|v| v.split_whitespace().last().unwrap_or("").to_string()).unwrap_or_else(|| y.dim(&crate::tf!("не установлен", "not installed", "não instalado"))));
     }
@@ -521,13 +522,8 @@ pub fn run(args: &[String], me: &str) -> i32 {
         Some("doctor") if a.get(1) == Some(&"games") => crate::gameboost::doctor(&y),
         Some("doctor") => crate::doctor::run(&y),
         Some("report") => crate::report::run(&y, &a[1..]),
-        Some("setup") => match std::process::Command::new("yami-setup").status() {
-            Ok(s) => s.code().unwrap_or(1),
-            Err(_) => {
-                eprintln!(" {} {}", y.bad("✕"), crate::tf!("нет yami-setup: поставь заново install.sh", "yami-setup is missing: run install.sh again", "yami-setup ausente: rode install.sh de novo"));
-                1
-            }
-        },
+        // первая настройка — окно самого шелла: язык, вид, бар, клавиши, niri, модули
+        Some("setup") => send(&y, &a.get(1).map_or("welcome".to_string(), |s| format!("welcome {s}"))),
         // распознавание живёт в модуле yami-shot
         Some("ocr") => match std::process::Command::new("yami-shot").arg("ocr").args(&a[1..]).status() {
             Ok(s) => s.code().unwrap_or(1),

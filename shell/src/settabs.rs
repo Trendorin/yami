@@ -362,6 +362,23 @@ pub(crate) fn tab_system(ui: &mut Ui, st: &State, b: R) {
     if !st.niri_note.is_empty() {
         y += ui.wrap(PX, R::new(lx, y, b.w, 40), &st.niri_note, ui.t.text_dim, 3) + 6;
     }
+    y = niri_parts(ui, st, b, y);
+    y = title(ui, b.x, y, b.w, "быстро");
+    let bw = (b.w - 18) / 4;
+    for (i, (label, icon, act)) in [("заблокировать", "lock", Act::SCycle("do_lock")), ("микшер", "speaker", Act::Pavu), ("процессы", "cpu", Act::SysMon), ("перечитать", "reboot", Act::SCycle("reload"))].into_iter().enumerate() {
+        ui.button(R::new(b.x + i as i32 * (bw + 6), y, bw, 28), label, icon, Tone::Plain, false, true, act);
+    }
+    y += 34;
+    // для тех, кто правит руками: файл открывается в редакторе, справка — yami-shell config
+    ui.button(R::new(b.x, y, bw * 2 + 6, 28), "файл настроек", "pen", Tone::Plain, false, true, Act::SCycle("open_config"));
+    ui.text_in(PX, R::new(b.x + bw * 2 + 18, y, b.w - bw * 2 - 18, 28), "или: yami-shell config list", ui.t.text_faint);
+}
+
+/// части yami в конфиге niri (вкладка «система» и шаг первой настройки): каждая — свой include
+pub(crate) fn niri_parts(ui: &mut Ui, st: &State, b: R, mut y: i32) -> i32 {
+    let s = &st.set;
+    let half = (b.w - 20) / 2;
+    let (lx, rx) = (b.x, b.x + half + 20);
     for (i, (k, name, hint, on)) in [
         ("niri_look", "вид niri от yami", "ввод, окна, анимации", s.niri_look),
         ("niri_keys", "клавиши yami", "настройки → клавиши", s.niri_keys),
@@ -381,15 +398,7 @@ pub(crate) fn tab_system(ui: &mut Ui, st: &State, b: R) {
     y += 46;
     ui.wrap(PX, R::new(lx, y, b.w, 28), "что написано в config.kdl ниже строки yami — главнее любой части", ui.t.text_faint, 2);
     y += 30;
-    y = title(ui, b.x, y, b.w, "быстро");
-    let bw = (b.w - 18) / 4;
-    for (i, (label, icon, act)) in [("заблокировать", "lock", Act::SCycle("do_lock")), ("микшер", "speaker", Act::Pavu), ("процессы", "cpu", Act::SysMon), ("перечитать", "reboot", Act::SCycle("reload"))].into_iter().enumerate() {
-        ui.button(R::new(b.x + i as i32 * (bw + 6), y, bw, 28), label, icon, Tone::Plain, false, true, act);
-    }
-    y += 34;
-    // для тех, кто правит руками: файл открывается в редакторе, справка — yami-shell config
-    ui.button(R::new(b.x, y, bw * 2 + 6, 28), "файл настроек", "pen", Tone::Plain, false, true, Act::SCycle("open_config"));
-    ui.text_in(PX, R::new(b.x + bw * 2 + 18, y, b.w - bw * 2 - 18, 28), "или: yami-shell config list", ui.t.text_faint);
+    y
 }
 
 /// уведомления: как ведут себя карточки, где они и где громкость с яркостью
@@ -580,5 +589,7 @@ pub(crate) fn tab_about(ui: &mut Ui, st: &State, b: R) {
     // шкала памяти: шелл против бюджета 64 МБ
     ui.cv.gauge(R::new(b.x, y, b.w, 12), 32, (st.rss / 64.0).min(1.0), t.red, t.surface.lerp(t.border, 0.3), 2);
     y += 30;
-    ui.button(R::new(b.x, y, 300, 30), "модули: поставить или убрать", "gear", Tone::Primary, false, crate::proc::have("yami-setup"), Act::SCycle("open_setup"));
+    let bw = (b.w - 12) / 2;
+    ui.button(R::new(b.x, y, bw, 30), "первая настройка заново", "about", Tone::Plain, false, true, Act::SCycle("open_welcome"));
+    ui.button(R::new(b.x + bw + 12, y, bw, 30), "модули: поставить или убрать", "gear", Tone::Primary, false, true, Act::SCycle("open_setup"));
 }

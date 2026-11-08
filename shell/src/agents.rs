@@ -116,18 +116,32 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     let t = ui.t;
     let half = (b.w - 20) / 2;
     let x2 = b.x + half + 20;
-    let mut y = title(ui, b.x, b.y, b.w, "трей и пароли");
+    // части модулей (yami-agents, yami-files) — только если модуль стоит
+    let here = st.mods_here;
+    let mut y = title(ui, b.x, b.y, b.w, if here.agents { "трей и пароли" } else { "трей" });
     ui.toggle(R::new(b.x, y, half, 40), "трей", "значки программ в баре", s.agent_tray, Act::SBool("agent_tray"));
-    ui.toggle(R::new(x2, y, half, 40), "окно пароля polkit", "выкл — другой агент", ag.polkit, Act::SBool("agent_polkit"));
+    if here.agents {
+        ui.toggle(R::new(x2, y, half, 40), "окно пароля polkit", "выкл — другой агент", ag.polkit, Act::SBool("agent_polkit"));
+    }
     y += 46;
-    y = title(ui, b.x, y, b.w, "флешки и телефоны");
-    ui.toggle(R::new(b.x, y, half, 40), "подключать сами", "флешки, диски, телефоны, камеры", ag.automount, Act::SBool("automount"));
-    ui.toggle(R::new(x2, y, half, 40), "сразу открывать в файлах", "иначе — карточка «открыть»", ag.automount_open, Act::SBool("automount_open"));
-    y += 46;
-    y = title(ui, b.x, y, b.w, "порталы");
-    ui.toggle(R::new(b.x, y, half, 40), "диалог файлов yami-files", "выкл — диалог GTK", s.portal_files, Act::SBool("portal_files"));
-    ui.toggle(R::new(x2, y, half, 40), "выбор экрана для трансляций", "выкл — окно GNOME", ag.screencast, Act::SBool("agent_cast"));
-    y += 46;
+    if here.agents {
+        y = title(ui, b.x, y, b.w, "флешки и телефоны");
+        ui.toggle(R::new(b.x, y, half, 40), "подключать сами", "флешки, диски, телефоны, камеры", ag.automount, Act::SBool("automount"));
+        ui.toggle(R::new(x2, y, half, 40), "сразу открывать в файлах", "иначе — карточка «открыть»", ag.automount_open, Act::SBool("automount_open"));
+        y += 46;
+    }
+    if here.files || here.agents {
+        y = title(ui, b.x, y, b.w, "порталы");
+        let mut x = b.x;
+        if here.files {
+            ui.toggle(R::new(x, y, half, 40), "диалог файлов yami-files", "выкл — диалог GTK", s.portal_files, Act::SBool("portal_files"));
+            x = x2;
+        }
+        if here.agents {
+            ui.toggle(R::new(x, y, half, 40), "выбор экрана для трансляций", "выкл — окно GNOME", ag.screencast, Act::SBool("agent_cast"));
+        }
+        y += 46;
+    }
     y = title(ui, b.x, y, b.w, "сеть");
     ui.toggle(R::new(b.x, y, half, 40), "обложки музыки из сети", "ссылки плеера; выкл — с диска", s.media_art_net, Act::SBool("media_art_net"));
     ui.toggle(R::new(x2, y, half, 40), "тексты песен из сети", "lrclib.net; выкл — плеер и .lrc", s.lyrics_net, Act::SBool("lyrics_net"));

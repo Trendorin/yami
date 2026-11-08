@@ -51,6 +51,7 @@ impl App {
             Modal::Power => self.st.power_cur = 0,
             Modal::Reply | Modal::Walls => {}
             Modal::Settings => {
+                self.st.mods_here = crate::welcome::Here::probe();
                 self.tab_probe();
                 self.st.hex.set(&self.st.set.accent.clone());
                 if self.st.sel_widget == 0 {
@@ -113,6 +114,11 @@ impl App {
         }
         if self.st.modal == Some(Modal::Settings) {
             self.sets_free();
+            // мастер закрыли не сам (лаунчер, другое окно): метка первого входа остаётся, при
+            // следующем запуске он откроется снова; пароль — из памяти
+            if let Some(mut w) = self.st.welcome.take() {
+                yami_px::ui::wipe(&mut w.pass.text);
+            }
         }
         if self.st.modal == Some(Modal::Launcher) {
             self.st.launcher.thumbs_free();

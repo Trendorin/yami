@@ -2,7 +2,7 @@
 # The repo in one screen: every source file with its header line and size. Cheaper than opening
 # files to find where something lives. Usage: tools/map.sh [path-substring]
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
-files=(shell/src/*.rs shell/setup/src/*.rs shell/dev/src/*.rs install.sh installer/*.sh tools/*.sh tools/*.rs)
+files=(shell/src/*.rs shell/dev/src/*.rs install.sh installer/*.sh tools/*.sh tools/*.rs)
 for f in "${files[@]}"; do
   [[ -n ${1:-} && $f != *"$1"* ]] && continue
   # the first comment or docstring line, without the comment marker

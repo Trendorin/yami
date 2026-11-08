@@ -18,7 +18,7 @@ LOGS="$WORK/logs"
 H="$WORK/home"
 REAL_HOME="$HOME"
 MODULES=(yami-files yami-view yami-play yami-shot yami-agents yami-greet yami-niri)
-BINS=(yami-shell yami-setup yami-files yami-view yami-play yami-shot yami-agents)
+BINS=(yami-shell yami-files yami-view yami-play yami-shot yami-agents)
 PASS=0 FAIL=0 FAILED_NAMES=()
 
 say() { printf '\e[1m── %s\e[0m\n' "$*"; }
@@ -102,8 +102,6 @@ shell_tag() { # version
   local d="$SRC/yami" r
   printf '%s\n' "$1" >"$d/VERSION"
   set_crate_ver "$d/shell" yami-shell "$1"
-  set_crate_ver "$d/shell/setup" yami-setup "$1"
-  sed -i '/^name = "yami-setup"$/{n;s/^version = .*/version = "'"$1"'"/}' "$d/shell/Cargo.lock"
   commit_tag "$d" "v$1"
   push yami
 }
@@ -219,7 +217,8 @@ t_base() {
   machine
   check "the first install finishes" first_install --yes
   check "the shell is in place" is_ver yami-shell 3.0.0
-  check "the setup window is in place" exists "$H/.local/bin/yami-setup"
+  # the first-run setup is part of the shell now (welcome.rs)
+  nocheck "no separate setup window" exists "$H/.local/bin/yami-setup"
   check "yami command" test -L "$H/.local/bin/yami"
   check "no module was installed" missing "$H/.local/bin/yami-files"
   check "the record says core" has_comp core
@@ -427,13 +426,13 @@ t_privacy() {
   SANDBOX_ENV=()
   [[ "$(count_hits)" == 0 ]] && ok "YAMI_NO_COUNT: no request" || no "YAMI_NO_COUNT: no request"
 }
-t_askpass() { # the setup window's way in: no terminal, the password through SUDO_ASKPASS
+t_askpass() { # the first-run setup's way in: no terminal, the password through SUDO_ASKPASS
   reset_world
   machine
   first_install --yes
   : >"$H/root.log"
   SANDBOX_ENV=(SUDO_ASKPASS=/usr/bin/false)
-  check "the setup window's command" apply "files login" "gtk qt"
+  check "the first-run setup's command" apply "files login" "gtk qt"
   SANDBOX_ENV=()
   check "  the root shell took the askpass" contains "$H/root.log" "sudo -A bash -c"
   check "  packages went through it" contains "$H/root.log" "root: "
@@ -490,8 +489,6 @@ t_migrate() { # the real previous release (2.7.0, one repository) updates to thi
   git -C "$d" ls-files -z | while IFS= read -r -d '' f; do [[ -e $SRC/yami/$f ]] || rm -f "$d/$f"; done
   printf '3.1.0\n' >"$d/VERSION"
   set_crate_ver "$d/shell" yami-shell 3.1.0
-  set_crate_ver "$d/shell/setup" yami-setup 3.1.0
-  sed -i '/^name = "yami-setup"$/{n;s/^version = .*/version = "3.1.0"/}' "$d/shell/Cargo.lock"
   local m
   for m in "${MODULES[@]}"; do module_tag "$m" 3.1.0; done
   : >"$d/modules.lock"

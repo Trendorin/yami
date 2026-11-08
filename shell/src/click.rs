@@ -37,7 +37,10 @@ impl App {
                     self.st.field_focus = None;
                 }
             }
-            Act::CloseModal => self.close_modal(),
+            Act::CloseModal => {
+                self.welcome_end();
+                self.close_modal();
+            }
             // ── выбор обоев ─────────────────────────────────────────────────
             Act::WallPick(i) => self.walls_pick(i),
             Act::WallsBack => self.walls_back(),

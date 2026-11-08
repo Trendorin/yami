@@ -81,7 +81,10 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     let t = ui.t;
     let half = (b.w - 20) / 2;
     let mut y = title(ui, b.x, b.y, b.w, "шелл и приложения yami");
-    for (key, label, cur) in [("font_shell", "шелл", &s.font_shell), ("font_files", "файлы", &s.font_files), ("font_view", "просмотр картинок", &s.font_view)] {
+    // строки модулей, которых нет, не показываются
+    let here = st.mods_here;
+    let rows = [("font_shell", "шелл", &s.font_shell, true), ("font_files", "файлы", &s.font_files, here.files), ("font_view", "просмотр картинок", &s.font_view, here.view)];
+    for (key, label, cur, _) in rows.into_iter().filter(|r| r.3) {
         opt_btn(ui, R::new(b.x, y, b.w, 26), label, &shown(key, cur), Act::SCycle(key));
         y += 32;
     }

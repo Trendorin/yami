@@ -53,11 +53,6 @@ if [[ -x $BIN ]]; then
   [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "shot --lang en: no Russian left" || bad "shot --lang en"
   "$BIN" shot --defaults --lang ru -o "$TMP/ru" >/dev/null || bad "shot --lang ru (render crashed?)"
 fi
-SETUP="$ROOT/shell/target/release/yami-setup"
-if [[ -x $SETUP ]]; then
-  "$SETUP" shot --lang en -o "$TMP/sen" >/dev/null && ok "yami-setup: every page renders" || bad "yami-setup shot"
-  "$SETUP" shot --lang en --plain -o "$TMP/sep" >/dev/null && ok "yami-setup: the neutral look renders" || bad "yami-setup shot --plain"
-fi
 # the shell in Brazilian Portuguese: nothing left in Russian or English from the catalogs
 "$BIN" shot --lang pt-BR -o "$TMP/pt" --defaults | grep untranslated
 [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-shell shot --lang pt-BR" || bad "yami-shell shot --lang pt-BR"

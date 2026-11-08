@@ -152,7 +152,7 @@ do_stamp() {
   for i in "${!C_ID[@]}"; do ((C_WANT[i])) && c+="${C_ID[$i]} "; done
   "$BIN/yami-shell" update stamp "$ROOT" --components "${c% }" || return 1
   printf '%s\n' "${C_ID[*]}" >"$KNOWN_F"
-  # откуда ставить модули потом (окно настройки); первый вход откроет это окно
+  # откуда ставить модули потом (первая настройка); первый вход откроет её
   printf '%s\n' "$ROOT" >"$STATE/source"
   ((UPDATE || APPLY || FULL || REPAIR)) || : >"$STATE/first-run"
 }

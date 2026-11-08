@@ -31,6 +31,16 @@ pub enum Act {
     PowerDo(usize),
     // настройки
     STab(&'static str),
+    /// первая настройка (welcome.rs): шаг, назад/дальше, язык, стиль, модуль, установка, niri, чужая программа
+    WStep(usize),
+    WBack,
+    WNext,
+    WLang(&'static str),
+    WPlain(bool),
+    WMod(usize),
+    WInstall,
+    WNiri(&'static str),
+    WOther(usize),
     /// настройки → вид: набор значков / курсоров по номеру карточки (iconsets.rs)
     SIconSet(usize),
     SCursorSet(usize),

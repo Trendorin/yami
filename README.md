@@ -203,8 +203,9 @@ or from a checkout: `git clone https://github.com/Trendorin/yami yami && yami/in
 It installs only the base: niri, the shell, a terminal and what the desktop cannot start without. Run it as
 yourself, not with sudo: it asks for the password once, where it is needed, and before anything else it says
 how long it will take and how much disk it needs. Then log out and pick the **Niri** session (no login screen
-on this system: type `niri-session` in the console). A full-screen setup window meets you there and asks the
-language, the look and which [modules](#modules) to add. Open it again at any time with `yami setup`. Running the
+on this system: type `niri-session` in the console). The first-run setup meets you there, in the settings window
+turned into steps: the language and style, colour, wallpaper, look, fonts, bar, dock, widgets, windows, keys, niri,
+notifications and services, then which [modules](#modules) to add. Open it again at any time with `yami setup`. Running the
 same command again later updates and repairs what is there and keeps your choices.
 
 No flag is needed for a normal install; these are for the rest:
@@ -234,7 +235,7 @@ What the base install does:
    NetworkManager, BlueZ, power-profiles-daemon, Noto fonts, cliphist, grim, kitty, btop and the night
    light with its native package manager, in one transaction. Names a repository does not carry are reported, not fatal. Enables Bluetooth
    and power profiles, and NetworkManager when nothing else manages the network.
-2. Builds the shell and the setup window with `cargo build --release --locked` (Rust ≥ 1.89; rustup
+2. Builds the shell with `cargo build --release --locked` (Rust ≥ 1.89; rustup
    is used when the distribution's toolchain is older) into `~/.local/bin`.
 3. Installs the pixel fonts (Tiny5, DotGothic16, Terminess).
 4. Connects yami to niri's config with one include line at its top (your config stays yours, what
@@ -428,7 +429,6 @@ yami-shell binds list                  # keybindings: id, keys, action
 | Path | Contents |
 |---|---|
 | `shell/` | yami-shell, the Rust Wayland shell (cargo workspace) |
-| `shell/setup/` | yami-setup: the first-run window that installs the modules |
 | `modules.lock` | which version of each module this version of the shell installs |
 | `config/portal/` | which portal backend serves what |
 | `config/niri/` | niri configuration (keybindings come from the shell) |
@@ -464,7 +464,7 @@ log in, `~/.local/lib/yami-niri/yami-niri.sh off`.
 | `tools/check.sh` | build without warnings, i18n checks, the English and Russian docs in step (`tools/check-docs.py`), script syntax, niri config, installer dry run (CI runs it too) |
 | `tools/map.sh [TEXT]` | every source file with its one-line description |
 | `yami-shell shot [TARGET…] --lang en [--transparent] -o DIR` | render panels to PNG without a compositor; fails on untranslated text |
-| `yami-setup shot`, `yami-files shot`, `yami-view shot`, `yami-play shot`, `yami-shot shot`, `yami-agents shot` | the same for the setup window and each module |
+| `yami-files shot`, `yami-view shot`, `yami-play shot`, `yami-shot shot`, `yami-agents shot` | the same for each module (the first-run setup is the shell's `welcome:STEP` targets) |
 | `tools/check-modules.sh [NAME…]` | every module next to this repository: no warnings, tests, translations, every state in both looks and three languages |
 | `yami-greet shot -o DIR`, `yami-greet --demo` | the login screen offscreen in each state; `--demo` runs it without greetd (password `yami`) inside a nested niri |
 | `tools/readme-art.py`, `tools/readme-shots.sh` | the README's logo and cards; real screenshots of your session (empty workspace, plain device names, everything put back) |

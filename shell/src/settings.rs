@@ -119,6 +119,9 @@ fn scrollbar(ui: &mut Ui, r: R, view: i32, full: i32, at: i32) {
 }
 
 pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
+    if st.welcome.is_some() {
+        return crate::welcome::draw(ui, st, w, h);
+    }
     let t = ui.t;
     let fr = R::new(0, 0, w - 6, h - 6);
     ui.frame(fr, false);
@@ -138,7 +141,8 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
         ui.cv.fill(R::new(side.x + 12, y + 8, 4, 4), t.red.alpha(0.7));
         ui.text_in(PX, R::new(side.x + 22, y, side.w - 30, HEAD_H - 4), gname, t.text_faint);
         y += HEAD_H;
-        for tb in tabs.iter() {
+        // вкладки модулей, которых нет (скриншоты без yami-shot, экран входа без yami-greet), прячутся
+        for tb in tabs.iter().filter(|tb| st.mods_here.shows(tb.id)) {
             let r = R::new(side.x + 8, y, side.w - 16, ROW_H - 2);
             ui.button(r, tb.name, tb.icon, Tone::Ghost, st.stab == tb.id, true, Act::STab(tb.id));
             if st.stab == tb.id {
@@ -170,9 +174,12 @@ impl App {
     /// колесо над вкладкой: листать, если есть куда (true — пролистали)
     pub fn settings_scroll(&mut self, d: i32) -> bool {
         let (w, h) = SIZE;
-        let view = body_rect(w, h).h;
+        let (view, own) = match &self.st.welcome {
+            Some(wz) => (crate::welcome::body_rect(w, h).h, wz.cur().own_scroll),
+            None => (body_rect(w, h).h, find(self.st.stab).is_some_and(|t| t.own_scroll)),
+        };
         let max = (self.st.sscroll_h.get() - view).max(0);
-        if max == 0 || find(self.st.stab).is_some_and(|t| t.own_scroll) {
+        if max == 0 || own {
             return false;
         }
         let at = (scroll_of(&self.st) + d * WHEEL).clamp(0, max);
@@ -279,6 +286,8 @@ impl App {
                         self.settings_click(&Act::SCycle("kb_apply"));
                     } else if f == "key_cmd" {
                         self.settings_click(&Act::KeyAdd);
+                    } else if f == "w_pass" {
+                        self.settings_click(&Act::WInstall);
                     } else {
                         self.settings_click(&Act::SCycle("wall_apply"));
                     }
@@ -294,6 +303,10 @@ impl App {
                         "night_geo" => &mut self.st.geo_field,
                         "weather_city" => &mut self.st.weather_field,
                         "kb_layout" => &mut self.st.keys.lay,
+                        "w_pass" => match self.st.welcome.as_mut() {
+                            Some(w) => &mut w.pass,
+                            None => &mut self.st.wall_field,
+                        },
                         _ => &mut self.st.wall_field,
                     };
                     App::edit_field(field, e, &mods);
@@ -302,11 +315,31 @@ impl App {
             self.dirty(&SKind::Modal);
             return;
         }
+        // первая настройка: Enter и Tab — по шагам, Esc закрывает
+        if let Some(at) = self.st.welcome.as_ref().map(|w| w.step) {
+            match e.keysym {
+                Keysym::Escape => {
+                    self.welcome_end();
+                    self.close_modal();
+                    return;
+                }
+                Keysym::Return | Keysym::KP_Enter => {
+                    self.settings_click(&Act::WNext);
+                    return;
+                }
+                Keysym::Tab | Keysym::ISO_Left_Tab => {
+                    let back = e.keysym == Keysym::ISO_Left_Tab || self.mods.shift;
+                    self.settings_click(&if back { Act::WStep(at.saturating_sub(1)) } else { Act::WStep(at + 1) });
+                    return;
+                }
+                _ => {}
+            }
+        }
         match e.keysym {
             Keysym::Escape => self.close_modal(),
             Keysym::Tab | Keysym::ISO_Left_Tab | Keysym::Down | Keysym::Up => {
                 let back = e.keysym == Keysym::ISO_Left_Tab || e.keysym == Keysym::Up || self.mods.shift;
-                let ids: Vec<&'static str> = tabs().map(|t| t.id).collect();
+                let ids: Vec<&'static str> = tabs().filter(|t| self.st.mods_here.shows(t.id)).map(|t| t.id).collect();
                 let n = ids.len();
                 let i = ids.iter().position(|x| *x == self.st.stab).unwrap_or(0);
                 self.st.stab = ids[if back { (i + n - 1) % n } else { (i + 1) % n }];

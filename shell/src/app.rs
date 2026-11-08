@@ -168,6 +168,8 @@ pub enum Msg {
     Themes(Vec<crate::bundle::Card>, String, bool),
     /// yami подключён к конфигу niri или убран из него (нить кнопки во вкладке «система»)
     NiriLink(crate::niricfg::Status, String),
+    /// ход установки модулей из первой настройки (wizinst.rs)
+    Install(crate::wizinst::Ev),
     Theme,
     /// recolor --templates закончил: итог в restyle.json (restyle.rs)
     Restyled,
@@ -290,6 +292,11 @@ pub struct State {
     pub game_probe: crate::gameboost::Probe,
     /// конфиг niri: подключён ли yami (вкладка «система» открылась — tab_probe) и что вышло из кнопки
     pub niri_link: crate::niricfg::Status,
+    /// первая настройка открыта (окно настроек в виде шагов) и пора ли её открыть (первый вход)
+    pub welcome: Option<crate::welcome::Welcome>,
+    pub welcome_due: bool,
+    /// какие модули стоят: вкладки без своего модуля прячутся
+    pub mods_here: crate::welcome::Here,
     pub niri_note: String,
     pub night: crate::night::Night,
     /// модули бара из скриптов (~/.config/yami/scripts)
@@ -492,6 +499,9 @@ impl State {
             game: Default::default(),
             game_probe: Default::default(),
             niri_link: Default::default(),
+            welcome: None,
+            welcome_due: false,
+            mods_here: crate::welcome::Here::probe(),
             niri_note: String::new(),
             night: Default::default(),
             plugins: Default::default(),
@@ -529,6 +539,12 @@ pub fn icon_set(theme: &str) -> String {
 
 pub fn run() {
     crate::proc::note_inherited();
+    // настроек ещё нет совсем (шелл поставлен пакетом, установщик не запускался): первый вход —
+    // с первой настройкой, как после install.sh
+    if !yami_px::paths::shell_settings().exists() && !crate::config::state_dir().join("install.json").exists() {
+        let _ = std::fs::create_dir_all(crate::config::state_dir());
+        let _ = std::fs::write(crate::config::state_dir().join("first-run"), "");
+    }
     // файлы старых версий — в ~/.config/yami (dirs.rs); команды читают и старые, пока шелл их не перенёс
     crate::dirs::migrate();
     // из TTY или по ssh: понятная строка вместо паники
@@ -642,10 +658,9 @@ pub fn run() {
     }
     crate::ipc::serve(tx.clone());
     dbus::spawn(tx.clone(), app.st.set.agent_notif, app.st.set.agent_tray);
-    // первый вход после установки: окно настройки (оно само снимет метку)
-    if crate::config::state_dir().join("first-run").exists() && crate::proc::have("yami-setup") {
-        App::spawn(&["yami-setup".to_string()]);
-    }
+    // первый вход после установки: первая настройка в окне настроек (welcome_tick откроет её, как
+    // только есть экран; закрытие снимает метку)
+    app.st.welcome_due = crate::config::state_dir().join("first-run").exists();
     // окна паролей, показ экрана и автоподключение — отдельная служба; второй экземпляр выйдет сам
     if crate::proc::have("yami-agents") {
         App::spawn(&["yami-agents".to_string()]);

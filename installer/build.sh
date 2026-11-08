@@ -68,12 +68,11 @@ built_mark() { # binary source-tree
   printf '%s\n' "${rev:--}" >"$CACHE/built-$1"
 }
 do_build_shell() {
-  rm -f "$CACHE/built-yami-shell" "$CACHE/built-yami-setup"
-  if src_installed yami-shell "$ROOT" && [[ -x $BIN/yami-setup ]]; then return 99; fi
+  rm -f "$CACHE/built-yami-shell"
+  src_installed yami-shell "$ROOT" && return 99
   need_rust || return 1
-  cargo_build "$ROOT/shell/Cargo.toml" -p yami-shell -p yami-setup || return 1
+  cargo_build "$ROOT/shell/Cargo.toml" -p yami-shell || return 1
   built_mark yami-shell "$ROOT"
-  built_mark yami-setup "$ROOT"
 }
 do_build_module() {
   local repo src
@@ -88,16 +87,18 @@ do_build_module() {
 # every build has passed: all at once. A record per binary says which source it came from
 do_install_bins() {
   local b rev any=0
-  for b in yami-shell yami-setup yami-files yami-view yami-play yami-shot yami-agents; do
+  for b in yami-shell yami-files yami-view yami-play yami-shot yami-agents; do
     [[ -f $CACHE/built-$b ]] || continue
     put_bin "$b" || return 1
     any=1
   done
   ((any)) || return 99
+  # a separate setup window of the development tree is part of the shell now (`yami setup`)
+  rm -f "$BIN/yami-setup" "$STATE/built/yami-setup"
   # `yami <command>`: the same binary, help instead of the shell when started without a command
   [[ -x $BIN/yami-shell ]] && ln -sfn yami-shell "$BIN/yami"
   mkdir -p "$STATE/built"
-  for b in yami-shell yami-setup yami-files yami-view yami-play yami-shot yami-agents; do
+  for b in yami-shell yami-files yami-view yami-play yami-shot yami-agents; do
     [[ -f $CACHE/built-$b ]] || continue
     rev="$(cat "$CACHE/built-$b")"
     if [[ $rev == - ]]; then rm -f "$STATE/built/$b"; else printf '%s\n' "$rev" >"$STATE/built/$b"; fi

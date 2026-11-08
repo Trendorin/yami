@@ -41,7 +41,7 @@ yami status                               # shell, portal, niri, last update che
 yami doctor                               # programs, D-Bus services, config: what is missing and what it costs
 yami doctor games                         # ntsync, gamemode, MangoHud: what is there, one command for the rest
 yami report [-o FILE]                     # versions, doctor, this boot's journal, configs in a tar.gz for an issue (secrets scrubbed)
-yami setup                                # the setup window: look, modules to add or remove
+yami setup [STEP]                         # the first-run setup again: language, look, bar, keys, niri, modules (STEP: niri, modules…)
 yami ocr FILE                             # text from an image, the same recognition as «text» in the screenshot overlay (needs tesseract)
 yami theme export FILE | import FILE|URL  # the look as one file: palette, effects, fonts, bar, widgets, wallpaper (never commands); an imported theme is kept in your themes, a URL must be https
 yami theme save [NAME] | list | apply NAME | remove NAME   # your themes in ~/.config/yami/themes (settings → color → themes); save with no name names it after the palette

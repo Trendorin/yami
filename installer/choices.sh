@@ -1,5 +1,5 @@
 # The choices the install starts from: palette, panels, theme, app font, fastfetch. Flags first, then
-# what the settings already say, else the defaults. Asking is the graphical setup's job (yami-setup).
+# what the settings already say, else the defaults. Asking is the first-run setup's job (the shell's own window, `yami setup`).
 # shellcheck shell=bash
 
 # ── the choices; the palettes are the shell's own ──────────────────────────

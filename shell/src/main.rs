@@ -85,9 +85,15 @@ mod wall;
 mod walls;
 mod themetab;
 mod weather;
+mod welcome;
 mod widgets;
+mod wizinst;
 
 fn main() {
+    // sudo спрашивает пароль для установки модулей из первой настройки (wizinst.rs)
+    if wizinst::askpass() {
+        return;
+    }
     // большие буферы (обои, скриншоты, обложки) — сразу через mmap и обратно системе при
     // освобождении: иначе glibc поднимает порог и держит их в куче нитей после каждого декода
     // (musl так не делает, и настроек этих у него нет)

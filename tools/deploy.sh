@@ -54,7 +54,8 @@ pc="${XDG_CONFIG_HOME:-$HOME/.config}/xdg-desktop-portal/niri-portals.conf"
 old_cast=0
 grep -qs 'ScreenCast=yami;' "$pc" && old_cast=1
 cargo build --release --locked --workspace --manifest-path "$ROOT/shell/Cargo.toml"
-put yami-setup
+# the separate setup window of the development tree is part of the shell now: `yami setup`
+rm -f "$HOME/.local/bin/yami-setup"
 put yami-shell
 ln -sfn yami-shell "$HOME/.local/bin/yami"
 # what runs now (`yami update` compares against it); a dirty tree is marked as such

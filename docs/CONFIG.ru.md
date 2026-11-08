@@ -42,7 +42,7 @@ yami status                               # шелл, портал, niri, пос
 yami doctor                               # программы, службы D-Bus, конфиг: чего не хватает и чего это стоит
 yami doctor games                         # ntsync, gamemode, MangoHud: что есть, одна команда для остального
 yami report [-o FILE]                     # версии, doctor, журнал этой загрузки, конфиги в tar.gz для issue (секреты вычищены)
-yami setup                                # окно настройки: вид, модули — поставить или убрать
+yami setup [STEP]                         # первая настройка заново: язык, вид, бар, клавиши, niri, модули (STEP: niri, modules…)
 yami ocr FILE                             # текст с картинки, то же распознавание, что «текст» в оверлее скриншота (нужен tesseract)
 yami theme export FILE | import FILE|URL  # вид одним файлом: палитра, эффекты, шрифты, бар, виджеты, обои (никогда — команды); импортированная тема остаётся в твоих темах, ссылка — только https
 yami theme save [NAME] | list | apply NAME | remove NAME   # свои темы в ~/.config/yami/themes (настройки → цвет → темы); save без имени называет тему по палитре
