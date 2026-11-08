@@ -294,7 +294,7 @@ impl Fm {
             Cmd::Undo => self.undo(),
             Cmd::Wallpaper => {
                 if let Some(p) = self.v().targets().first() {
-                    if crate::look::set_wallpaper(p) {
+                    if crate::look::set_wallpaper(p, &self.look.wallpaper_cmd) {
                         self.toast(crate::i18n::tr("обои поменяются через секунду"));
                     }
                 }

@@ -96,7 +96,9 @@ pub fn for_items(fm: &mut Fm) -> Vec<MItem> {
     m.push(MItem::sub("сжать", "zip", vec![MItem::new(".zip", "", "", Cmd::Compress("zip")), MItem::new(".tar.zst", "", "", Cmd::Compress("tar.zst")), MItem::new(".tar.gz", "", "", Cmd::Compress("tar.gz")), MItem::new(".7z", "", "", Cmd::Compress("7z"))]));
     m.push(MItem::new("создать ссылку", "", "", Cmd::Link));
     if one && k == Kind::Image {
-        m.push(MItem::new("сделать обоями", "image", "", Cmd::Wallpaper));
+        if fm.look.can_set_wallpaper() {
+            m.push(MItem::new("сделать обоями", "image", "", Cmd::Wallpaper));
+        }
     }
     if all_dirs {
         m.push(MItem::new("добавить в места", "pin", "", Cmd::AddPlace));

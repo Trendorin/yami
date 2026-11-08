@@ -30,7 +30,7 @@ fn main() {
     }
     // через 15 с старт позади и окно открыто: код старта — из памяти (yami_px::shed_code)
     yami_px::shed_code_later(15);
-    let look = look::Look::load();
+    let look = look::Look::load("play");
     i18n::set(&look.lang);
     let items: Vec<String> = args.into_iter().filter(|a| !a.starts_with('-') || a == "-").collect();
     // ссылки (http, rtsp…) — как есть; file:// и пути — файлами
@@ -72,7 +72,7 @@ fn shot(args: &[String]) -> i32 {
             _ => {}
         }
     }
-    let mut look = look::Look::load_mode(mode);
+    let mut look = look::Look::load_mode("play", mode);
     look.animations = false;
     if !lang.is_empty() {
         look.lang = lang.clone();

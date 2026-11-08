@@ -17,8 +17,8 @@ use yami_px::gfx::{Img, R};
 use yami_px::ui::Tone;
 
 /// ключи настроек, которые читает экран входа (yami_px::look::Look::from_json, data::Opts, kdl.rs)
-const KEYS: [&str; 22] = [
-    "palette", "accent", "tint", "glass", "lift", "inner", "light", "lang", "reveal", "revealGrain", "animations", "animSpeed", "lite", "wallKanji", "fontShell", "greetUsers", "greetDim", "greetClock",
+const KEYS: [&str; 26] = [
+    "preset", "corners", "radius", "shadow", "palette", "accent", "tint", "glass", "lift", "inner", "light", "lang", "reveal", "revealGrain", "animations", "animSpeed", "lite", "wallKanji", "fontShell", "greetUsers", "greetDim", "greetClock",
     "greetHost", "greetPower", "greetOff", "greetNumlock",
 ];
 

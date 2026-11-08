@@ -292,7 +292,7 @@ impl App {
         // настройки шелла поменялись — новые цвета, язык
         if self.fm.look.stale() {
             let font = self.fm.look.font("files").to_string();
-            self.fm.look = crate::look::Look::load();
+            self.fm.look = crate::look::Look::load("files");
             if self.fm.look.font("files") != font {
                 self.fonts = Fonts::with(self.fm.look.font("files"));
             }

@@ -165,7 +165,7 @@ pub fn run(args: &[String]) -> i32 {
         set.light = l;
     }
     crate::i18n::set(&set.lang);
-    let mut res = Res { icons: Icons::new(&set.icon_theme), fonts: Fonts::with(&set.font_shell), font: set.font_shell.clone(), iset: crate::app::icon_set(&set.icon_theme) };
+    let mut res = Res { icons: Icons::new(&set.icon_theme), fonts: Fonts::with(&set.font_family()), font: set.font_family(), iset: crate::app::icon_set(&set.icon_theme) };
     res.icons.set_style(crate::theme::Theme::new(set.accent_rgb(), set.tint, set.glass, set.lift, set.inner, set.light).icon_ramp(), set.icon_pixel, set.icon_tint);
     let mut st = State::new(set, mock_niri());
     st.apps = mock_apps();

@@ -311,7 +311,7 @@ impl App {
     fn tick(&mut self) {
         if self.p.look.stale() {
             let font = self.p.look.font("view").to_string();
-            self.p.look = crate::look::Look::load();
+            self.p.look = crate::look::Look::load("play");
             if self.p.look.font("view") != font {
                 self.fonts = Fonts::with(self.p.look.font("view"));
             }

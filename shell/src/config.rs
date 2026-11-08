@@ -81,6 +81,16 @@ pub struct Settings {
     pub tint: f32,
     /// светлая тема (бумага вместо графита) для шелла и всего, что красит theme.py
     pub light: bool,
+    /// общий вид всех модулей (style.json): yami — пиксельный, plain — нейтральный
+    pub preset: String,
+    /// notch | round | square; пусто — как у пресета
+    pub corners: String,
+    /// радиус скругления; -1 — как у пресета
+    pub radius: i32,
+    /// hard | soft | none; пусто — как у пресета
+    pub shadow: String,
+    /// свои цвета поверх выведенных из акцента (ключи — как в palette.json)
+    pub colors: std::collections::BTreeMap<String, String>,
 
     // вид
     pub glass: f32,
@@ -480,6 +490,11 @@ impl Default for Settings {
             anim_speed: 1.0,
             reveal: "dither".into(),
             reveal_grain: 1,
+            preset: "yami".into(),
+            corners: String::new(),
+            radius: -1,
+            shadow: String::new(),
+            colors: Default::default(),
             anim_close: true,
             scanlines: false,
             lite: false,
@@ -933,6 +948,44 @@ impl Settings {
 
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_default() + "\n"
+    }
+
+    /// то, что шелл отдаёт всем модулям (~/.config/yami/style.json); те же ключи читает yami_px::look.
+    /// Необязательное выкладывается, только когда задано: иначе решает пресет
+    pub fn style_value(&self) -> serde_json::Value {
+        const KEYS: [&str; 21] = [
+            "preset", "palette", "accent", "tint", "glass", "lift", "inner", "light", "lang", "reveal", "revealGrain", "animations", "animSpeed", "lite", "iconTheme", "blurShell", "iconPixel", "iconTint",
+            "fontShell", "fontFiles", "fontView",
+        ];
+        let all = serde_json::to_value(self).unwrap_or_default();
+        let mut o = serde_json::Map::new();
+        for k in KEYS {
+            if let Some(v) = all.get(k) {
+                o.insert(k.to_string(), v.clone());
+            }
+        }
+        if !self.corners.is_empty() {
+            o.insert("corners".into(), self.corners.clone().into());
+        }
+        if !self.shadow.is_empty() {
+            o.insert("shadow".into(), self.shadow.clone().into());
+        }
+        if self.radius >= 0 {
+            o.insert("radius".into(), self.radius.into());
+        }
+        if !self.colors.is_empty() {
+            o.insert("colors".into(), serde_json::to_value(&self.colors).unwrap_or_default());
+        }
+        serde_json::Value::Object(o)
+    }
+
+    /// шрифт шелла: свой; у нейтрального вида пустой — системный, а не Tiny5
+    pub fn font_family(&self) -> String {
+        if self.font_shell.is_empty() && self.preset == "plain" {
+            "sans".into()
+        } else {
+            self.font_shell.clone()
+        }
     }
 
     pub fn accent_rgb(&self) -> u32 {

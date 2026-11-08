@@ -3,7 +3,6 @@
 
 use crate::app::*;
 use crate::config::{self, Settings};
-use crate::theme::Theme;
 use crate::font::Fonts;
 
 
@@ -17,17 +16,28 @@ pub fn templates_example(d: &std::path::Path) {
     }
 }
 
+/// общий вид для модулей. Тот же текст не перезаписывается: модули не перечитывают его зря
+pub fn write_style(s: &Settings) {
+    let mut v = s.style_value();
+    if let Some(o) = v.as_object_mut() {
+        o.insert("_".into(), "written by yami-shell (settings → look); what one module does differently goes to style.<module>.json".into());
+    }
+    let t = serde_json::to_string_pretty(&v).unwrap_or_default() + "\n";
+    let _ = config::write_atomic(&config::config_dir().join("yami/style.json"), &t);
+}
+
 impl App {
     // ── настройки ───────────────────────────────────────────────────────────
     pub fn settings_changed(&mut self) {
         let s = &self.st.set;
         crate::i18n::set(&s.lang);
-        if s.font_shell != self.res.font {
-            self.res.font = s.font_shell.clone();
+        if s.font_family() != self.res.font {
+            self.res.font = s.font_family();
             self.res.fonts = Fonts::with(&self.res.font);
         }
-        self.st.t = Theme::new(s.accent_rgb(), s.tint, s.glass, s.lift, s.inner, s.light).apply();
-        yami_px::gfx::set_reveal(yami_px::gfx::Reveal::from_id(&s.reveal), s.reveal_grain);
+        // тот же разбор, что у модулей: шелл и модули не могут разойтись во внешности
+        self.st.t = yami_px::look::Look::from_json(&s.style_value(), Some(s.light)).theme;
+        crate::prefs::write_style(s);
         // набор значков сменился (или «авто» и в системе теперь другой) — собрать заново
         let iset = crate::app::icon_set(&s.icon_theme);
         if iset != self.res.iset {

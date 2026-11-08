@@ -207,7 +207,7 @@ pub fn run(mut v: V) {
             }
             if app.v.look.stale() {
                 let font = app.v.look.font("view").to_string();
-                app.v.look = crate::look::Look::load();
+                app.v.look = crate::look::Look::load("view");
                 if app.v.look.font("view") != font {
                     app.fonts = Fonts::with(app.v.look.font("view"));
                 }

@@ -111,7 +111,7 @@ fn main() {
     }
     // через 15 с старт позади и окно открыто: код старта — из памяти (yami_px::shed_code)
     yami_px::shed_code_later(15);
-    let look = look::Look::load();
+    let look = look::Look::load("files");
     i18n::set(&look.lang);
     let cfg = cfg::Cfg::load();
     // кеш миниатюр (общий с выбором обоев) — раз в сутки, не мешая открытию окна

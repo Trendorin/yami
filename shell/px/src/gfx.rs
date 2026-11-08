@@ -1,7 +1,9 @@
-// Пиксельная графика в shm-буфер: только целые пиксели, без сглаживания.
+// Графика в shm-буфер. В пиксельном стиле — только целые пиксели, без сглаживания; что меняется
+// в других стилях (углы, тени, значки), решает style.rs.
 // Буфер — ARGB8888 с предумноженной альфой (как ждёт wl_shm), цвет C — обычный 0xAARRGGBB.
 
 use crate::font::{Fonts, Face};
+use crate::style::{Corners, Shadow, Style};
 use crate::theme::Theme;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -118,6 +120,8 @@ pub struct Canvas<'a> {
     /// тень у букв (виджеты прямо на обоях): каждая буква сначала этим цветом на «пиксель
     /// шрифта» ниже и правее
     pub text_shade: Option<C>,
+    /// углы, тени, значки (style.rs)
+    pub style: Style,
 }
 
 /// цвет тени для всех новых холстов процесса: тема одна на процесс, а холстов много
@@ -140,12 +144,18 @@ pub enum Reveal {
     Wipe,
     /// Байер, но клетки вдвое крупнее
     Blocks,
+    /// плавно, по прозрачности (не пиксельные стили)
+    Fade,
+    /// сразу, без проявления
+    Off,
 }
 
 impl Reveal {
     pub const ALL: [(&'static str, Reveal); 5] = [("dither", Reveal::Dither), ("scan", Reveal::Scan), ("noise", Reveal::Noise), ("wipe", Reveal::Wipe), ("blocks", Reveal::Blocks)];
+    /// ALL — то, что предлагают настройки шелла; здесь ещё и то, что можно задать в style.json
+    const ANY: [(&'static str, Reveal); 7] = [("dither", Reveal::Dither), ("scan", Reveal::Scan), ("noise", Reveal::Noise), ("wipe", Reveal::Wipe), ("blocks", Reveal::Blocks), ("fade", Reveal::Fade), ("none", Reveal::Off)];
     pub fn from_id(s: &str) -> Reveal {
-        Reveal::ALL.iter().find(|(id, _)| *id == s).map(|x| x.1).unwrap_or(Reveal::Dither)
+        Reveal::ANY.iter().find(|(id, _)| *id == s).map(|x| x.1).unwrap_or(Reveal::Dither)
     }
 }
 
@@ -154,14 +164,14 @@ static GRAIN: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(1);
 
 /// узор и крупность клеток проявления для всего процесса; grain — множитель клетки (1–4)
 pub fn set_reveal(r: Reveal, grain: i32) {
-    let i = Reveal::ALL.iter().position(|x| x.1 == r).unwrap_or(0) as u8;
+    let i = Reveal::ANY.iter().position(|x| x.1 == r).unwrap_or(0) as u8;
     REVEAL.store(i, std::sync::atomic::Ordering::Relaxed);
     GRAIN.store(grain.clamp(1, 4) as u8, std::sync::atomic::Ordering::Relaxed);
 }
 
 fn reveal() -> (Reveal, i32) {
     let i = REVEAL.load(std::sync::atomic::Ordering::Relaxed) as usize;
-    let r = Reveal::ALL.get(i).map(|x| x.1).unwrap_or(Reveal::Dither);
+    let r = Reveal::ANY.get(i).map(|x| x.1).unwrap_or(Reveal::Dither);
     let g = GRAIN.load(std::sync::atomic::Ordering::Relaxed) as i32 * if r == Reveal::Blocks { 2 } else { 1 };
     (r, g)
 }
@@ -181,7 +191,7 @@ fn hash(x: i32, y: i32) -> u32 {
 
 impl<'a> Canvas<'a> {
     pub fn new(buf: &'a mut [u32], w: i32, h: i32) -> Canvas<'a> {
-        Canvas { buf, w, h, ox: 0, oy: 0, clip: R::new(0, 0, w, h), clips: vec![], opacity: 1.0, blur: vec![], reach: 0, shade: C(SHADE.load(std::sync::atomic::Ordering::Relaxed)), text_shade: None }
+        Canvas { buf, w, h, ox: 0, oy: 0, clip: R::new(0, 0, w, h), clips: vec![], opacity: 1.0, blur: vec![], reach: 0, shade: C(SHADE.load(std::sync::atomic::Ordering::Relaxed)), text_shade: None, style: crate::style::current() }
     }
 
     /// проявление панели: при k клетка видна, если её порог ниже k. Узор — из настроек
@@ -201,6 +211,22 @@ impl<'a> Canvas<'a> {
             return;
         }
         let (style, grain) = reveal();
+        if style == Reveal::Off {
+            return;
+        }
+        if style == Reveal::Fade {
+            let m = (k.clamp(0.0, 1.0) * 256.0) as u32;
+            for y in r.y..r.bottom() {
+                let row = (y * self.w + r.x) as usize;
+                for p in &mut self.buf[row..row + r.w as usize] {
+                    let v = *p;
+                    let rb = (((v & 0x00ff_00ff) * m) >> 8) & 0x00ff_00ff;
+                    let ag = (((v >> 8 & 0x00ff_00ff) * m) >> 8) & 0x00ff_00ff;
+                    *p = ag << 8 | rb;
+                }
+            }
+            return;
+        }
         let cell = (cell * grain).max(1);
         // порог клетки в 0..256; клетка видна, если порог < lvl
         let lvl = (k.clamp(0.0, 1.0) * 256.0) as i32;
@@ -401,6 +427,11 @@ impl<'a> Canvas<'a> {
 
     /// прямоугольник со срезанными углами (px.rs notched_fill)
     pub fn notched(&mut self, r: R, n: i32, c: C) {
+        match self.style.corners {
+            Corners::Square => return self.fill(r, c),
+            Corners::Round => return self.rounded(r, self.rad(r, n), c),
+            Corners::Notch => {}
+        }
         if r.w <= 2 * n || r.h <= 2 * n {
             self.fill(r, c);
             return;
@@ -413,6 +444,7 @@ impl<'a> Canvas<'a> {
     /// фаска a без фаски b: жёсткая тень только там, где её не закрывает панель. Под полупрозрачным
     /// стеклом тень иначе просвечивает второй рамкой со сдвигом (#16)
     pub fn notched_minus(&mut self, a: R, b: R, n: i32, c: C) {
+        let n = if self.style.corners == Corners::Square { 0 } else { n };
         let span = |r: R, y: i32| -> Option<(i32, i32)> {
             if y < r.y || y >= r.bottom() {
                 return None;
@@ -442,11 +474,22 @@ impl<'a> Canvas<'a> {
 
     /// размыть фон под r (углы с фаской n остаются чистыми)
     pub fn blur_rect(&mut self, r: R, n: i32) {
+        let rad = self.rad(r, n);
+        let n = if self.style.corners == Corners::Square { 0 } else { n };
         let r = R::new(r.x + self.ox, r.y + self.oy, r.w, r.h);
         if self.blur.iter().any(|b| b.x <= r.x && b.y <= r.y && b.right() >= r.right() && b.bottom() >= r.bottom()) {
             return;
         }
-        if n > 0 {
+        if self.style.corners == Corners::Round && rad > 0 {
+            // скругление лесенкой: размытие не вылезает за углы
+            self.blur.push(R::new(r.x, r.y + rad, r.w, r.h - 2 * rad));
+            for j in 0..rad {
+                let d = rad as f32 - 0.5 - j as f32;
+                let cut = rad - ((rad * rad) as f32 - d * d).max(0.0).sqrt().round() as i32;
+                self.blur.push(R::new(r.x + cut, r.y + j, r.w - 2 * cut, 1));
+                self.blur.push(R::new(r.x + cut, r.bottom() - 1 - j, r.w - 2 * cut, 1));
+            }
+        } else if n > 0 {
             self.blur.push(R::new(r.x, r.y + n, r.w, r.h - 2 * n));
             self.blur.push(R::new(r.x + n, r.y, r.w - 2 * n, r.h));
         } else {
@@ -454,7 +497,72 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    /// радиус скругления для фаски n: мелкие элементы круглятся меньше панелей
+    fn rad(&self, r: R, n: i32) -> i32 {
+        if self.style.corners != Corners::Round || n <= 0 {
+            return 0;
+        }
+        (self.style.radius as i32 * n / 2).min(r.w / 2).min(r.h / 2).max(0)
+    }
+
+    /// скруглённый прямоугольник со сглаженными углами
+    fn rounded(&mut self, r: R, rad: i32, c: C) {
+        if rad <= 0 {
+            return self.fill(r, c);
+        }
+        self.fill(R::new(r.x, r.y + rad, r.w, r.h - 2 * rad), c);
+        self.fill(R::new(r.x + rad, r.y, r.w - 2 * rad, rad), c);
+        self.fill(R::new(r.x + rad, r.bottom() - rad, r.w - 2 * rad, rad), c);
+        self.round_corners(r, rad, 0, c);
+    }
+
+    /// четыре угла: кольцо между радиусами rad и inner (0 — сплошной угол)
+    fn round_corners(&mut self, r: R, rad: i32, inner: i32, c: C) {
+        let src = self.eff(c);
+        for j in 0..rad {
+            for i in 0..rad {
+                let (dx, dy) = (rad as f32 - i as f32 - 0.5, rad as f32 - j as f32 - 0.5);
+                let d = (dx * dx + dy * dy).sqrt();
+                let mut cov = (rad as f32 - d + 0.5).clamp(0.0, 1.0);
+                if inner > 0 {
+                    cov -= (inner as f32 - d + 0.5).clamp(0.0, 1.0);
+                }
+                if cov <= 0.0 {
+                    continue;
+                }
+                let p = if cov >= 1.0 { src } else { scale_premul(src, cov) };
+                self.put(r.x + i, r.y + j, p);
+                self.put(r.right() - 1 - i, r.y + j, p);
+                self.put(r.x + i, r.bottom() - 1 - j, p);
+                self.put(r.right() - 1 - i, r.bottom() - 1 - j, p);
+            }
+        }
+    }
+
+    /// размытая тень: кольца наружу от панели, под самой панелью её нет (стекло не темнеет)
+    fn soft_shadow(&mut self, r: R, rad: i32, spread: i32) {
+        let c = self.shade;
+        for i in 1..=spread {
+            let k = (spread - i + 1) as f32 / spread as f32;
+            let ring = c.fade(0.55 * k * k);
+            let o = R::new(r.x - i, r.y - i, r.w + 2 * i, r.h + 2 * i);
+            self.round_ring(o, rad + i, 1, ring);
+        }
+    }
+
+    /// контур толщиной s со скруглёнными углами
+    fn round_ring(&mut self, r: R, rad: i32, s: i32, c: C) {
+        self.fill(R::new(r.x + rad, r.y, r.w - 2 * rad, s), c);
+        self.fill(R::new(r.x + rad, r.bottom() - s, r.w - 2 * rad, s), c);
+        self.fill(R::new(r.x, r.y + rad, s, r.h - 2 * rad), c);
+        self.fill(R::new(r.right() - s, r.y + rad, s, r.h - 2 * rad), c);
+        self.round_corners(r, rad, rad - s, c);
+    }
+
     pub fn pxbox(&mut self, r: R, st: &BoxStyle) {
+        if self.style.corners != Corners::Notch || self.style.shadow != Shadow::Hard {
+            return self.box_styled(r, st);
+        }
         let n = st.notch;
         // стеклянная панель с тенью — верхний уровень, под ней размытие
         if st.shadow > 0 && st.fill.a() < 255 {
@@ -489,8 +597,58 @@ impl<'a> Canvas<'a> {
         }
     }
 
-    /// иконка 7×7 из битмапа клетками cell
+    /// pxbox не пиксельных стилей: те же стекло и обводка, а углы и тень — из стиля
+    fn box_styled(&mut self, r: R, st: &BoxStyle) {
+        let n = if self.style.corners == Corners::Square { 0 } else { st.notch };
+        let rad = self.rad(r, n);
+        if st.shadow > 0 && st.fill.a() < 255 {
+            self.blur_rect(r, n);
+        }
+        if st.shadow > 0 && !st.pressed {
+            match self.style.shadow {
+                Shadow::Hard => self.notched_minus(R::new(r.x + st.shadow, r.y + st.shadow, r.w, r.h), r, n, self.shade),
+                Shadow::Soft => self.soft_shadow(r, rad, st.shadow * 3),
+                Shadow::Off => {}
+            }
+        }
+        self.notched(r, n, st.fill);
+        if st.bevel && self.style.bevel {
+            let hi = st.fill.lerp(C(0xffffffff), if st.pressed { 0.0 } else { 0.22 });
+            let lo = st.fill.lerp(C(0xff000000), if st.pressed { 0.1 } else { 0.45 });
+            let m = n.max(rad);
+            self.fill(R::new(r.x + m, r.y, r.w - 2 * m, 1), hi);
+            self.fill(R::new(r.x, r.y + m, 1, r.h - 2 * m), hi);
+            self.fill(R::new(r.x + m, r.bottom() - 1, r.w - 2 * m, 1), lo);
+            self.fill(R::new(r.right() - 1, r.y + m, 1, r.h - 2 * m), lo);
+        }
+        let s = st.stroke;
+        if s > 0 && st.outline.a() > 0 {
+            match self.style.corners {
+                Corners::Round if rad > s => self.round_ring(r, rad, s, st.outline),
+                Corners::Notch => {
+                    let o = st.outline;
+                    self.fill(R::new(r.x + n, r.y, r.w - 2 * n, s), o);
+                    self.fill(R::new(r.x + n, r.bottom() - s, r.w - 2 * n, s), o);
+                    self.fill(R::new(r.x, r.y + n, s, r.h - 2 * n), o);
+                    self.fill(R::new(r.right() - s, r.y + n, s, r.h - 2 * n), o);
+                    if n > s {
+                        let k = n - s;
+                        self.fill(R::new(r.x + s, r.y + s, k, k), o);
+                        self.fill(R::new(r.right() - n, r.y + s, k, k), o);
+                        self.fill(R::new(r.x + s, r.bottom() - n, k, k), o);
+                        self.fill(R::new(r.right() - n, r.bottom() - n, k, k), o);
+                    }
+                }
+                _ => self.outline(r, st.outline, s),
+            }
+        }
+    }
+
+    /// иконка 7×7 из битмапа клетками cell (в сглаженных стилях — со скруглением)
     pub fn icon(&mut self, name: &str, x: i32, y: i32, cell: i32, c: C) {
+        if self.style.smooth {
+            return self.icon_smooth(name, x, y, cell, c);
+        }
         if let Some(rows) = icon7(name) {
             for (j, row) in rows.iter().enumerate() {
                 for (i, ch) in row.bytes().enumerate() {
@@ -501,6 +659,27 @@ impl<'a> Canvas<'a> {
             }
         }
     }
+    fn icon_smooth(&mut self, name: &str, x: i32, y: i32, cell: i32, c: C) {
+        let src = self.eff(c);
+        let size = 7 * cell;
+        ICONS.with(|m| {
+            let mut m = m.borrow_mut();
+            let key = (name.to_string(), cell);
+            let cov = m.entry(key).or_insert_with(|| icon7(name).map(|rows| smooth_glyph(rows, cell)).unwrap_or_default());
+            if cov.len() != (size * size) as usize {
+                return;
+            }
+            for j in 0..size {
+                for i in 0..size {
+                    let v = cov[(j * size + i) as usize];
+                    if v > 0 {
+                        self.put(x + i, y + j, if v == 255 { src } else { scale_premul(src, v as f32 / 255.0) });
+                    }
+                }
+            }
+        });
+    }
+
     /// батарейка клетками, как значки icon7: корпус 10×7 с фасками и «пипкой» (11 клеток в ширину),
     /// внутри 6 столбиков заряда; погасшие — цветом `empty`. frac > 0 зажигает хотя бы один
     pub fn battery(&mut self, x: i32, y: i32, cell: i32, frac: f32, body: C, fill: C, empty: C) {
@@ -682,8 +861,16 @@ impl<'a> Canvas<'a> {
 
     /// сегментная шкала с блеском сверху; пустые клетки видны
     pub fn gauge(&mut self, r: R, segments: i32, value: f32, c: C, empty: C, gap: i32) {
-        let cw = r.w / segments.max(1);
         let v = value.clamp(0.0, 1.0);
+        if !self.style.cells {
+            self.notched(r, 2, empty);
+            let fw = (r.w as f32 * v).round() as i32;
+            if fw > 0 {
+                self.notched(R::new(r.x, r.y, fw, r.h), 2, c);
+            }
+            return;
+        }
+        let cw = r.w / segments.max(1);
         for i in 0..segments {
             let x = r.x + i * cw;
             let cell = R::new(x, r.y, cw - gap, r.h);
@@ -728,6 +915,65 @@ pub fn over(d: u32, src: u32) -> u32 {
 pub fn scale_premul(p: u32, k: f32) -> u32 {
     let m = |s: u32| ((((p >> s) & 255) as f32 * k).round() as u32).min(255) << s;
     m(24) | m(16) | m(8) | m(0)
+}
+
+thread_local! {
+    /// сглаженные значки: (имя, клетка) → покрытие; значков в интерфейсе десятки
+    static ICONS: std::cell::RefCell<std::collections::HashMap<(String, i32), Vec<u8>>> = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// битмап 7×7 → сглаженное покрытие: маска с запасом, размытие и порог (углы круглятся), затем
+/// усреднение до размера значка
+fn smooth_glyph(rows: &[&str; 7], cell: i32) -> Vec<u8> {
+    const OVER: i32 = 4;
+    let cell = cell.max(1);
+    let n = 7 * cell * OVER;
+    let mut mask = vec![0u8; (n * n) as usize];
+    for (j, row) in rows.iter().enumerate() {
+        for (i, ch) in row.bytes().enumerate() {
+            if ch != b'#' {
+                continue;
+            }
+            let (x0, y0) = (i as i32 * cell * OVER, j as i32 * cell * OVER);
+            for y in y0..y0 + cell * OVER {
+                let a = (y * n + x0) as usize;
+                mask[a..a + (cell * OVER) as usize].fill(1);
+            }
+        }
+    }
+    // сумма по окну (две суммы по осям: окно размером с треть клетки)
+    let rad = (cell * OVER / 3).max(1);
+    let wide = 2 * rad + 1;
+    let mut acc = vec![0u32; ((n + 1) * (n + 1)) as usize];
+    for y in 0..n {
+        let mut line = 0u32;
+        for x in 0..n {
+            line += mask[(y * n + x) as usize] as u32;
+            acc[((y + 1) * (n + 1) + x + 1) as usize] = acc[(y * (n + 1) + x + 1) as usize] + line;
+        }
+    }
+    let area = |x0: i32, y0: i32, x1: i32, y1: i32| -> u32 {
+        let (x0, y0, x1, y1) = (x0.clamp(0, n), y0.clamp(0, n), x1.clamp(0, n), y1.clamp(0, n));
+        let at = |x: i32, y: i32| acc[(y * (n + 1) + x) as usize];
+        at(x1, y1) + at(x0, y0) - at(x0, y1) - at(x1, y0)
+    };
+    let size = 7 * cell;
+    let mut out = vec![0u8; (size * size) as usize];
+    for j in 0..size {
+        for i in 0..size {
+            let mut hit = 0;
+            for sy in 0..OVER {
+                for sx in 0..OVER {
+                    let (px, py) = (i * OVER + sx, j * OVER + sy);
+                    if area(px - rad, py - rad, px - rad + wide, py - rad + wide) * 2 >= (wide * wide) as u32 {
+                        hit += 1;
+                    }
+                }
+            }
+            out[(j * size + i) as usize] = (hit * 255 / (OVER * OVER)) as u8;
+        }
+    }
+    out
 }
 
 #[derive(Clone, Copy)]
@@ -875,6 +1121,9 @@ pub fn phys(w: i32, h: i32, scale: f64) -> (i32, i32) {
 /// (pw×ph): на 4K с масштабом 2 каждый пиксель шелла — ровно 2×2, без мыла от
 /// билинейного растяжения композитором. Дробный масштаб даёт чуть неровные клетки, но чётко.
 pub fn upscale(src: &[u32], w: i32, h: i32, dst: &mut [u32], pw: i32, ph: i32) {
+    if crate::style::current().smooth {
+        return upscale_smooth(src, w, h, dst, pw, ph);
+    }
     let (w, h, pw, ph) = (w as usize, h as usize, pw as usize, ph as usize);
     if w == 0 || h == 0 || src.len() < w * h || dst.len() < pw * ph {
         return;
@@ -910,6 +1159,38 @@ pub fn upscale(src: &[u32], w: i32, h: i32, dst: &mut [u32], pw: i32, ph: i32) {
         let row = &src[sy * w..sy * w + w];
         for (x, &sx) in xs.iter().enumerate() {
             dst[out + x] = row[sx];
+        }
+    }
+}
+
+/// Увеличение билинейно: для сглаженных стилей, где ступеньки ближайшего соседа заметнее мягкости
+fn upscale_smooth(src: &[u32], w: i32, h: i32, dst: &mut [u32], pw: i32, ph: i32) {
+    let (w, h, pw, ph) = (w as usize, h as usize, pw as usize, ph as usize);
+    if w == 0 || h == 0 || src.len() < w * h || dst.len() < pw * ph {
+        return;
+    }
+    // индекс и дробь левого соседа для каждого столбца: считаются один раз на кадр
+    let map = |n: usize, m: usize| -> Vec<(usize, usize, u32)> {
+        (0..m)
+            .map(|i| {
+                let f = ((i as f32 + 0.5) * n as f32 / m as f32 - 0.5).clamp(0.0, (n - 1) as f32);
+                let a = f as usize;
+                (a, (a + 1).min(n - 1), ((f - a as f32) * 256.0) as u32)
+            })
+            .collect()
+    };
+    let (xs, ys) = (map(w, pw), map(h, ph));
+    let mix = |a: u32, b: u32, t: u32| {
+        let it = 256 - t;
+        let rb = ((a & 0x00ff_00ff) * it + (b & 0x00ff_00ff) * t) >> 8 & 0x00ff_00ff;
+        let ag = ((a >> 8 & 0x00ff_00ff) * it + (b >> 8 & 0x00ff_00ff) * t) >> 8 & 0x00ff_00ff;
+        ag << 8 | rb
+    };
+    for (y, &(ya, yb, ty)) in ys.iter().enumerate() {
+        let (ra, rb) = (&src[ya * w..ya * w + w], &src[yb * w..yb * w + w]);
+        let out = &mut dst[y * pw..y * pw + pw];
+        for (p, &(xa, xb, tx)) in out.iter_mut().zip(&xs) {
+            *p = mix(mix(ra[xa], ra[xb], tx), mix(rb[xa], rb[xb], tx), ty);
         }
     }
 }

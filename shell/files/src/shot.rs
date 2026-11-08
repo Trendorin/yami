@@ -77,7 +77,7 @@ pub fn run(args: &[String]) -> i32 {
     if targets.is_empty() {
         targets = TARGETS.iter().map(|s| s.to_string()).collect();
     }
-    let mut look = crate::look::Look::load_mode(mode);
+    let mut look = crate::look::Look::load_mode("files", mode);
     if !lang.is_empty() {
         look.lang = lang.clone();
     }

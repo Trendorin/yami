@@ -58,6 +58,10 @@ fn cap(font: &FontRef<'static>) -> Option<f32> {
     Some((o.bounds.max.y - o.bounds.min.y).abs() / font.units_per_em()?)
 }
 
+/// высота прописной у Tiny5: по ней вёрстана разметка всех панелей. Модуль в чужой системе может
+/// жить вовсе без Tiny5, а размеры должны совпасть
+const TINY_CAP: f32 = 0.625;
+
 pub struct Fonts {
     srcs: Vec<Src>,
     // индексы в srcs: порядок поиска глифа для каждого вида
@@ -147,9 +151,10 @@ impl Fonts {
         let generic = matches!(family.to_lowercase().as_str(), "sans" | "sans-serif" | "serif" | "monospace");
         let custom = if family.is_empty() || family.eq_ignore_ascii_case("tiny5") { None } else { add(family, (!generic).then_some(family), !generic && is_pixel_family(family), &mut srcs) };
         let tiny = add("Tiny5", Some("tiny5"), true, &mut srcs);
-        if let (Some(c), Some(t)) = (custom, tiny) {
+        if let Some(c) = custom {
             if !srcs[c].pixel {
-                if let (Some(a), Some(b)) = (cap(&srcs[t].font), cap(&srcs[c].font)) {
+                let a = tiny.and_then(|t| cap(&srcs[t].font)).unwrap_or(TINY_CAP);
+                if let Some(b) = cap(&srcs[c].font) {
                     srcs[c].k = (a / b).clamp(0.5, 1.5);
                 }
             }

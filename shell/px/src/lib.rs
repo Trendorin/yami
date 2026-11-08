@@ -9,6 +9,7 @@ pub mod i18n;
 pub mod icons;
 pub mod look;
 pub mod paths;
+pub mod style;
 pub mod theme;
 pub mod time;
 pub mod ui;

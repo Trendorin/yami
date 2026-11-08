@@ -438,7 +438,7 @@ pub(crate) const LOCK_BASE: u32 = u32::MAX - 64;
 
 impl State {
     pub fn new(set: Settings, niri: Niri) -> State {
-        yami_px::gfx::set_reveal(yami_px::gfx::Reveal::from_id(&set.reveal), set.reveal_grain);
+        let _ = yami_px::look::Look::from_json(&set.style_value(), Some(set.light));
         State {
             t: Theme::new(set.accent_rgb(), set.tint, set.glass, set.lift, set.inner, set.light).apply(),
             niri,
@@ -584,7 +584,7 @@ pub fn run() {
     let mut icons = Icons::new(&iset);
     icons.set_style(Theme::new(set.accent_rgb(), set.tint, set.glass, set.lift, set.inner, set.light).icon_ramp(), set.icon_pixel, set.icon_tint);
     let set_saved = set.to_json();
-    let set_font = set.font_shell.clone();
+    let set_font = set.font_family();
 
     let mut niri = Niri::new();
     niri.stacking = niri.stacking || set.stacking;
@@ -669,6 +669,7 @@ pub fn run() {
     media::spawn(tx.clone());
     net::spawn_bt(tx.clone());
     app.write_palette();
+    crate::prefs::write_style(&app.st.set);
     // обои: при старте палитра обычно та же, theme.py не запускается — готовим картинку сами
     app.sync_wall();
     app.write_fx();

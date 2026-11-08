@@ -356,7 +356,7 @@ impl V {
 
     pub fn wallpaper(&mut self) {
         let Some(p) = self.path().cloned() else { return };
-        if crate::look::set_wallpaper(&p) {
+        if crate::look::set_wallpaper(&p, &self.look.wallpaper_cmd) {
             self.toast(crate::i18n::tr("обои поменяются через секунду"));
         }
     }

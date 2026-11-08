@@ -127,6 +127,19 @@ pub fn shell_settings() -> PathBuf {
     config_dir().join("yami-shell.json")
 }
 
+/// общий вид всех модулей yami (look.rs); YAMI_STYLE — другой файл (проверки, разовый запуск)
+pub fn style_file() -> PathBuf {
+    match std::env::var_os("YAMI_STYLE") {
+        Some(p) if !p.is_empty() => PathBuf::from(p),
+        _ => config_dir().join("yami/style.json"),
+    }
+}
+
+/// вид отдельного модуля, поверх общего: только те ключи, что отличаются
+pub fn style_app_file(app: &str) -> PathBuf {
+    config_dir().join(format!("yami/style.{app}.json"))
+}
+
 /// свой бинарь: после обновления старый файл удалён («… (deleted)») — берём новый по тому же пути
 pub fn self_exe() -> PathBuf {
     let Some(p) = std::fs::read_link("/proc/self/exe").ok().or_else(|| std::env::current_exe().ok()) else { return PathBuf::from("yami-shell") };

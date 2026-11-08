@@ -195,6 +195,37 @@ impl Theme {
         }
     }
 
+    /// цвета из style.json поверх выведенных из акцента; ключи — как в palette_json
+    pub fn override_colors(&mut self, colors: &serde_json::Map<String, serde_json::Value>) {
+        for (k, v) in colors {
+            let Some(c) = v.as_str().and_then(parse_hex) else { continue };
+            let c = C::hex(c);
+            let slot = match k.as_str() {
+                "bg" => &mut self.bg,
+                "panel" => &mut self.panel,
+                "surface" => &mut self.surface,
+                "surfaceHi" => &mut self.surface_hi,
+                "codeBg" => &mut self.code_bg,
+                "border" => &mut self.border,
+                "dim" => &mut self.dim,
+                "accent" => &mut self.red,
+                "deep" => &mut self.blood,
+                "glow" => &mut self.glow,
+                "bright" => &mut self.ember,
+                "selection" => &mut self.selection,
+                "text" => &mut self.text,
+                "textDim" => &mut self.text_dim,
+                "textFaint" => &mut self.text_faint,
+                "onAccent" => &mut self.on_accent,
+                "textHi" => &mut self.text_hi,
+                "ok" => &mut self.ok,
+                "warn" => &mut self.warn,
+                _ => continue,
+            };
+            *slot = c;
+        }
+    }
+
     /// сделать тему текущей для процесса: то, что холсты берут сами (тень)
     pub fn apply(&self) -> Theme {
         crate::gfx::set_shade(self.shade);
