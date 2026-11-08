@@ -1,6 +1,6 @@
 # Rust (the distro's if new enough, else rustup into ~/.cargo) and the build of
-# the shell and the chosen apps (yami-files, yami-view, yami-play, yami-greet) into the cache, then
-# the binaries into ~/.local/bin, each swapped in whole.
+# the shell and of each chosen module into the cache, then the binaries into ~/.local/bin, each swapped
+# in whole. The login screen's binary goes to /usr/local/bin (login.sh).
 # shellcheck shell=bash
 
 plan_build() {
@@ -10,6 +10,7 @@ plan_build() {
   for id in files view play shot agents; do
     on "$id" && add "$(t "сборка:" "build:" "compilar:") yami-$id" do_build_module "$id"
   done
+  wants login && add "$(t "сборка:" "build:" "compilar:") yami-greet" do_build_greet
   return 0
 }
 
@@ -61,9 +62,13 @@ do_build_module() {
   need_rust || return 1
   local repo src
   repo="$(m_repo "$1")" || return 1
-  src="$(m_fetch "$repo")" || return 1
+  src="$(m_src "$repo")" || return 1
   cargo_build "$src/Cargo.toml" || return 1
-  put_bin "$repo" || return 1
-  printf '%s
-' "$src" >"$CACHE/src-$repo"
+  put_bin "$repo"
+}
+do_build_greet() {
+  need_rust || return 1
+  local src
+  src="$(m_src yami-greet)" || return 1
+  cargo_build "$src/Cargo.toml"
 }

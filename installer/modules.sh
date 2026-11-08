@@ -20,6 +20,24 @@ m_repo() {
 }
 m_tag() { awk -v r="$1" '$1 == r { print $2 }' "$ROOT/modules.lock" 2>/dev/null; }
 
+# папка исходников, записанная шагом «исходники» (do_fetch_module)
+m_src() { [[ -s $CACHE/src-$1 ]] && cat "$CACHE/src-$1"; }
+do_fetch_module() {
+  local dir
+  dir="$(m_fetch "$1")" || return 1
+  printf '%s\n' "$dir" >"$CACHE/src-$1"
+}
+# первым делом: дальше root-шаги и сборка берут всё из готовых папок
+plan_fetch() {
+  local id repo
+  for id in files view play shot agents login fork; do
+    wants "$id" || continue
+    repo="$(m_repo "$id")" || continue
+    add "$(t "исходники:" "sources:" "código-fonte:") $repo" do_fetch_module "$repo"
+  done
+  return 0
+}
+
 # исходники модуля: печатает папку; нет сети или подписи — код возврата не 0
 m_fetch() {
   local repo=$1 tag dir

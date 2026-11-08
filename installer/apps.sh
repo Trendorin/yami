@@ -1,4 +1,4 @@
-# Our apps, each one only when chosen: yami-files (folders, the file dialog of every app through the
+# Our modules, each one only when chosen (their files come from the module's own repository): yami-files (folders, the file dialog of every app through the
 # portal, «show in folder»), yami-view (pictures), yami-play (video and music). Their .desktop files
 # and the defaults for their MIME types; unchecked over an earlier install, an app goes again with
 # its defaults (mimeapps.list keeps every other entry), yami-files with its portal and D-Bus files.
@@ -26,10 +26,12 @@ app_desktop() {
   local data="${XDG_DATA_HOME:-$HOME/.local/share}"
   # на чистой системе ~/.config ещё нет, а xdg-mime его не создаёт
   mkdir -p "$CFG" "$data/applications"
-  install -Dm644 "$ROOT/config/applications/$1.desktop" "$data/applications/$1.desktop" || return 1
+  local src
+  src="$(m_src "$1")" || return 1
+  install -Dm644 "$src/config/$1.desktop" "$data/applications/$1.desktop" || return 1
   command -v xdg-mime >/dev/null || return 0
   # shellcheck disable=SC2046 # one argument per MIME type
-  xdg-mime default "$1.desktop" $(sed -n 's/^MimeType=//p' "$ROOT/config/applications/$1.desktop" | tr ';' ' ')
+  xdg-mime default "$1.desktop" $(sed -n 's/^MimeType=//p' "$src/config/$1.desktop" | tr ';' ' ')
 }
 # pictures open in yami-view, video and music in yami-play
 do_view() { app_desktop yami-view; }
@@ -66,13 +68,21 @@ PY
 
 # ── services: the screen-share portal backend and the agent process ─────────
 do_agents() {
-  local data="${XDG_DATA_HOME:-$HOME/.local/share}"
-  install -Dm644 "$ROOT/config/portal/yami-agents.portal" "$data/xdg-desktop-portal/portals/yami-agents.portal" || return 1
+  local data="${XDG_DATA_HOME:-$HOME/.local/share}" src pc="$CFG/xdg-desktop-portal/niri-portals.conf"
+  src="$(m_src yami-agents)" || return 1
+  install -Dm644 "$src/config/yami-agents.portal" "$data/xdg-desktop-portal/portals/yami-agents.portal" || return 1
   mkdir -p "$data/dbus-1/services"
-  sed "s|@BIN@|$BIN/yami-agents|" "$ROOT/config/portal/org.freedesktop.impl.portal.desktop.yamiagents.service" \
+  sed "s|@BIN@|$BIN/yami-agents|" "$src/config/org.freedesktop.impl.portal.desktop.yamiagents.service" \
     >"$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service"
   # работающая служба переходит на новый бинарь, как только свободна, остановленная запускается
   ((RUNNING_NIRI)) && "$BIN/yami-agents" --reload 2>/dev/null
+  # до 2.8 показ экрана был у бэкенда yami: фронтенд читает конфиг только при старте
+  if grep -qs 'ScreenCast=yami;' "$pc" && head -1 "$pc" | grep -q '^# yami:'; then
+    sed -i 's/ScreenCast=yami;/ScreenCast=yami-agents;/' "$pc"
+    if ((SYSTEMD)) && systemctl --user is-active -q xdg-desktop-portal 2>/dev/null; then
+      systemctl --user restart xdg-desktop-portal
+    fi
+  fi
   return 0
 }
 drop_agents() {
@@ -84,18 +94,19 @@ drop_agents() {
 
 # ── files: yami-files as the folder handler, the portal file dialog ─────────
 do_files() {
-  local data="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local data="${XDG_DATA_HOME:-$HOME/.local/share}" src
+  src="$(m_src yami-files)" || return 1
   app_desktop yami-files || return 1
   # xdg-desktop-portal: FileChooser → yami-files (browsers, Telegram, GTK/KDE apps)
-  install -Dm644 "$ROOT/config/portal/yami.portal" "$data/xdg-desktop-portal/portals/yami.portal"
+  install -Dm644 "$src/config/yami.portal" "$data/xdg-desktop-portal/portals/yami.portal"
   # which backend serves what: a niri-portals.conf of your own (no «# yami:» line) stays yours
   local pc="$CFG/xdg-desktop-portal/niri-portals.conf"
   if [[ ! -e $pc ]] || head -1 "$pc" | grep -q '^# yami:'; then install -Dm644 "$ROOT/config/portal/niri-portals.conf" "$pc"; fi
   mkdir -p "$data/dbus-1/services"
-  sed "s|@BIN@|$BIN/yami-files|" "$ROOT/config/portal/org.freedesktop.impl.portal.desktop.yami.service" \
+  sed "s|@BIN@|$BIN/yami-files|" "$src/config/org.freedesktop.impl.portal.desktop.yami.service" \
     >"$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yami.service"
   # «показать в папке» из браузеров и прочих: org.freedesktop.FileManager1
-  sed "s|@BIN@|$BIN/yami-files|" "$ROOT/config/portal/org.freedesktop.FileManager1.service" \
+  sed "s|@BIN@|$BIN/yami-files|" "$src/config/org.freedesktop.FileManager1.service" \
     >"$data/dbus-1/services/org.freedesktop.FileManager1.service"
   # Firefox and its forks pick the portal dialog only with this pref
   # profiles from profiles.ini too (they may live outside the browser folder)

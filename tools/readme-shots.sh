@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Real screenshots of a running yami session for the README (.github/assets): the plain desktop
 # (clean.png), the desktop with the launcher, settings tabs, yami-files on a demo folder (闇 as in fastfetch on each palette's
-# wallpaper), yami-view on one of them, the screenshot overlay (`yami-shell shot screenshot --frame`: the same drawing code
+# wallpaper), yami-view on one of them, the screenshot overlay (`yami-shot shot --frame`: the same drawing code
 # with a selection and marks, over a real frame of the screen), the login screen (`yami-greet shot
 # --size`: its own drawing code at the screen's size, with a made-up user and host, on the look the
 # shell published); in English and Russian. yami-greet comes from this tree's build. Runs on an empty workspace with do-not-disturb on (no live notification or
@@ -40,8 +40,8 @@ fi
 ws() { niri msg --json workspaces | python3 -I -c "$1"; }
 out="$(niri msg --json focused-output | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["name"])')"
 size="$(niri msg --json focused-output | python3 -I -c 'import json,sys; l=json.load(sys.stdin)["logical"]; print("%dx%d" % (l["width"], l["height"]))')"
-GREET="$ROOT/shell/target/release/yami-greet"
-[[ -x $GREET ]] || die "$(t "нет $GREET — собери: cargo build --release -p yami-greet" "no $GREET: build it with cargo build --release -p yami-greet")"
+GREET="$ROOT/../yami-modules/yami-greet/target/release/yami-greet"
+[[ -x $GREET ]] || die "$(t "нет $GREET — собери модуль yami-greet" "no $GREET: build the yami-greet module")"
 back="$(ws 'import json,sys; print(next(w["idx"] for w in json.load(sys.stdin) if w["is_focused"]))')"
 empty="$(ws "import json,sys; print(max(w['idx'] for w in json.load(sys.stdin) if w['output']=='$out' and w['active_window_id'] is None))")"
 lang0="$(yami config get lang)"
@@ -90,7 +90,8 @@ import theme  # noqa: E402
 from PIL import Image  # noqa: E402
 # 闇 как в fastfetch (theme.KANJI: полосы от светлого к акценту, тень в пиксель) на обоях палитры
 k = theme.KANJI
-for pid, hx in re.findall(r'Preset \{ id: "(\w+)", name: "[^"]*", accent: 0x([0-9a-f]{6})', (root / "shell/px/src/theme.rs").read_text()):
+choices = (root / "installer/choices.sh").read_text()
+for pid, hx in zip(re.search(r"PAL_ID=\(([^)]*)\)", choices)[1].split(), re.search(r"PAL_HEX=\(([^)]*)\)", choices)[1].split()):
     p = theme.derive("#" + hx)
     im = theme.wallpaper_img(p)
     bands = [p["bright"], theme.mix(p["bright"], p["accent"], 0.5), p["accent"], theme.mix(p["accent"], p["deep"], 0.5)]
@@ -234,8 +235,8 @@ for lang in en ru; do
   shoot "files" 2
   full files "$OUT/files-$lang.png"
   # оверлей скриншота: выделение и метки (код снимка шелла) поверх настоящего кадра с файлами
-  yami-shell shot screenshot --lang "$lang" --frame "$TMP/files.png" -o "$TMP/snap" >/dev/null
-  full snap/screenshot "$OUT/screenshot-$lang.png"
+  yami-shot shot --lang "$lang" --frame "$TMP/files.png" -o "$TMP/snap" >/dev/null
+  full snap/edit "$OUT/screenshot-$lang.png"
   kill "${pids[@]}" 2>/dev/null || true
   pids=()
   # просмотрщик — на обоях «сакуры»

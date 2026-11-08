@@ -2,6 +2,7 @@
 language), from the project itself: colours by theme.py `derive`, icons from gfx.rs `icon7`, fonts
 from fonts/. Screenshots of a real session come from tools/readme-shots.sh.
 Needs Pillow (as theme.py).  Usage: tools/readme-art.py [#accent]  (default: the shell's palette)"""
+import os
 import re
 import sys
 from pathlib import Path
@@ -20,7 +21,8 @@ def accent():
         st = json.loads((Path.home() / ".config/yami-shell.json").read_text())
     except (OSError, ValueError):
         st = {}
-    presets = dict(re.findall(r'Preset \{ id: "(\w+)", name: "[^"]*", accent: 0x([0-9a-f]{6})', (ROOT / "shell/px/src/theme.rs").read_text()))
+    choices = (ROOT / "installer/choices.sh").read_text()
+    presets = dict(zip(re.search(r"PAL_ID=\(([^)]*)\)", choices)[1].split(), re.search(r"PAL_HEX=\(([^)]*)\)", choices)[1].split()))
     if re.fullmatch(r"#?[0-9a-fA-F]{6}", st.get("accent") or ""):
         return "#" + st["accent"].lstrip("#")
     return "#" + presets.get(st.get("palette", "blood"), "c4161c")
@@ -37,7 +39,8 @@ def rgb(k, a=255):
 
 
 def icons():
-    src = (ROOT / "shell/px/src/gfx.rs").read_text()
+    # значки 7×7 — в библиотеке yami-px: рядом с этим репозиторием или в YAMI_MODULES_DIR
+    src = (Path(os.environ.get("YAMI_MODULES_DIR", ROOT.parent / "yami-modules")) / "yami-px/src/gfx.rs").read_text()
     return {m[0]: re.findall(r'"([.#]{7})"', m[1]) for m in re.findall(r'"(\w+)" => &\[((?:"[.#]{7}",? ?){7})\]', src)}
 
 

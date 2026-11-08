@@ -85,10 +85,10 @@ const PAIRS: &[(&str, &str)] = &[
     // экран входа (login.rs)
     ("экран входа", "login screen"),
     ("экран входа: greetd + yami-greet", "login screen: greetd + yami-greet"),
-    ("не установлен: ./install.sh --login или tools/greet-install.sh", "not installed: ./install.sh --login or tools/greet-install.sh"),
+    ("не установлен: модуль yami-greet ставится из yami setup", "not installed: the yami-greet module comes from yami setup"),
     ("настройки ниже применятся, когда он появится", "the settings below apply once it is installed"),
     ("greetd — менеджер входа", "greetd is the login manager"),
-    ("greetd не включён: tools/greet-install.sh", "greetd is not enabled: tools/greet-install.sh"),
+    ("greetd не включён: yami setup", "greetd is not enabled: yami setup"),
     ("стоит; служба greetd — в твоей системе инициализации", "installed; the greetd service is up to your init system"),
     ("ещё не запускался с этой версии", "not started since this version"),
     ("папка вида не твоя: экран входа не идёт за шеллом", "the look folder is not yours: the login screen does not follow the shell"),

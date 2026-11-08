@@ -166,8 +166,9 @@ components_limit
 if ((UPDATE)); then
   # rebuild from this tree with the choices of the first install; no packages, no sudo
   say "$(t "обновление из" "update from" "atualizar de") $ROOT"
+  plan_fetch    # modules.sh: each module's source, signature checked
   plan_build    # build.sh: the shell and the chosen apps
-  plan_apps     # apps.sh: yami-files, yami-view, yami-play (or out, when unticked)
+  plan_apps     # apps.sh: the modules' files (or out, when unticked)
   plan_desktop  # desktop.sh: fonts, niri config, everything from the palette
   plan_record   # desktop.sh: install record, packages-needed, counter, restart
   run_steps
@@ -180,6 +181,7 @@ fi
 if ((APPLY)); then
   say "$(t "ставлю выбранное" "installing what you chose" "instalando o que você escolheu")"
   root_begin
+  plan_fetch
   plan_packages
   plan_login
   plan_build
@@ -198,6 +200,7 @@ paint
 [[ -t 1 ]] && printf '\e[H\e[J'
 banner $((YES))
 root_begin      # root.sh: the password once
+plan_fetch      # modules.sh: the source of each chosen module
 
 # root steps first: the root shell closes before the build (run_steps, root.sh)
 plan_packages   # packages.sh

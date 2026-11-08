@@ -1,7 +1,7 @@
 // Пакеты, которых не хватает выбранным частям установки (ночной свет, текст со скриншота,
 // GameMode…). Установщик (installer/packages.sh, do_need_pkgs) пишет
 // ~/.local/state/yami/packages-needed: «pm pacman» и «pkgs a b c» — только то, что есть в
-// репозиториях и не стоит; «login ПУТЬ» — экран входа (greet-install.sh того дерева, из которого
+// репозиториях и не стоит; «login ПУТЬ» — экран входа (install-system.sh модуля yami-greet, из которого
 // шло обновление): нового нет или он старее сборки. Обновление идёт без sudo и само их не поставит: `yami update need`
 // печатает одну команду, `--run` выполняет её здесь же, вкладка «обновления» открывает её в
 // терминале (пароль sudo спрашивает там). Команду собирает шелл по своей таблице: из файла
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 pub struct Need {
     pub pm: String,
     pub pkgs: Vec<String>,
-    /// tools/greet-install.sh, который поставит экран входа (вместо SDDM или новее)
+    /// yami-greet/install-system.sh, который поставит экран входа (вместо SDDM или новее)
     pub login: Option<PathBuf>,
 }
 
@@ -49,9 +49,9 @@ pub fn parse(t: &str) -> Option<Need> {
         } else if let Some(v) = l.strip_prefix("pkgs ") {
             n.pkgs = v.split_whitespace().filter(|p| name_ok(p)).map(String::from).collect();
         } else if let Some(v) = l.strip_prefix("login ") {
-            // только настоящий greet-install.sh по абсолютному пути: другое имя файл не подсунет
+            // только настоящий install-system.sh модуля по абсолютному пути: другое имя файл не подсунет
             let p = PathBuf::from(v.trim());
-            if p.is_absolute() && p.ends_with("tools/greet-install.sh") && p.is_file() && !v.chars().any(char::is_control) {
+            if p.is_absolute() && p.ends_with("yami-greet/install-system.sh") && p.is_file() && !v.chars().any(char::is_control) {
                 n.login = Some(p);
             }
         }
@@ -181,7 +181,7 @@ mod tests {
     fn login_line() {
         let d = std::env::temp_dir().join(format!("yami-need-{}", std::process::id()));
         let _ = std::fs::create_dir_all(d.join("tools"));
-        let g = d.join("tools/greet-install.sh");
+        let g = d.join("yami-greet/install-system.sh");
         let _ = std::fs::write(&g, "#!/bin/sh\n");
         // только экран входа: менеджер пакетов не нужен
         let n = super::parse(&format!("login {}\n", g.display())).unwrap();
@@ -191,8 +191,8 @@ mod tests {
         assert!(n.line().ends_with(&format!("pacman -S --needed zbar && '{}'", g.display())));
         // чужой файл, относительный путь, нет файла — мимо
         assert!(super::parse("login /bin/sh\n").is_none());
-        assert!(super::parse("login tools/greet-install.sh\n").is_none());
-        assert!(super::parse("login /nowhere/tools/greet-install.sh\n").is_none());
+        assert!(super::parse("login yami-greet/install-system.sh\n").is_none());
+        assert!(super::parse("login /nowhere/yami-greet/install-system.sh\n").is_none());
         let _ = std::fs::remove_dir_all(&d);
     }
 }

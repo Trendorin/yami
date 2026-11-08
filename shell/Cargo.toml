@@ -17,7 +17,7 @@ path = "src/main.rs"
 package-managed = []
 
 [dependencies]
-yami-px = { path = "px" }
+yami-px = { git = "https://github.com/Trendorin/yami-px", tag = "v3.0.0" }
 smithay-client-toolkit = "0.20"
 wayland-client = "0.31"
 wayland-protocols = { version = "0.32", features = ["client", "staging", "unstable"] }
@@ -34,7 +34,7 @@ blocking = "=1.6.2"
 libc = "0.2"
 
 [workspace]
-members = ["px", "files", "view", "play", "greet", "shot", "agents", "setup"]
+members = ["setup"]
 
 [profile.release]
 opt-level = 3

@@ -1,3 +1,0 @@
-[portal]
-DBusName=org.freedesktop.impl.portal.desktop.yamiagents
-Interfaces=org.freedesktop.impl.portal.ScreenCast

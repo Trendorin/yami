@@ -7,6 +7,8 @@ uninstall() {
   banner 1
   say "$(t "удаляю YAMI" "removing YAMI" "removendo YAMI")"
   ((DRY)) && { note "--dry-run"; return; }
+  # первым: скрипт экрана входа лежит в том, что удаляется ниже
+  uninstall_login
   pgrep -x yami-shell >/dev/null && "$BIN/yami-shell" msg quit 2>/dev/null
   [[ -x $HOME/.local/lib/yami-niri/yami-niri.sh ]] && "$HOME/.local/lib/yami-niri/yami-niri.sh" off
   rm -rf "$HOME/.local/lib/yami-niri" "$HOME/.local/lib/yami"
@@ -27,7 +29,6 @@ uninstall() {
   # the MangoHud config theme.py wrote (one without its mark is the user's own)
   head -1 "$CFG/MangoHud/MangoHud.conf" 2>/dev/null | grep -q '^# yami: written by tools/theme.py' && rm -f "$CFG/MangoHud/MangoHud.conf"
   rm -rf "$HOME/.local/share/fonts/yami" "$HOME/.local/share/yami" "$CFG/qt6ct/qss/yami"
-  uninstall_login
   # the one file 2.7 could put outside the home folder for NVIDIA
   { [[ -n $SU ]] || ((EUID == 0)); } && $SU rm -f /etc/nvidia/nvidia-application-profiles-rc.d/50-niri-vram.json
   rm -f "$STATE/packages-needed" "$STATE/components-known" "$STATE/settings-newer.json"

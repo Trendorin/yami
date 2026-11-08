@@ -6,6 +6,10 @@
 #   --fast  skip the installer dry run
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# пока модулей нет на GitHub: yami-px берётся из соседней папки (env.sh указывает git туда)
+MODS="${YAMI_MODULES_DIR:-$ROOT/../yami-modules}"
+# shellcheck source=/dev/null
+[[ -f $MODS/env.sh ]] && . "$MODS/env.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 FAST=0
@@ -40,7 +44,7 @@ done
 
 step "i18n"
 python3 -I "$ROOT/tools/check-i18n.py" || bad "static i18n"
-# README, CHANGELOG, docs/*, fork/README and their .ru.md twins: one skeleton, links, anchors
+# README, CHANGELOG, docs/* and their .ru.md twins: one skeleton, links, anchors
 python3 -I "$ROOT/tools/check-docs.py" && ok "docs: English and Russian in step" || bad "docs EN/RU (tools/check-docs.py)"
 if [[ -x $BIN ]]; then
   # every panel drawn offscreen in English: any Russian text left on screen fails
@@ -48,57 +52,25 @@ if [[ -x $BIN ]]; then
   [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "shot --lang en: no Russian left" || bad "shot --lang en"
   "$BIN" shot --defaults --lang ru -o "$TMP/ru" >/dev/null || bad "shot --lang ru (render crashed?)"
 fi
-FILES="$ROOT/shell/target/release/yami-files"
-if [[ -x $FILES ]]; then
-  "$FILES" shot --lang en -o "$TMP/fen" | grep untranslated
-  [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-files shot --lang en: no Russian left" || bad "yami-files shot --lang en"
-  "$FILES" shot --lang ru -o "$TMP/fru" >/dev/null || bad "yami-files shot --lang ru (render crashed?)"
+SETUP="$ROOT/shell/target/release/yami-setup"
+if [[ -x $SETUP ]]; then
+  "$SETUP" shot --lang en -o "$TMP/sen" >/dev/null && ok "yami-setup: every page renders" || bad "yami-setup shot"
+  "$SETUP" shot --lang en --plain -o "$TMP/sep" >/dev/null && ok "yami-setup: the neutral look renders" || bad "yami-setup shot --plain"
 fi
-
-VIEW="$ROOT/shell/target/release/yami-view"
-if [[ -x $VIEW ]]; then
-  "$VIEW" shot --lang en -o "$TMP/ven" | grep untranslated
-  [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-view shot --lang en: no Russian left" || bad "yami-view shot --lang en"
-fi
-PLAY="$ROOT/shell/target/release/yami-play"
-if [[ -x $PLAY ]]; then
-  "$PLAY" shot --lang en -o "$TMP/pen" | grep untranslated
-  [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-play shot --lang en: no Russian left" || bad "yami-play shot --lang en"
-fi
-# every app in Brazilian Portuguese: nothing left in Russian or English from the catalogs
-for name in shell files view play greet; do
-  exe="$ROOT/shell/target/release/yami-$name"
-  [[ -x $exe ]] || continue
-  args=(shot --lang pt-BR -o "$TMP/pt-$name")
-  [[ $name == shell ]] && args+=(--defaults)
-  "$exe" "${args[@]}" | grep untranslated
-  [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-$name shot --lang pt-BR" || bad "yami-$name shot --lang pt-BR"
-done
+# the shell in Brazilian Portuguese: nothing left in Russian or English from the catalogs
+"$BIN" shot --lang pt-BR -o "$TMP/pt" --defaults | grep untranslated
+[[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-shell shot --lang pt-BR" || bad "yami-shell shot --lang pt-BR"
 step "unit tests"
 cargo test --release --locked --workspace --quiet --manifest-path "$ROOT/shell/Cargo.toml" >"$TMP/test.log" 2>&1 && ok "cargo test" || { tail -20 "$TMP/test.log"; bad "cargo test"; }
 # a package manager's build (Nix, distro packages): the updater is off (docs/PACKAGING.md)
 cargo test --release --locked -p yami-shell --features package-managed --quiet --manifest-path "$ROOT/shell/Cargo.toml" package_manager_owns_updates >"$TMP/managed.log" 2>&1 && ok "cargo test (package-managed)" || { tail -20 "$TMP/managed.log"; bad "cargo test --features package-managed"; }
 
-step "login screen (yami-greet: offscreen states, niri config)"
-GREET="$ROOT/shell/target/release/yami-greet"
-if [[ -x $GREET ]]; then
-  "$GREET" shot --lang en -o "$TMP/gen" | grep untranslated
-  [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-greet shot --lang en: no Russian left" || bad "yami-greet shot --lang en"
-  NIRI_BIN="$(command -v niri || true)"
-  if [[ -n $NIRI_BIN ]]; then
-    for v in "" --plain; do
-      "$GREET" kdl $v >"$TMP/greet.kdl" && "$NIRI_BIN" validate -c "$TMP/greet.kdl" >/dev/null 2>&1 && ok "niri takes yami-greet kdl $v" || bad "yami-greet kdl $v: niri rejects it"
-    done
-  fi
-  sh -n "$ROOT/system/greet/greet-session" || bad "syntax: system/greet/greet-session"
-fi
-
 step "scripts"
-for f in "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh "$ROOT"/fork/*.sh; do
+for f in "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh; do
   bash -n "$f" || bad "syntax: ${f#"$ROOT"/}"
 done
 if command -v shellcheck >/dev/null; then
-  shellcheck -S error -x "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh "$ROOT"/fork/*.sh || bad "shellcheck"
+  shellcheck -S error -x "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh || bad "shellcheck"
 fi
 python3 -I -c 'import ast,sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' "$ROOT"/tools/*.py || bad "python syntax"
 ok "scripts parsed"
@@ -120,9 +92,10 @@ if ((!FAST)); then
   step "installer dry run (throwaway HOME)"
   mkdir -p "$TMP/home"
   # a first install, the same with root (the plan only: --dry-run never asks for it), an update
-  for args in "--no-sudo" "" "--update" "--lang pt-BR --no-sudo"; do
+  for args in "--no-sudo" "" "--update" "--full" "--apply files\ shot\ agents" "--lang pt-BR --no-sudo"; do
+    eval "argv=($args)"
     if HOME="$TMP/home" NIRI_SOCKET='' XDG_CONFIG_HOME='' XDG_CACHE_HOME='' XDG_STATE_HOME='' XDG_DATA_HOME='' \
-      timeout 60 "$ROOT/install.sh" --yes --dry-run --no-anim --lang en $args >"$TMP/dry.log" 2>&1; then
+      timeout 60 "$ROOT/install.sh" --yes --dry-run --no-anim --lang en "${argv[@]}" >"$TMP/dry.log" 2>&1; then
       ok "install.sh --dry-run $args"
     else
       tail -20 "$TMP/dry.log"

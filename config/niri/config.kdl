@@ -2,7 +2,7 @@
 // │  YAMI // niri                                                             │
 // │  dark graphite and a single accent. crisp pixels, light on the GPU.       │
 // └──────────────────────────────────────────────────────────────────────────┘
-// Works on the packaged niri and on yami-niri (fork/); keys come from yami-binds.kdl, window
+// Works on the packaged niri and on yami-niri; keys come from yami-binds.kdl, window
 // rules from yami-fx.kdl, both written by the shell. Personal tweaks go to user.kdl next to this
 // file: it is read after them and never overwritten.
 

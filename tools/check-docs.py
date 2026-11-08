@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # The English and Russian documents are one text in two languages: README, CHANGELOG, docs/CONFIG,
-# docs/SECURITY, fork/README and their .ru.md twins. Run by tools/check.sh (CI) and tools/release.sh.
+# docs/SECURITY and their .ru.md twins. Run by tools/check.sh (CI) and tools/release.sh.
 # Each pair has to keep the same skeleton: the same headings (version headings and file names
 # verbatim), paragraphs, list items and table rows in the same order, the same `code` in every
 # block (a <placeholder> may be translated), the same code blocks (comments may be translated),
@@ -15,7 +15,7 @@ import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PAIRS = ["README.md", "CHANGELOG.md", "docs/CONFIG.md", "docs/SECURITY.md", "docs/PACKAGING.md", "fork/README.md"]
+PAIRS = ["README.md", "CHANGELOG.md", "docs/CONFIG.md", "docs/SECURITY.md", "docs/PACKAGING.md"]
 # headings that are a name, not words: the same in both languages
 SAME = re.compile(r"^(\d+\.\d+\.\d+|[\w.]*[.\-][\w.\-]*|yami|Nix)$")
 HEADS = {"Unreleased": "Не выпущено"}

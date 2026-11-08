@@ -1,5 +1,5 @@
 # Niri itself. Upstream niri from source when the distro's is older than 26.04 (the one root step
-# here), and yami-niri (fork/): built into ~/.local/lib when its patch series moved, its sources (~4 GB)
+# here), and yami-niri (its own repository): built into ~/.local/lib when its patch series moved, its sources (~4 GB)
 # removed after a build unless they hold patch work. Realtime priority is never granted behind your
 # back: `yami-niri.sh status` says how (a realtime group or setcap) when the system has no rtprio limit.
 # shellcheck shell=bash
@@ -51,7 +51,7 @@ do_niri_source() {
 # update: yami-niri only when the patch series moved (5–25 min), else the built one stays
 fork_stale() {
   local want have
-  want="$(sed -n 's/^VERSION="\(.*\)"/\1/p' "$ROOT/fork/yami-niri.sh")"
+  want="$(sed -n 's/^VERSION="\(.*\)"/\1/p' "$(m_src yami-niri)/yami-niri.sh")"
   have="$("$HOME/.local/lib/yami-niri/current/niri" --version 2>/dev/null | awk '{print $2}')"
   [[ $want != "$have" ]]
 }
@@ -86,6 +86,6 @@ fork_tidy() {
 
 # yami-niri: build (5–25 min, the output stays on the terminal), then the sources go
 fork_build() {
-  need_rust && "$ROOT/fork/yami-niri.sh" build 2>&1 | tee -a "$LOG" || return 1
+  need_rust && "$(m_src yami-niri)/yami-niri.sh" build 2>&1 | tee -a "$LOG" || return 1
   fork_tidy
 }

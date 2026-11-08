@@ -650,6 +650,8 @@ pub fn run() {
     net::spawn_bt(tx.clone());
     app.write_palette();
     crate::prefs::write_style(&app.st.set);
+    // кто отвечает за порталы, зависит от поставленных модулей
+    crate::agents::write_portals(&app.st.set);
     // обои: при старте палитра обычно та же, theme.py не запускается — готовим картинку сами
     app.sync_wall();
     app.write_fx();

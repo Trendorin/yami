@@ -22,7 +22,7 @@ const KEYS: [&str; 26] = [
     "greetHost", "greetPower", "greetOff", "greetNumlock",
 ];
 
-/// куда ставит установщик (tools/greet-install.sh)
+/// куда ставит модуль (install-system.sh)
 const GREET: &str = "/usr/local/bin/yami-greet";
 const LOG_DIR: &str = "/var/lib/yami-greet/log";
 
@@ -217,14 +217,14 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     let (lx, rx) = (b.x, b.x + half + 20);
     let mut y = title(ui, b.x, b.y, b.w, "экран входа: greetd + yami-greet");
     if !p.installed {
-        ui.text_in(PX, R::new(b.x, y, b.w, 20), "не установлен: ./install.sh --login или tools/greet-install.sh", t.warn);
+        ui.text_in(PX, R::new(b.x, y, b.w, 20), "не установлен: модуль yami-greet ставится из yami setup", t.warn);
         y += 22;
         ui.text_in(PX, R::new(b.x, y, b.w, 20), "настройки ниже применятся, когда он появится", t.text_faint);
         y += 30;
     } else {
         let (dm, dc) = match p.dm {
             Some(true) => ("greetd — менеджер входа", t.text_dim),
-            Some(false) => ("greetd не включён: tools/greet-install.sh", t.warn),
+            Some(false) => ("greetd не включён: yami setup", t.warn),
             None => ("стоит; служба greetd — в твоей системе инициализации", t.text_dim),
         };
         ui.text_in(PX, R::new(b.x, y, b.w, 20), dm, dc);

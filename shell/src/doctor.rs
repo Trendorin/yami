@@ -96,12 +96,12 @@ fn login(y: &Sty) {
     }
     y.section(&crate::tf!("экран входа", "login screen", "tela de login"));
     if !greet {
-        line(y, &y.warn("·"), "SDDM", &crate::tf!("тема yami до 2.6; свой экран входа: tools/greet-install.sh", "the yami theme of before 2.6; our own login screen: tools/greet-install.sh", "o tema yami de antes da 2.6; nossa própria tela de login: tools/greet-install.sh"));
+        line(y, &y.warn("·"), "SDDM", &crate::tf!("тема yami до 2.6; свой экран входа: yami setup", "the yami theme of before 2.6; our own login screen: yami setup", "o tema yami de antes da 2.6; nossa própria tela de login: yami setup"));
         return;
     }
     line(y, &y.ok("✓"), "yami-greet", &crate::login::greet_bin().map(|p| p.display().to_string()).unwrap_or_default());
     match crate::login::dm() {
-        Some(false) => line(y, &y.warn("·"), "greetd", &crate::tf!("не менеджер входа: tools/greet-install.sh", "not the login manager: tools/greet-install.sh", "não é o gerenciador de login: tools/greet-install.sh")),
+        Some(false) => line(y, &y.warn("·"), "greetd", &crate::tf!("не менеджер входа: yami setup", "not the login manager: yami setup", "não é o gerenciador de login: yami setup")),
         _ => line(y, &y.ok("✓"), "greetd", &crate::tf!("менеджер входа", "the login manager", "o gerenciador de login")),
     }
     if crate::login::writable() {

@@ -1,9 +1,16 @@
 # The login screen, greetd + yami-greet. greetd (a small daemon in Rust, every
 # distro has it) does PAM and starts the session; yami-greet draws the login screen inside niri with
-# the lock screen's look. The root half is tools/greet-install.sh --system. An update (no sudo) only
+# the lock screen's look. The root half is the module's install-system.sh --system. An update (no sudo) only
 # offers it: now from a terminal, else one button in settings → updates. --uninstall takes it out and
 # brings back the login manager it replaced.
 # shellcheck shell=bash
+
+# где скрипт root-половины: исходники модуля, при удалении — его клон
+greet_script() {
+  local d
+  d="$(m_src yami-greet)" || d="${XDG_DATA_HOME:-$HOME/.local/share}/yami/modules/yami-greet"
+  printf '%s/install-system.sh\n' "$d"
+}
 
 # the root half is the last root step (run_steps closes the root shell before the build)
 plan_login() {
@@ -18,14 +25,14 @@ login_after() {
   fi
   on login && ((SUDO && !DRY && !BUILD_FAILED)) || return 0
   say "$(t "экран входа: ставлю yami-greet (пароль администратора ещё раз)" "login screen: installing yami-greet (the administrator password once more)" "tela de login: instalando o yami-greet (a senha de administrador mais uma vez)")"
-  greet_bin || { FAILED+=("yami-greet"); warn "$(t "yami-greet не встал: до него вход будет текстовым; поставить потом:" "yami-greet is not installed: the login is text until then; install it later:" "o yami-greet não foi instalado: até lá o login será em texto; instale depois:") $ROOT/tools/greet-install.sh"; }
+  greet_bin || { FAILED+=("yami-greet"); warn "$(t "yami-greet не встал: до него вход будет текстовым; поставить потом:" "yami-greet is not installed: the login is text until then; install it later:" "o yami-greet não foi instalado: até lá o login será em texto; instale depois:") $(greet_script)"; }
 }
 
 # the installed login screen is older than this build (or still the SDDM theme of before 2.6)
 greet_stale() {
   [[ -d /usr/share/sddm/themes/yami ]] && return 0
   [[ -x /usr/local/bin/yami-greet ]] || return 1
-  ! cmp -s "$CACHE/target/release/yami-greet" /usr/local/bin/yami-greet || ! cmp -s "$ROOT/system/greet/greet-session" /usr/local/lib/yami/greet-session
+  ! cmp -s "$CACHE/target/release/yami-greet" /usr/local/bin/yami-greet || ! cmp -s "$(m_src yami-greet)/greet-session" /usr/local/lib/yami/greet-session
 }
 
 # the root half before the build (greetd, folders, greet-session, fonts, cursor); yami-greet itself is
@@ -42,14 +49,14 @@ do_greet() {
     # the login manager it replaces, from the next boot (this session is untouched); --uninstall brings it back
     mkdir -p "$STATE" && printf '%s\n' "$OTHER_DM" >"$STATE/login-dm"
   fi
-  $SU "$ROOT/tools/greet-install.sh" --system "$(id -un)" --cursor "$CACHE/yami-cursor" || return 1
+  $SU "$(greet_script)" --system "$(id -un)" --cursor "$CACHE/yami-cursor" || return 1
   rm -rf -- "$CACHE/yami-cursor"
 }
 # after the build: the binary, root-owned in /usr/local/bin (the root shell is closed by then: the
 # password is asked once more), and the shell's look for it
 greet_bin() {
   [[ -x $CACHE/target/release/yami-greet ]] || return 1
-  $SU "$ROOT/tools/greet-install.sh" --system "$(id -un)" --bin "$CACHE/target/release/yami-greet" --bin-only || return 1
+  $SU "$(greet_script)" --system "$(id -un)" --bin "$CACHE/target/release/yami-greet" --bin-only || return 1
   "$BIN/yami-shell" login sync >/dev/null 2>&1 || true
 }
 
@@ -61,7 +68,7 @@ greet_bin() {
 login_offer() {
   local msg a f="$STATE/packages-needed"
   wants login && ((!DRY && !BUILD_FAILED)) && greet_stale || return 0
-  mkdir -p "$STATE" && printf 'login %s\n' "$ROOT/tools/greet-install.sh" >>"$f"
+  mkdir -p "$STATE" && printf 'login %s\n' "$(greet_script)" >>"$f"
   if [[ -d /usr/share/sddm/themes/yami ]]; then
     msg="$(t "новый экран входа: свой, вместо SDDM (SDDM выключится, но останется — ./install.sh --uninstall вернёт его)" "the new login screen: our own instead of SDDM (SDDM is turned off, not removed; ./install.sh --uninstall brings it back)" "a nova tela de login: a nossa no lugar do SDDM (o SDDM é desativado, não removido; ./install.sh --uninstall o traz de volta)")"
   else
@@ -70,14 +77,14 @@ login_offer() {
   if [[ -t 0 && -t 1 && -n $SU ]]; then
     printf '\n  %s%s%s\n  %s %s[%s]%s ' "$T" "$msg" "$R" "$(t "поставить сейчас?" "install it now?" "instalar agora?")" "$F" "$(t "enter — да, n — потом" "enter yes, n later" "enter sim, n depois")" "$R"
     read -r a || a=n
-    if [[ ! $a =~ ^[nNнН] ]] && "$ROOT/tools/greet-install.sh"; then
+    if [[ ! $a =~ ^[nNнН] ]] && "$(greet_script)"; then
       sed -i '/^login /d' "$f"
       grep -q '^pkgs ' "$f" || rm -f "$f"
     else
-      note "$(t "потом: настройки → обновления, или $ROOT/tools/greet-install.sh" "later: settings → updates, or $ROOT/tools/greet-install.sh" "depois: configurações → atualizações, ou $ROOT/tools/greet-install.sh")"
+      note "$(t "потом: настройки → обновления, или $(greet_script)" "later: settings → updates, or $(greet_script)" "depois: configurações → atualizações, ou $(greet_script)")"
     fi
   else
-    note "$msg: $(t "настройки → обновления, одна кнопка (или $ROOT/tools/greet-install.sh, нужен sudo)" "settings → updates, one button (or $ROOT/tools/greet-install.sh, needs sudo)" "configurações → atualizações, um botão (ou $ROOT/tools/greet-install.sh, requer sudo)")"
+    note "$msg: $(t "настройки → обновления, одна кнопка (или $(greet_script), нужен sudo)" "settings → updates, one button (or $(greet_script), needs sudo)" "configurações → atualizações, um botão (ou $(greet_script), requer sudo)")"
   fi
 }
 
@@ -102,8 +109,8 @@ uninstall_login() {
   grep -qs '^# yami:' /etc/greetd/config.toml && ours=1
   ((${#files[@]} || ours)) || [[ -n $dm ]] || return 0
   local cmd="rm -rf ${files[*]}"
-  # OpenRC, runit: greetd off and the managers it replaced back on (greet-install.sh wrote them down)
-  ((SYSTEMD)) || cmd="$ROOT/tools/greet-install.sh --uninit; $cmd"
+  # OpenRC, runit: greetd off and the managers it replaced back on (install-system.sh wrote them down)
+  ((SYSTEMD)) || cmd="$(greet_script) --uninit; $cmd"
   ((ours)) && cmd+="; mv -f /etc/greetd/config.toml.yami-orig /etc/greetd/config.toml"
   [[ -n $dm ]] && cmd+="; systemctl enable -f $dm.service"
   if ((EUID != 0)) && { ((!SUDO)) || [[ -z $SU ]] || ! root_start; }; then
@@ -111,7 +118,7 @@ uninstall_login() {
     return 0
   fi
   if ((!SYSTEMD)) && [[ -e /var/lib/yami-greet ]]; then
-    $SU "$ROOT/tools/greet-install.sh" --uninit || warn "$(t "greetd не выключен: включи прежний менеджер входа сам" "greetd is not turned off: enable your old login manager yourself" "o greetd não foi desativado: ative você mesmo o gerenciador de login anterior")"
+    $SU "$(greet_script)" --uninit || warn "$(t "greetd не выключен: включи прежний менеджер входа сам" "greetd is not turned off: enable your old login manager yourself" "o greetd não foi desativado: ative você mesmo o gerenciador de login anterior")"
   fi
   ((${#files[@]})) && $SU rm -rf -- "${files[@]}"
   if ((ours)); then

@@ -997,10 +997,10 @@ const PT_BR: &[(&str, &str)] = &[
     // экран входа (2.6), батарея (#21)
     ("login screen", "tela de login"),
     ("login screen: greetd + yami-greet", "tela de login: greetd + yami-greet"),
-    ("not installed: ./install.sh --login or tools/greet-install.sh", "não instalada: ./install.sh --login ou tools/greet-install.sh"),
+    ("not installed: the yami-greet module comes from yami setup", "não instalada: o módulo yami-greet vem do yami setup"),
     ("the settings below apply once it is installed", "as configurações abaixo valem depois de instalada"),
     ("greetd is the login manager", "o greetd é o gerenciador de login"),
-    ("greetd is not enabled: tools/greet-install.sh", "o greetd não está ativado: tools/greet-install.sh"),
+    ("greetd is not enabled: yami setup", "o greetd não está ativado: yami setup"),
     ("installed; the greetd service is up to your init system", "instalada; o serviço greetd fica a cargo do seu sistema de init"),
     ("not started since this version", "não iniciada desde esta versão"),
     ("the look folder is not yours: the login screen does not follow the shell", "a pasta de aparência não é sua: a tela de login não acompanha o shell"),

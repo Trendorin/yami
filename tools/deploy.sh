@@ -1,13 +1,28 @@
 #!/usr/bin/env bash
 # Build yami-shell and swap it into the running session: ~/.local/bin/yami-shell, then restart.
 # Refuses while a game or any fullscreen window has focus (the restart flashes the bar and
-# panels); --force skips that guard. --files-only installs yami-files, yami-view and yami-play and leaves the shell running.
-# Usage: tools/deploy.sh [--force] [--files-only]
+# panels); --force skips that guard.
+#   --modules       also build and install the modules next to this repository (YAMI_MODULES_DIR)
+#   --modules-only  only the modules, the shell keeps running
+# The login screen needs root: yami-greet/install-system.sh.
+# Usage: tools/deploy.sh [--force] [--modules | --modules-only]
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN="$HOME/.local/bin/yami-shell"
+MODS="${YAMI_MODULES_DIR:-$ROOT/../yami-modules}"
+FORCE=0 WITH_MODULES=0 ONLY_MODULES=0
+for a in "$@"; do
+  case $a in
+    --force) FORCE=1 ;;
+    --modules) WITH_MODULES=1 ;;
+    --modules-only) WITH_MODULES=1 ONLY_MODULES=1 ;;
+    *) echo "usage: tools/deploy.sh [--force] [--modules | --modules-only]" >&2; exit 2 ;;
+  esac
+done
+# shellcheck source=/dev/null
+[[ -f $MODS/env.sh ]] && . "$MODS/env.sh"
 
-if [[ ${1:-} != --force && ${1:-} != --files-only ]] && command -v niri >/dev/null && [[ -n ${NIRI_SOCKET:-} ]]; then
+if ((!FORCE && !ONLY_MODULES)) && command -v niri >/dev/null && [[ -n ${NIRI_SOCKET:-} ]]; then
   focus="$(niri msg --json focused-window 2>/dev/null || true)"
   if grep -qiE '"app_id":"(steam_app_[0-9]+|gamescope|.*\.exe)"' <<<"$focus" ||
     grep -q '"is_fullscreen":true' <<<"$focus"; then
@@ -16,24 +31,24 @@ if [[ ${1:-} != --force && ${1:-} != --files-only ]] && command -v niri >/dev/nu
   fi
 fi
 
-cargo build --release --locked --workspace --manifest-path "$ROOT/shell/Cargo.toml"
 # a copy next to the target, then a rename: a running program keeps its old file, a full disk
 # leaves the old binary in place instead of a cut one
 put() { install -Dm755 "$ROOT/shell/target/release/$1" "$HOME/.local/bin/.$1.new" && mv -f "$HOME/.local/bin/.$1.new" "$HOME/.local/bin/$1"; }
-put yami-files
-put yami-view
-put yami-play
-install -Dm644 "$ROOT/config/applications/yami-files.desktop" "${XDG_DATA_HOME:-$HOME/.local/share}/applications/yami-files.desktop"
-install -Dm644 "$ROOT/config/applications/yami-view.desktop" "${XDG_DATA_HOME:-$HOME/.local/share}/applications/yami-view.desktop"
-install -Dm644 "$ROOT/config/applications/yami-play.desktop" "${XDG_DATA_HOME:-$HOME/.local/share}/applications/yami-play.desktop"
-# the portal backend runs from login: it moves to the new binary as soon as no screencast or file
-# dialog is open, and is started if it is not running (xdg-desktop-portal reads ScreenCast's source
-# types from the running backend; without it OBS and browsers see no screen to capture)
-"$HOME/.local/bin/yami-files" --portal-reload || true
-if [[ ${1:-} == --files-only || ${2:-} == --files-only ]]; then
-  echo "deploy: yami-files, yami-view and yami-play installed"
+if ((WITH_MODULES)); then
+  for m in yami-files yami-view yami-play yami-shot yami-agents; do
+    [[ -x $MODS/$m/install.sh ]] || { echo "deploy: no $MODS/$m" >&2; exit 1; }
+    "$MODS/$m/install.sh"
+  done
+  # running services move to the new binaries as soon as nothing is open (a stream is not cut)
+  "$HOME/.local/bin/yami-files" --portal-reload || true
+  "$HOME/.local/bin/yami-agents" --reload || true
+fi
+if ((ONLY_MODULES)); then
+  echo "deploy: modules installed"
   exit 0
 fi
+cargo build --release --locked --workspace --manifest-path "$ROOT/shell/Cargo.toml"
+put yami-setup
 put yami-shell
 ln -sfn yami-shell "$HOME/.local/bin/yami"
 # what runs now (`yami update` compares against it); a dirty tree is marked as such

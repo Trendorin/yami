@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Static i18n check for every crate (shell, files, view, play, greet): every Russian string literal must be translatable.
+"""Static i18n check: every Russian string literal must be translatable. Checks the shell and the setup
+window, or the source folders given as arguments (tools/check-modules.sh passes each module's).
 
 A literal passes when it is a key of PAIRS in i18n.rs, the Russian part of tf!("…", "…", "…"),
 or sits on a line marked `// i18n-ok` (text that is Russian on purpose). In a file marked
@@ -15,7 +16,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent / "shell"
-CRATES = [ROOT / "src", ROOT / "files" / "src", ROOT / "view" / "src", ROOT / "play" / "src", ROOT / "greet" / "src"]
+CRATES = [ROOT / "src", ROOT / "setup" / "src"]
 CYR = re.compile(r"[а-яА-ЯёЁ]")
 LIT = re.compile(r'"((?:[^"\\]|\\.)*)"')
 NATIVE = {"Русский"}
@@ -40,7 +41,9 @@ def code_part(line: str) -> str:
 
 
 def check(SRC: Path) -> tuple:
-    table = (SRC / "i18n.rs").read_text()
+    # без таблицы (окно настройки: всё парами прямо в коде) — только проверка строк
+    has_table = (SRC / "i18n.rs").exists()
+    table = (SRC / "i18n.rs").read_text() if has_table else ""
     pairs = PAIR.findall(table)
     problems = []
     seen = {}
@@ -51,9 +54,9 @@ def check(SRC: Path) -> tuple:
         seen[ru] = en
         if CYR.search(en) and en not in NATIVE:
             problems.append(f"i18n.rs: English value of «{ru}» is Cyrillic: «{en}»")
-    rel = SRC.relative_to(ROOT.parent)
+    rel = SRC.relative_to(SRC.parent.parent)
     portuguese = {}
-    for en, pt in PAIR.findall((SRC / "i18n_pt_br.rs").read_text()):
+    for en, pt in PAIR.findall((SRC / "i18n_pt_br.rs").read_text() if has_table else ""):
         if en in portuguese:
             problems.append(f"{rel}/i18n_pt_br.rs: duplicate key «{en}»")
         portuguese[en] = pt
@@ -77,7 +80,7 @@ def check(SRC: Path) -> tuple:
                 # a tf! carries its own Portuguese template: only the other pairs need the catalog
                 own = {(m.group(1), m.group(2)) for m in TEMPLATE.finditer(code)}
                 for ru, en in INLINE_PAIR.findall(code):
-                    if CYR.search(ru) and en and not CYR.search(en) and en not in portuguese and (ru, en) not in own:
+                    if has_table and CYR.search(ru) and en and not CYR.search(en) and en not in portuguese and (ru, en) not in own:
                         problems.append(f"{rel}/{f.name}:{n}: no Portuguese for the inline «{en}»")
             for m in TEMPLATE.finditer(code):
                 _, en, pt = m.groups()
@@ -94,13 +97,13 @@ def check(SRC: Path) -> tuple:
                     continue
                 if re.search(r"tf!\(\s*$", code[: m.start()]):
                     continue
-                problems.append(f"{SRC.relative_to(ROOT.parent)}/{f.name}:{n}: no translation for «{s}»")
+                problems.append(f"{rel}/{f.name}:{n}: no translation for «{s}»")
     return problems, len(seen)
 
 
 def main() -> int:
     problems, n = [], 0
-    for c in CRATES:
+    for c in [Path(a).resolve() for a in sys.argv[1:]] or CRATES:
         p, k = check(c)
         problems += p
         n += k
