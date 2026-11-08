@@ -34,6 +34,7 @@ const ALL: &[Step] = &[
     step("color", "цвет", "drop", crate::settabs::tab_color),
     step("wall", "обои", "image", crate::wall::tab),
     step("look", "вид", "eye", crate::settabs::tab_look),
+    step("anim", "анимации", "slides", crate::animtab::tab),
     Step { gap: true, ..step("fonts", "шрифты", "text", crate::fonttab::tab) },
     step("bar", "бар", "menu", crate::bartab::tab_bar),
     step("dock", "док", "tile", crate::settabs::tab_dock),

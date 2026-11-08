@@ -38,6 +38,8 @@ impl App {
         // тот же разбор, что у модулей: шелл и модули не могут разойтись во внешности
         self.st.t = yami_px::look::Look::from_json(&s.style_value(), Some(s.light)).theme;
         crate::prefs::write_style(s);
+        // уход карточек уведомлений (настройки → анимации)
+        self.st.notifs.leave_s = crate::notif::leave_s(s);
         // набор значков сменился (или «авто» и в системе теперь другой) — собрать заново
         let iset = crate::app::icon_set(&s.icon_theme);
         if iset != self.res.iset {

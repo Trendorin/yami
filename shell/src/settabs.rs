@@ -256,16 +256,7 @@ pub(crate) fn tab_look(ui: &mut Ui, st: &State, b: R) {
     ui.toggle(R::new(b.x, y, half, 26), "размытие под панелями", "", s.blur_shell, Act::SBool("blur_shell"));
     ui.toggle(R::new(b.x + half + 20, y, half, 26), "размытие под терминалами", "", s.blur_term, Act::SBool("blur_term"));
     y += 38;
-    y = title(ui, b.x, y, b.w, "анимации");
-    ui.toggle(R::new(b.x, y, half, 26), "анимации", "", s.animations, Act::SBool("animations"));
-    ui.toggle(R::new(b.x + half + 20, y, half, 26), "анимация закрытия", "", s.anim_close, Act::SBool("anim_close"));
-    y += 34;
-    ui.slider(R::new(b.x, y, b.w, 40), "скорость анимаций (меньше — быстрее)", (s.anim_speed - 0.3) / 1.7, &format!("×{:.1}", s.anim_speed), 17, Act::SSlider("anim_speed", 0.3, 2.0, 17));
-    y += 50;
-    // узор проявления и крупность клеток — во всех программах yami; развёртка — только шелл
-    opt_btn(ui, R::new(b.x, y, half, 26), "появление", reveal_name(&s.reveal), Act::SCycle("reveal"));
-    num_btn(ui, R::new(b.x + half + 20, y, half, 26), "размер клеток", s.num("reveal_grain"), "reveal_grain");
-    y += 34;
+    // анимации — своя вкладка (animtab.rs); развёртка — только шелл
     ui.toggle(R::new(b.x, y, b.w, 26), "строки развёртки на панелях шелла (как на старом мониторе)", "", s.scanlines, Act::SBool("scanlines"));
     y += 38;
     y = title(ui, b.x, y, b.w, "значки программ");

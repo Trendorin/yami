@@ -11,7 +11,7 @@ use crate::widgets::{self, ANIMS, COLORS, SIZES, SOURCES, STYLES};
 impl App {
     /// клики внутри настроек; true — обработано
     pub fn settings_click(&mut self, a: &Act) -> bool {
-        if self.welcome_click(a) {
+        if self.welcome_click(a) || self.anim_click(a) {
             return true;
         }
         let s = &mut self.st.set;

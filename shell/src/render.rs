@@ -97,19 +97,11 @@ impl App {
             };
             ui.cv.clear(CLEAR);
             let st = &self.st;
-            // появление: пиксельное проявление по Байеру + плавное всплытие
+            // появление: проявление узором группы (настройки → анимации) + всплытие
+            let group = anim_group(&s.kind);
+            let style = yami_px::gfx::Reveal::from_id(st.set.reveal_for(group, s.closing));
             let (k, finished) = match s.kind {
-                SKind::Modal | SKind::Popup | SKind::Menu | SKind::Dim | SKind::Catcher | SKind::Osd | SKind::EditBar | SKind::Widget(_) | SKind::Dock | SKind::CurtainBadge => {
-                    let dur = match s.kind {
-                        SKind::Dock => 200.0,
-                        SKind::Widget(_) => 320.0,
-                        SKind::Menu => 140.0,
-                        SKind::Popup | SKind::Osd | SKind::CurtainBadge => 190.0,
-                        _ => 230.0,
-                    };
-                    let (k, fin) = reveal_of(st, &s, dur);
-                    (k, fin)
-                }
+                SKind::Modal | SKind::Popup | SKind::Menu | SKind::Dim | SKind::Catcher | SKind::Osd | SKind::EditBar | SKind::Widget(_) | SKind::Dock | SKind::CurtainBadge => reveal_of(st, &s, group),
                 _ => (1.0, true),
             };
             if !finished {
@@ -126,7 +118,9 @@ impl App {
                 _ => 0,
             };
             ui.cv.opacity = (0.35 + 0.65 * k).min(1.0);
-            ui.cv.oy = rise - ((1.0 - k) * rise as f32).round() as i32;
+            // без движения — сразу на своём месте, только проявление
+            let moves = st.set.anims.get(group).map_or(true, |a| a.motion);
+            ui.cv.oy = if moves { rise - ((1.0 - k) * rise as f32).round() as i32 } else { rise };
             let (w, h) = (s.w, s.h - rise);
             match &s.kind {
                 SKind::Wall => crate::wall::draw(&mut ui, st, w, h),
@@ -165,7 +159,7 @@ impl App {
                 ui.cv.scanlines(if st.t.light { 0.06 } else { 0.22 });
             }
             if k < 1.0 && !matches!(s.kind, SKind::Dim | SKind::Catcher) {
-                ui.cv.dissolve(k, 2);
+                ui.cv.dissolve_as(k, 2, style, st.set.reveal_grain);
             }
             // размытие — с первой трети проявления (#18: раньше ждало конца анимации и появлялось
             // рывком): под почти пустыми клетками ещё не нужно, дальше идёт вместе с панелью
@@ -269,12 +263,24 @@ fn frame_hash(px: &[u32], dims: [i32; 4]) -> u64 {
     h | 1
 }
 
-pub fn reveal_of(st: &State, s: &Surf, dur_ms: f32) -> (f32, bool) {
-    if !st.set.anim() {
+/// группа анимаций поверхности (config::ANIM_GROUPS); шторка — как окна
+pub fn anim_group(k: &SKind) -> &'static str {
+    match k {
+        SKind::Popup | SKind::Catcher => "popups",
+        SKind::Menu => "menus",
+        SKind::Osd => "notifs",
+        SKind::Widget(_) | SKind::EditBar => "widgets",
+        SKind::Dock => "dock",
+        _ => "windows",
+    }
+}
+
+pub fn reveal_of(st: &State, s: &Surf, group: &str) -> (f32, bool) {
+    if !st.set.anim() || st.set.reveal_for(group, s.closing) == "none" {
         return (if s.closing { 0.0 } else { 1.0 }, true);
     }
     // закрытие быстрее открытия
-    let dur = dur_ms * st.set.anim_speed.max(0.1) * if s.closing { 0.7 } else { 1.0 };
+    let dur = st.set.anim_ms(group) * if s.closing { 0.7 } else { 1.0 };
     let t = (s.born.elapsed().as_secs_f32() * 1000.0 / dur).min(1.0);
     // открытие: быстро и мягко садится (ease-out cubic); закрытие: разгоняется (ease-in)
     let k = if s.closing { 1.0 - t * t } else { 1.0 - (1.0 - t).powi(3) };

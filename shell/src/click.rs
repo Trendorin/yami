@@ -165,6 +165,7 @@ impl App {
                 }
                 self.st.notifs.history.clear();
                 self.st.notifs.popups.clear();
+                self.st.notifs.leaving.clear();
                 self.sync_notifs();
                 self.resize_popup();
             }

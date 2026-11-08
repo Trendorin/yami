@@ -42,7 +42,8 @@ pub const GROUPS: &[(&str, &[Tab])] = &[
         &[
             tab("color", "цвет", "drop", "палитра акцент цвет тема темы шаблон светлая тёмная стекло прозрачность плотность palette accent colour color theme themes template light dark glass opacity paleta destaque cor cores tema temas modelo claro escuro vidro transparência", tab_color), // i18n-ok
             tab("wall", "обои", "image", "обои картинка фон папка миниатюры skwd skwd-wall видео wallpaper background image folder thumbnails picker video papel parede imagem fundo pasta miniaturas seletor vídeo", crate::wall::tab), // i18n-ok
-            tab("look", "вид", "eye", "пиксельность пиксели лёгкий режим слабый тормозит виртуалка анимации эффекты появление развёртка размытие значки иконки курсор pixel pixelation lite slow lag vm animation effects reveal scanlines blur icons cursor visual aparência pixels pixelização leve lento animação efeitos desfoque ícones cursor", tab_look), // i18n-ok
+            tab("look", "вид", "eye", "пиксельность пиксели лёгкий режим слабый тормозит виртуалка эффекты развёртка размытие значки иконки курсор pixel pixelation lite slow lag vm animation effects reveal scanlines blur icons cursor visual aparência pixels pixelização leve lento animação efeitos desfoque ícones cursor", tab_look), // i18n-ok
+            tab("anim", "анимации", "slides", "анимации появление закрытие скорость длительность узор дизеринг развёртка шум диагональ блоки плавно сразу движение animations reveal open close speed duration pattern dither fade motion animações abrir fechar velocidade duração padrão movimento", crate::animtab::tab), // i18n-ok
             tab("fonts", "шрифты", "text", "шрифт размер терминал fastfetch браузер fonts size terminal browser fonte fontes tamanho terminal navegador", crate::fonttab::tab), // i18n-ok
         ],
     ),

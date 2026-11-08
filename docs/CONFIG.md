@@ -116,6 +116,7 @@ file for one run. The files are reread when they change.
 | `reveal` | `"dither"` | how panels appear: `dither` (Bayer 4×4), `scan` (interlaced lines), `noise`, `wipe` (diagonal with a dithered edge), `blocks` (Bayer, double cells) |
 | `revealGrain` | `1` | cell size of the reveal, 1–4 |
 | `animClose` | `true` | panels close with the reveal backwards; off: they vanish at once |
+| `anims` | `{}` | each group of panels its own animation (settings → animations): keys `windows`, `popups`, `menus`, `notifs`, `widgets`, `dock`, each `{"open": "", "close": "", "speed": 1.0, "motion": true}`; `open`/`close` = a `reveal` pattern or `none`, empty = as everywhere |
 | `scanlines` | `false` | every second line of the shell's panels a little darker, like an old monitor |
 | `wallpaper` | `""` | path to your own image (PNG, JPEG, WebP); empty: the generated pixel wallpaper |
 | `wallDir` | `""` | the folder the wallpaper picker shows as a grid (settings → wallpaper → pick, `yami open walls`; its «folder…» button sets it); empty: `~/Pictures/Wallpapers` (or `wallpapers`), else the folder of the current wallpaper, else `~/Pictures`. Thumbnails share yami-files' cache `~/.cache/yami/thumbs` |

@@ -233,6 +233,8 @@ pub struct State {
     pub sel_widget: u32,
     pub editing: bool,
     pub notifs: notif::Notifs,
+    /// образец во вкладке анимаций: группа и когда пошёл (animtab.rs)
+    pub anim_demo: Option<(u8, std::time::Instant)>,
     pub osd: Option<(&'static str, Instant)>,
     /// шторка для трансляций опущена
     pub curtain: Option<crate::curtain::Curtain>,
@@ -453,6 +455,7 @@ impl State {
             sel_widget: 0,
             editing: false,
             notifs: notif::Notifs::default(),
+            anim_demo: None,
             osd: None,
             curtain: None,
             audio: audio::AudioState::default(),
@@ -587,7 +590,8 @@ pub fn run() {
     let mut niri = Niri::new();
     niri.stacking = niri.stacking || set.stacking;
 
-    let st = State::new(set, niri);
+    let mut st = State::new(set, niri);
+    st.notifs.leave_s = crate::notif::leave_s(&st.set);
 
     let mut app = App {
         conn: conn.clone(),
@@ -854,7 +858,9 @@ impl App {
     pub fn close(&mut self, id: u32) {
         let anim = self.st.set.anim() && self.st.set.anim_close;
         if let Some(s) = self.surfs.get_mut(&id) {
-            if !anim || !s.configured {
+            // у группы закрытие «сразу» (настройки → анимации)
+            let instant = self.st.set.reveal_for(crate::render::anim_group(&s.kind), true) == "none";
+            if !anim || instant || !s.configured {
                 self.destroy(id);
                 return;
             }

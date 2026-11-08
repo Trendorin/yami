@@ -8,6 +8,7 @@
 pub use yami_px::{font, gfx, icons, theme};
 
 mod agents;
+mod animtab;
 mod app;
 mod profile;
 mod iconsets;

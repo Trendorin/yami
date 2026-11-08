@@ -55,6 +55,8 @@ pub enum Act {
     STplForce(usize),
     SSlider(&'static str, f32, f32, i32),
     SCycle(&'static str),
+    /// настройки → анимации: группа (config::ANIM_GROUPS) и что в ней менять (animtab.rs)
+    SAnim(u8, u8),
     /// число в пикселях (config::NUMS): на шаг вниз (-1) или вверх (+1); колесо — тоже
     SNum(&'static str, i32),
     /// вкладка «обновления»: выбрать, куда откатиться («prev» — прошлая сборка, иначе версия)

@@ -38,6 +38,7 @@ const TARGETS: &[&str] = &[
     "settings:wall-skwd",
     "settings:widgets",
     "settings:look",
+    "settings:anim",
     "settings:look-sets",
     "settings:wall",
     "settings:system",

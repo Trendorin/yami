@@ -11,6 +11,37 @@ pub fn settings_path() -> PathBuf {
     yami_px::paths::shell_settings()
 }
 
+/// анимация одной группы панелей (настройки → анимации): узор появления и закрытия ("" — общий
+/// `reveal`, "none" — сразу), множитель длительности, движение (всплытие, въезд карточек)
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Anim {
+    pub open: String,
+    pub close: String,
+    pub speed: f32,
+    pub motion: bool,
+}
+
+impl Default for Anim {
+    fn default() -> Self {
+        Anim { open: String::new(), close: String::new(), speed: 1.0, motion: true }
+    }
+}
+
+/// группы анимаций: id (ключ в `anims`), имя, что в неё входит, длительность открытия в мс при ×1
+pub const ANIM_GROUPS: [(&str, &str, &str, f32); 6] = [
+    ("windows", "окна", "запуск, настройки, питание, обои", 230.0),
+    ("popups", "всплывашки бара", "звук, сеть, музыка, календарь", 190.0),
+    ("menus", "меню", "трей, док, окна, виджеты", 140.0),
+    ("notifs", "уведомления", "карточки и громкость (OSD)", 160.0),
+    ("widgets", "виджеты", "на столе и их панель", 320.0),
+    ("dock", "док", "появление и скрытие", 200.0),
+];
+/// узоры проявления: id и имя ("" — как везде)
+pub const REVEALS: [&str; 7] = ["dither", "scan", "noise", "wipe", "blocks", "fade", "none"];
+/// шаги длительности группы
+pub const ANIM_SPEEDS: [f32; 6] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Widget {
@@ -112,6 +143,8 @@ pub struct Settings {
     pub reveal_grain: i32,
     /// закрывать панели с анимацией (иначе — сразу)
     pub anim_close: bool,
+    /// свои анимации групп панелей (ANIM_GROUPS); нет ключа — как везде
+    pub anims: std::collections::BTreeMap<String, Anim>,
     /// строки развёртки поверх панелей шелла
     pub scanlines: bool,
     /// лёгкий режим для слабых и виртуальных машин (lite.rs): без размытия, без анимаций шелла
@@ -489,6 +522,7 @@ impl Default for Settings {
             shadow: String::new(),
             colors: Default::default(),
             anim_close: true,
+            anims: Default::default(),
             scanlines: false,
             lite: false,
             niri_look: true,
@@ -736,6 +770,34 @@ impl Settings {
         if !crate::notif::OSD_POS.iter().any(|(k, _)| *k == self.osd_pos) {
             self.osd_pos = "bottom".into();
         }
+        // анимации: только известные группы и узоры, длительность в разумных пределах
+        self.anims.retain(|k, _| ANIM_GROUPS.iter().any(|g| g.0 == k));
+        for a in self.anims.values_mut() {
+            for v in [&mut a.open, &mut a.close] {
+                if !REVEALS.contains(&v.as_str()) {
+                    v.clear();
+                }
+            }
+            a.speed = if a.speed.is_finite() { a.speed.clamp(0.25, 3.0) } else { 1.0 };
+        }
+    }
+
+    /// анимация группы (своя или та, что везде)
+    pub fn anim_of(&self, g: &str) -> Anim {
+        self.anims.get(g).cloned().unwrap_or_default()
+    }
+
+    /// узор группы при открытии или закрытии: свой, иначе общий `reveal`
+    pub fn reveal_for(&self, g: &str, closing: bool) -> &str {
+        let a = self.anims.get(g);
+        let own = a.map(|a| if closing { &a.close } else { &a.open }).filter(|v| !v.is_empty());
+        own.map(|v| v.as_str()).unwrap_or(&self.reveal)
+    }
+
+    /// открытие группы в мс: общая скорость × своя
+    pub fn anim_ms(&self, g: &str) -> f32 {
+        let base = ANIM_GROUPS.iter().find(|x| x.0 == g).map_or(230.0, |x| x.3);
+        base * self.anim_speed.max(0.1) * self.anims.get(g).map_or(1.0, |a| a.speed)
     }
 
     /// разбор, прощающий ошибки: ключ с негодным значением берётся по умолчанию, а не весь

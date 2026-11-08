@@ -50,6 +50,10 @@ pub struct Notifs {
     pub history: Vec<Note>,
     pub hover: bool,
     last: Option<Instant>,
+    /// карточки, которые уходят (анимация закрытия): id и с какого мгновения
+    pub leaving: Vec<(u32, Instant)>,
+    /// сколько длится уход, с; 0 — карточка пропадает сразу (prefs: настройки → анимации)
+    pub leave_s: f32,
 }
 
 impl Notifs {
@@ -57,14 +61,32 @@ impl Notifs {
         self.history.iter().find(|n| n.id == id)
     }
     pub fn remove(&mut self, id: u32, from_history: bool) {
-        self.popups.retain(|x| *x != id);
+        // из истории — сразу (рисовать уже нечего), иначе карточка сперва уходит
+        if self.leave_s > 0.0 && !from_history && self.popups.contains(&id) {
+            if !self.leaving.iter().any(|x| x.0 == id) {
+                self.leaving.push((id, Instant::now()));
+            }
+        } else {
+            self.popups.retain(|x| *x != id);
+            self.leaving.retain(|x| x.0 != id);
+        }
         if from_history {
             self.history.retain(|n| n.id != id);
         }
     }
+    /// с какого мгновения карточка уходит
+    pub fn leaving_since(&self, id: u32) -> Option<Instant> {
+        self.leaving.iter().find(|x| x.0 == id).map(|x| x.1)
+    }
     pub fn resume(&mut self) {
         self.last = Some(Instant::now());
     }
+}
+
+/// сколько уходит карточка, с (0 — сразу): закрытие группы «уведомления»
+pub fn leave_s(s: &crate::config::Settings) -> f32 {
+    let on = s.anim() && s.anim_close && s.reveal_for("notifs", true) != "none";
+    if on { s.anim_ms("notifs") * 0.7 / 1000.0 } else { 0.0 }
 }
 
 /// высота карточки
@@ -99,14 +121,26 @@ pub fn draw(ui: &mut Ui, st: &State, _w: i32, _h: i32) {
     for id in &st.notifs.popups {
         let Some(n) = st.notifs.get(*id) else { continue };
         let ch = card_h(ui.f, n);
-        // въезд справа ступенями по 8 px
-        let k = if st.set.anim() { (n.born.elapsed().as_secs_f32() / (0.16 * st.set.anim_speed.max(0.1))).min(1.0) } else { 1.0 };
+        // въезд справа ступенями по 8 px и проявление узором группы «уведомления»; уход — наоборот
+        let leaving = st.notifs.leaving_since(n.id);
+        let style = st.set.reveal_for("notifs", leaving.is_some());
+        let k = if !st.set.anim() || style == "none" {
+            if leaving.is_some() { 0.0 } else { 1.0 }
+        } else if let Some(at) = leaving {
+            let t = (at.elapsed().as_secs_f32() / st.notifs.leave_s.max(0.01)).min(1.0);
+            1.0 - t * t
+        } else {
+            (n.born.elapsed().as_secs_f32() * 1000.0 / st.set.anim_ms("notifs")).min(1.0)
+        };
         let step = (k * 4.0).ceil() / 4.0;
         if k < 1.0 {
             ui.anim = true;
         }
-        let x0 = 48 - ((step * 48.0 / 8.0).round() as i32) * 8 + 4;
-        ui.cv.opacity = step;
+        let moves = st.set.anims.get("notifs").map_or(true, |a| a.motion);
+        let x0 = if moves { 48 - ((step * 48.0 / 8.0).round() as i32) * 8 + 4 } else { 4 };
+        let pixel = !matches!(style, "fade" | "none");
+        ui.cv.opacity = if pixel { (0.35 + 0.65 * k).min(1.0) } else { step };
+        let z0 = ui.zones.len();
         let r = R::new(x0, y, W, ch);
         let hov = ui.hover(r);
         ui.cv.pxbox(r, &BoxStyle::new(t.glass_panel(), if n.critical { t.ember } else if hov { t.red } else { t.border }).shadow(4));
@@ -124,6 +158,13 @@ pub fn draw(ui: &mut Ui, st: &State, _w: i32, _h: i32) {
         }
         ui.zone(r, Act::NotifClick(n.id), Cur::Pointer);
         draw_card(ui, n, R::new(r.x + 14, r.y + 8, r.w - 24, r.h - 16), true);
+        if pixel && k < 1.0 {
+            ui.cv.dissolve_rect_as(R::new(r.x - 4, r.y - 4, r.w + 12, r.h + 12), k, 2, yami_px::gfx::Reveal::from_id(style), st.set.reveal_grain);
+        }
+        // уходящая карточка уже не ловит нажатий
+        if leaving.is_some() {
+            ui.zones.truncate(z0);
+        }
         y += ch + 8;
     }
     ui.cv.opacity = 1.0;
@@ -239,6 +280,7 @@ impl App {
         }
         if (!quiet || critical) && !self.st.locked {
             ns.popups.retain(|x| *x != id);
+            ns.leaving.retain(|x| x.0 != id);
             ns.popups.insert(0, id);
             // лишние уходят в историю
             ns.popups.truncate(self.st.set.notif_max.clamp(1, 8) as usize);
@@ -260,8 +302,18 @@ impl App {
         let dt = ns.last.map(|l| now.duration_since(l).as_secs_f32()).unwrap_or(0.0);
         ns.last = Some(now);
         let mut gone = vec![];
+        // ушедшие до конца — из стопки
+        let left: Vec<u32> = ns.leaving.iter().filter(|x| x.1.elapsed().as_secs_f32() >= ns.leave_s).map(|x| x.0).collect();
+        let shrunk = !left.is_empty();
+        for id in left {
+            ns.popups.retain(|x| *x != id);
+            ns.leaving.retain(|x| x.0 != id);
+        }
         if !ns.hover {
             for id in ns.popups.clone() {
+                if ns.leaving.iter().any(|x| x.0 == id) {
+                    continue;
+                }
                 if let Some(n) = ns.history.iter_mut().find(|n| n.id == id) {
                     if n.critical {
                         continue;
@@ -274,11 +326,12 @@ impl App {
             }
         }
         for id in &gone {
-            ns.popups.retain(|x| x != id);
+            ns.remove(*id, false);
             crate::dbus::notif_closed(*id, 1);
         }
+        let changed = shrunk || (!gone.is_empty() && ns.leave_s <= 0.0);
         self.dirty(&SKind::Notifs);
-        !gone.is_empty()
+        changed
     }
 
     /// карточки на своём месте (notifPos): у края, с отступом 10; исключённые зоны бара и дока
