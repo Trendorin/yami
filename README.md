@@ -84,7 +84,7 @@ Everything it does and its flags: [Installation](#installation).
 - **yami-niri.** Our niri: upstream 26.04 plus a short patch series, built for your CPU (fat
   LTO, `target-cpu=native`): tearing for fullscreen games (async page flips, less input lag), a
   realtime compositor thread so a game loading every core doesn't make the desktop stutter. The
-  packaged niri stays as an automatic fallback. See [fork/README.md](fork/README.md).
+  packaged niri stays as an automatic fallback. See [yami-niri](https://github.com/Trendorin/yami-niri).
 - **Games.** Settings → games: game windows open fullscreen with VRR (and tearing on yami-niri),
   a big shader cache; while a game has focus notifications wait quietly and the power profile
   switches to «performance»; the shell stops redrawing what the game covers. It finds and uses what
@@ -199,85 +199,49 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Trendorin/yami/main/install.
 ```
 
 or from a checkout: `git clone https://github.com/Trendorin/yami yami && yami/install.sh`.
-The installer asks the language and shows what it will install, picked for this machine: Enter
-installs it, `c` walks through the choices first (components, what to restyle, palette, panels,
-theme, app font), `s` installs only the shell: niri, the shell and its fonts, nothing of anyone
-else's touched. An update repeats these choices.
-Run it as yourself, not with sudo: it asks for the password once, where it is needed. Reboot
-afterwards (or log out) and pick the **Niri** session: you land in the finished desktop. No flag
-is needed for a normal install; these are for the rest:
+
+It installs only the base: niri, the shell and what the desktop cannot start without. Run it as
+yourself, not with sudo: it asks for the password once, where it is needed. Then log out and pick
+the **Niri** session. A full-screen setup window meets you there and asks the language, the look
+and which [modules](#modules) to add. Open it again at any time with `yami setup`.
+
+No flag is needed for a normal install; these are for the rest:
 
 | Flag | Effect |
 |---|---|
-| `--yes` | no questions, defaults for this machine |
+| `--yes` | no questions |
+| `--full` | everything now, no setup window at the first login |
+| `--apply "files view …"` | install exactly these modules (what the setup window runs) |
 | `--lang en\|ru\|pt-BR` | language of the installer, the shell and the key hints |
 | `--palette ID` | `blood` `ash` `sakura` `amber` `venom` `ice` `dusk` |
 | `--look ID` | panels: `matte` `glass` `light` `solid` |
 | `--font sans\|pixel` | app font: readable sans (default) or the pixel Tiny5 everywhere |
 | `--fetch mini\|full` | fastfetch: who, system and desktop (default) or with the hardware too |
-| `--shell-only` | niri and the shell only: none of the apps below, no login screen, no other program restyled |
-| `--no-ID`, `--ID` | a component off or on (the table below) |
-| `--restyle LIST` | what yami restyles: `all`, `none` or a comma list of `gtk` `qt` `cursor` `kitty` `fastfetch` `btop` `firefox` `mangohud` `foot` `cava` `starship`; a program left out is never touched (later: settings → color → apps) |
+| `--no-ID`, `--ID` | with `--full`: a module off or on |
+| `--restyle LIST` | what yami restyles: `all`, `none` or a list of `gtk` `qt` `cursor` `kitty` `fastfetch` `btop` `firefox` `mangohud` `foot` `cava` `starship`; a program left out is never touched (later: settings → color → apps) |
 | `--no-sudo` | home directory only: no packages, no system files |
 | `--dry-run` | print the plan, change nothing |
 | `--no-count` | do not add this machine to the «installs» badge (one anonymous download, [details](docs/SECURITY.md#install-count)) |
-| `--uninstall` | remove the shell, the fork, the dotfiles and the login theme, restore the backups and the previous login manager |
+| `--uninstall` | remove yami and its modules, restore the backups and the previous login manager |
 | `--update` | rebuild from this tree keeping every setting, no sudo (what `yami update apply` runs) |
 | `--no-anim` | disable the installer animations |
 
-The components (the `c` page), each one on its own:
+What the base install does:
 
-| ID | What | Default |
-|---|---|---|
-| `files` | yami-files: the file manager, the file dialog of every app, «show in folder» | on |
-| `view` | yami-view opens pictures | on |
-| `play` | yami-play opens video and music (libmpv) | on |
-| `login` | yami's login screen (greetd + yami-greet) | on unless another login manager is set |
-| `apps` | kitty, fastfetch, pavucontrol, btop | on |
-| `drives` | udisks2 and gvfs: drives, phones, cameras, network shares | on |
-| `tools` | night light, text and QR from screenshots (wlsunset, tesseract, zbar) | on |
-| `games` | GameMode and MangoHud | on when Steam is installed |
-| `nvidia` | niri's profile against its VRAM growth: one file in `/etc/nvidia`, nothing else of the driver | on with the NVIDIA driver |
-| `fork` | yami-niri built from source | on unless the machine is weak |
-
-A component unticked later goes on the next run or update: yami-files, yami-view and yami-play
-with their file associations.
-
-What it does:
-
-1. Detects the distribution from `/etc/os-release` and installs the packages of the chosen
-   components with its native package manager (niri, portals, polkit, PipeWire, NetworkManager,
-   BlueZ, power-profiles-daemon, Noto fonts, cliphist, grim; then kitty, fastfetch, btop, udisks2,
-   gvfs with the MTP/PTP/AFC/SMB backends, ffmpegthumbnailer, bsdtar, mpv (libmpv), qt6ct, adw-gtk3,
-   greetd as chosen). Names a repository does not carry are reported, not fatal. Enables
-   Bluetooth and power profiles, and NetworkManager when nothing else manages the network.
-2. Builds the shell and the chosen apps with `cargo build --release --locked` (Rust ≥ 1.89; rustup
-   is used when the distribution's toolchain is older) into `~/.local/bin`; registers yami-files
-   for folders and as the portal file dialog / FileManager1 (with the Firefox-family portal pref),
-   yami-view for images, yami-play for video and music. Without yami-files the shell opens folders
-   in your file manager.
-3. Installs the pixel fonts (Tiny5, DotGothic16, Terminess; Monocraft, pinned and checksummed,
-   for kitty) and, with GTK or Qt restyled, a fontconfig rule for crisp text.
+1. Detects the distribution from `/etc/os-release` and installs niri, portals, polkit, PipeWire,
+   NetworkManager, BlueZ, power-profiles-daemon, Noto fonts, cliphist and grim with its native
+   package manager. Names a repository does not carry are reported, not fatal. Enables Bluetooth
+   and power profiles, and NetworkManager when nothing else manages the network.
+2. Builds the shell and the setup window with `cargo build --release --locked` (Rust ≥ 1.89; rustup
+   is used when the distribution's toolchain is older) into `~/.local/bin`.
+3. Installs the pixel fonts (Tiny5, DotGothic16, Terminess).
 4. Writes the niri configuration, the keybindings and the game rules; `output` blocks from a
-   previous niri config are carried over into `user.kdl`. kitty gets one `include yami.conf` line
-   at the end of `kitty.conf`, nothing else of it changes.
-5. Recolours what was chosen (GTK, Qt and KDE, the cursor, kitty, fastfetch, btop, browser menus,
-   MangoHud, foot, cava, starship); a file it replaces is kept as `*.bak-yami` or `*.bak-DATE`.
-6. With the «login screen» component: installs greetd, yami-greet (root-owned, in `/usr/local/bin`),
-   its safety net `greet-session` and the pixel cursor, and makes greetd the login manager from the
-   next boot (off by default when another login manager is set; an SDDM with the old yami theme is
-   replaced; systemd, OpenRC and runit). `--uninstall` removes it, gives greetd its own config back and
-   brings back the login manager it replaced.
-7. Builds yami-niri (5–25 minutes, output shown) and enables it from the next login. Realtime
-   priority stays your call: `yami-niri.sh status` says how to grant it.
-8. With the NVIDIA driver: niri's application profile against its VRAM growth, the fix the niri
-   wiki gives. Nothing else of the driver is touched: no session environment, no module options,
-   no initramfs.
+   previous niri config are carried over into `user.kdl`. A file it replaces is kept as `*.bak-DATE`.
 
-An existing install under the old name DARK-4RMY is moved over: settings, palette, widgets
-and clipboard pins are kept, the old files are removed; the old dark-niri fork is removed too.
-Everything is logged to `~/.cache/yami/install.log`. On NixOS use the flake instead: a NixOS module
-for the system half and a Home Manager module for the home half ([docs/PACKAGING.md](docs/PACKAGING.md#nix)).
+yami stays out of your drivers and your boot: no session environment for a driver, no module
+options, no initramfs. Everything is logged to `~/.cache/yami/install.log`. On NixOS use the flake
+instead: a NixOS module for the system half and a Home Manager module for the home half
+([docs/PACKAGING.md](docs/PACKAGING.md#nix)).
 
 ### Building the shell by hand
 
@@ -290,6 +254,31 @@ install -Dm755 target/release/yami-shell ~/.local/bin/yami-shell
 Runtime libraries: `libxkbcommon`, `libpam`. Optional helpers: `pactl`/`parec` (volume, mixer,
 equalizer), `playerctl` (media), `nmcli` (Wi-Fi), BlueZ (Bluetooth), `cliphist` and
 `wl-clipboard` (clipboard), `python3` with Pillow (palette export to other apps).
+
+## Modules
+
+Everything beyond the shell is a separate program in its own repository. The setup window adds and
+removes them, and any of them works without the yami shell: take one into your own setup with
+`git clone` and `./install.sh`, no root needed.
+
+| Module | What | Needs |
+|---|---|---|
+| [yami-files](https://github.com/Trendorin/yami-files) | file manager, the file dialog of every app, «show in folder» | any Wayland compositor |
+| [yami-view](https://github.com/Trendorin/yami-view) | image viewer and quick editor | any Wayland compositor |
+| [yami-play](https://github.com/Trendorin/yami-play) | video and music player | libmpv |
+| [yami-shot](https://github.com/Trendorin/yami-shot) | screenshots: freeze, select, mark up, read text and QR | layer-shell, grim |
+| [yami-agents](https://github.com/Trendorin/yami-agents) | polkit and drive password windows, the screen-share picker and portal, automount; each part on its own | polkit; niri for screen sharing |
+| [yami-greet](https://github.com/Trendorin/yami-greet) | the login screen | greetd, niri |
+| [yami-niri](https://github.com/Trendorin/yami-niri) | niri with tearing for games and a realtime thread | a build from source |
+
+Besides these the setup window offers packages of your distribution: `drives` (udisks2, gvfs),
+`apps` (kitty, fastfetch, pavucontrol, btop), `tools` (night light, text and QR from screenshots)
+and `games` (GameMode, MangoHud).
+
+Every module draws through [yami-px](https://github.com/Trendorin/yami-px) and reads one look: `~/.config/yami/style.json`
+for all of them, `style.<module>.json` for what one does differently. Outside yami a module is
+neutral: the system font, rounded corners, soft shadows. The pixel look of the shell is the preset
+`yami`, and the keys go down to every colour: [docs/CONFIG.md](docs/CONFIG.md#the-look-of-every-module).
 
 ## Resource usage
 
@@ -424,8 +413,8 @@ yami-shell binds list                  # keybindings: id, keys, action
   --pick open|save|dir …` is the dialog the portal runs; `yami-files --portal` is the portal and
   FileManager1 service, started by D-Bus; `yami-files --portal-reload` hands it over to a newly
   installed binary without cutting a recording (the installer runs it).
-- **Login screen**: `tools/greet-install.sh` builds yami-greet and installs it on a running system
-  (sudo once), greetd from the next boot; the installer does it with the «login screen» component.
+- **Login screen**: `install-system.sh` of the yami-greet module builds it and installs it on a running
+  system (sudo once), greetd from the next boot; the setup window does the same.
   `yami login sync` hands it the shell's look at once (the shell does that on every change).
 
 ## Repository layout
@@ -433,39 +422,34 @@ yami-shell binds list                  # keybindings: id, keys, action
 | Path | Contents |
 |---|---|
 | `shell/` | yami-shell, the Rust Wayland shell (cargo workspace) |
-| `shell/px/` | yami-px: canvas, fonts, theme, icons and UI shared by every program |
-| `shell/files/` | yami-files: file manager, portal file dialog, FileManager1 |
-| `shell/view/` | yami-view: image viewer and quick editor |
-| `shell/play/` | yami-play: video and music player (libmpv) |
-| `shell/greet/` | yami-greet: the login screen, a greetd greeter inside niri (`system/greet/greet-session` starts it) |
-| `config/portal/`, `config/applications/` | portal registration, D-Bus services, desktop entries |
+| `shell/setup/` | yami-setup: the first-run window that installs the modules |
+| `modules.lock` | which version of each module this version of the shell installs |
+| `config/portal/` | which portal backend serves what |
 | `config/niri/` | niri configuration (keybindings come from the shell) |
 | `config/kitty/`, `config/fontconfig/` | terminal and pixel font rendering |
 | `tools/theme.py` | palette export: Qt, KDE, GTK, kitty, fastfetch, niri, wallpaper |
 | `tools/apply-theme.sh` | fonts and widget style for Qt and GTK |
 | `fonts/` | bundled pixel fonts (SIL OFL) |
-| `fork/` | yami-niri: patch series on upstream niri, build script, session wrapper |
 | `install.sh`, `installer/` | the installer: the entry and the order of its steps, one module per job |
 | `flake.nix`, `nix/` | the Nix package and the NixOS and Home Manager modules |
 | `docs/` | configuration reference, security notes, packaging and Nix (each also in Russian: `*.ru.md`) |
-| `keys/` | release signing keys (`allowed_signers`), read by `yami update` |
+| `keys/` | release signing keys (`allowed_signers`), read by `yami update` and the installer |
 | `VERSION`, `CHANGELOG.md` | the release version and what changed in each release (`CHANGELOG.ru.md` in Russian) |
-| `system/nvidia/` | niri's application profile against VRAM growth with the NVIDIA driver |
 
 ## yami-niri
 
-Upstream niri v26.04 plus the patches in `fork/patches/`, built on your machine. The installer
-builds and enables it; by hand:
+Upstream niri v26.04 plus a short patch series, built on your machine. It lives in its own
+[repository](https://github.com/Trendorin/yami-niri); the setup window builds and enables it, by hand from a clone of it:
 
 ```sh
-fork/yami-niri.sh build     # fetch, patch, build (5–25 min), enable from the next login
-fork/yami-niri.sh status    # which niri the next login starts
-fork/yami-niri.sh off       # back to the packaged niri
+./yami-niri.sh build     # fetch, patch, build (5–25 min), enable from the next login
+./yami-niri.sh status    # which niri the next login starts
+./yami-niri.sh off       # back to the packaged niri
 ```
 
 The session starts it through a wrapper that falls back to the packaged niri when the fork rejects
 the config or dies right after the start. If the session still does not come up: `Ctrl+Alt+F3`,
-log in, `~/.local/lib/yami-niri/yami-niri.sh off`. Details: [fork/README.md](fork/README.md).
+log in, `~/.local/lib/yami-niri/yami-niri.sh off`.
 
 ## Development
 
@@ -473,12 +457,13 @@ log in, `~/.local/lib/yami-niri/yami-niri.sh off`. Details: [fork/README.md](for
 |---|---|
 | `tools/check.sh` | build without warnings, i18n checks, the English and Russian docs in step (`tools/check-docs.py`), script syntax, niri config, installer dry run (CI runs it too) |
 | `tools/map.sh [TEXT]` | every source file with its one-line description |
-| `yami-shell shot [TARGET…] --lang en [--transparent] [--frame PNG] -o DIR` | render panels to PNG without a compositor (`--frame`: a real screen under the screenshot overlay); fails on untranslated text |
-| `yami-files shot`, `yami-view shot`, `yami-play shot` | the same for the file manager, the viewer and the player |
+| `yami-shell shot [TARGET…] --lang en [--transparent] -o DIR` | render panels to PNG without a compositor; fails on untranslated text |
+| `yami-setup shot`, `yami-files shot`, `yami-view shot`, `yami-play shot`, `yami-shot shot`, `yami-agents shot` | the same for the setup window and each module |
+| `tools/check-modules.sh [NAME…]` | every module next to this repository: no warnings, tests, translations, every state in both looks and three languages |
 | `yami-greet shot -o DIR`, `yami-greet --demo` | the login screen offscreen in each state; `--demo` runs it without greetd (password `yami`) inside a nested niri |
 | `tools/readme-art.py`, `tools/readme-shots.sh` | the README's logo and cards; real screenshots of your session (empty workspace, plain device names, everything put back) |
 | `tools/release.sh X.Y.Z` | cut a release: changelog, versions, check, signed tag, push (`--keygen` once for the key) |
-| `tools/deploy.sh` | build, install to `~/.local/bin` and restart the running shell (refuses while a game has focus); `--files-only` installs yami-files, yami-view and yami-play only |
+| `tools/deploy.sh` | build, install to `~/.local/bin` and restart the running shell (refuses while a game has focus); `--modules` adds the modules next to this repository, `--modules-only` installs only them |
 
 ## Thanks
 
@@ -500,7 +485,7 @@ as long as every copy and every substantial part of it keeps the copyright line 
 text. Bundled fonts keep their own licenses (SIL Open Font License, texts in `fonts/`). Monocraft
 is downloaded from its upstream release at install time (pinned version, checked against its
 SHA-256). yami-niri is built from upstream niri (GPL-3.0)
-with the patches in `fork/`.
+with the patches of the yami-niri repository.
 
 The license is for the code and gives no rights to the project's name: a fork or a rebuild goes
 under its own name and logo and does not present itself as yami or as made by its authors.

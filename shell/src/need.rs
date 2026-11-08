@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn login_line() {
         let d = std::env::temp_dir().join(format!("yami-need-{}", std::process::id()));
-        let _ = std::fs::create_dir_all(d.join("tools"));
+        let _ = std::fs::create_dir_all(d.join("yami-greet"));
         let g = d.join("yami-greet/install-system.sh");
         let _ = std::fs::write(&g, "#!/bin/sh\n");
         // только экран входа: менеджер пакетов не нужен

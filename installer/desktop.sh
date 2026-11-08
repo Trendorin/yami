@@ -22,22 +22,11 @@ plan_desktop() {
   on look && add "$(t "тема программ: Qt, KDE, GTK" "app theme: Qt, KDE, GTK" "tema dos aplicativos: Qt, KDE e GTK")" do_look
   return 0
 }
-# the setup window chose what to restyle: into the settings, then everything from the palette
+# the setup window chose what to restyle: do_refresh writes it into the settings and repaints
 plan_apply_look() {
-  add "$(t "что перекрасить" "what to restyle" "o que recolorir")" do_apply_restyle
   add "$(t "палитра: всё, что из неё выводится" "palette: everything derived from it" "paleta: tudo deriva dela")" do_refresh
   on look && add "$(t "тема программ: Qt, KDE, GTK" "app theme: Qt, KDE, GTK" "tema dos aplicativos: Qt, KDE e GTK")" do_look
   return 0
-}
-do_apply_restyle() {
-  [[ -f $SET_JSON ]] || return 99
-  python3 -I - "$SET_JSON" "$(restyle_json)" <<'PY_'
-import json, sys
-p, new = sys.argv[1], json.loads(sys.argv[2])
-d = json.load(open(p))
-d.update(new)
-open(p, "w").write(json.dumps(d, ensure_ascii=False, indent=2) + "\n")
-PY_
 }
 
 # last: what was installed, what the chosen components still miss (an update has no sudo: the

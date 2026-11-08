@@ -94,3 +94,31 @@ t_desc() {
   esac
 }
 
+# settings → yami-shell.json (do_dotfiles): themeApps and the cursor
+restyle_json() {
+  python3 -I - "$SET_JSON" "$(t_list)" "$(t_on cursor && echo yami || echo system)" <<'PY'
+import json, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+try:
+    d = json.loads(p.read_text())
+except (OSError, ValueError):
+    d = {}
+d = d if isinstance(d, dict) else {}
+d["themeApps"] = sys.argv[2].split()
+d.pop("appThemes", None)
+# the pixel cursor: on keeps a size or kind already set, off is the system one
+if sys.argv[3] == "system":
+    d["cursor"] = "system"
+elif d.get("cursor") in (None, "system"):
+    d["cursor"] = "yami"
+text = json.dumps(d, ensure_ascii=False, indent=2) + "\n"
+p.parent.mkdir(parents=True, exist_ok=True)
+try:
+    same = p.read_text() == text
+except OSError:
+    same = False
+if not same:
+    p.write_text(text)
+PY
+}

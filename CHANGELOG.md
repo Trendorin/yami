@@ -9,6 +9,14 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+- yami is now a shell and separate modules: yami-files, yami-view, yami-play, yami-shot, yami-agents, yami-greet and yami-niri each live in their own repository and work without the shell, so any of them can go into another setup.
+- A graphical first run: the install puts in only niri and the shell, and a full-screen window at the first login asks the language, the look and which modules to add. `yami setup` opens it again.
+- Every module can look your way: a neutral look next to the pixel one, corners, shadows, fonts and each colour in `~/.config/yami/style.json`, and per module in `style.<module>.json`. Settings → look has the style of everything.
+- yami-shot: the screenshot tool is its own program for any compositor with layer-shell.
+- yami-agents: the polkit window, passwords of encrypted drives, the screen-share picker and automount are one service, each part switched on its own (`yami-agents status`).
+- The installer's terminal side says what it is about to do in plain words and asks nothing else.
+- yami no longer touches drivers: the NVIDIA profile and every trace of the old name are gone.
+
 ## 2.7.0
 
 - Switch between players (#24): the bar and the music popup follow the player that started playing last, so a YouTube tab no longer pushes Spotify out; with several players the name in the popup is a button that switches to the next one (right click: back), and `yami msg media player` does it from a key. Play/pause, next and previous keys go to the player the bar shows.

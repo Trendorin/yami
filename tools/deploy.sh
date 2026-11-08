@@ -52,7 +52,8 @@ put yami-setup
 put yami-shell
 ln -sfn yami-shell "$HOME/.local/bin/yami"
 # what runs now (`yami update` compares against it); a dirty tree is marked as such
-"$BIN" update stamp "$ROOT" || true
+# без env.sh: иначе в запись попадёт локальный адрес вместо настоящего
+env -u GIT_CONFIG_COUNT -u GIT_CONFIG_KEY_0 -u GIT_CONFIG_VALUE_0 "$BIN" update stamp "$ROOT" || true
 # alive = answers on its socket (not pgrep: `yami update apply` is a yami-shell process too)
 # the new shell binds its socket anew: with an inode given, a ping counts only from another one
 ino() { stat -c %i "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/yami-shell.sock" 2>/dev/null || echo none; }

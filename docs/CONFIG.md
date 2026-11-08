@@ -38,6 +38,7 @@ yami status                               # shell, portal, niri, last update che
 yami doctor                               # programs, D-Bus services, config: what is missing and what it costs
 yami doctor games                         # ntsync, gamemode, MangoHud: what is there, one command for the rest
 yami report [-o FILE]                     # versions, doctor, this boot's journal, configs in a tar.gz for an issue (secrets scrubbed)
+yami setup                                # the setup window: look, modules to add or remove
 yami ocr FILE                             # text from an image, the same recognition as «text» in the screenshot overlay (needs tesseract)
 yami theme export FILE | import FILE|URL  # the look as one file: palette, effects, fonts, bar, widgets, wallpaper (never commands); an imported theme is kept in your themes, a URL must be https
 yami theme save [NAME] | list | apply NAME | remove NAME   # your themes in ~/.config/yami/themes (settings → color → themes); save with no name names it after the palette
@@ -63,6 +64,30 @@ yami-shell config lite-auto               # lite mode on if this machine is weak
 yami-shell binds list | print | write     # keybindings
 ```
 
+## The look of every module
+
+Every module reads `~/.config/yami/style.json`; the yami shell writes that file from its settings
+(settings → look), without the shell it is yours. `~/.config/yami/style.<module>.json` (`files`
+`view` `play` `shot` `agents` `setup`) holds only what one module does differently. Without any of
+them a module is neutral and follows the system's light or dark theme. `YAMI_STYLE` names another
+file for one run. The files are reread when they change.
+
+| Key | Values | Meaning |
+|---|---|---|
+| `preset` | `plain`, `yami` | the base: neutral or the pixel look; everything below overrides it |
+| `accent`, `palette` | `#rrggbb`, a preset id | the colour every tone is derived from |
+| `light` | `true`, `false` | absent: as the system |
+| `corners` | `notch`, `round`, `square` | panel and button corners |
+| `radius` | pixels | panel corner radius with `round` |
+| `shadow` | `hard`, `soft`, `none` | shadow under panels |
+| `reveal` | `fade`, `none`, `dither`, `scan`, `noise`, `wipe`, `blocks` | how panels appear |
+| `font` | a font family | empty: `sans` with `plain`, Tiny5 with `yami` |
+| `iconPixel`, `iconTheme` | `true`, `false`; a theme name | app icons |
+| `animations`, `animSpeed` | `true`, `false`; a number | on or off, speed |
+| `wallpaperCmd` | a command with `{}` | «set as wallpaper» outside the yami shell, e.g. `swww img {}` |
+| `lang` | `ru`, `en`, `pt-BR` | empty: as the system |
+| `colors` | an object of `#rrggbb` | any of `bg` `panel` `surface` `surfaceHi` `codeBg` `border` `dim` `accent` `deep` `glow` `bright` `selection` `text` `textDim` `textFaint` `onAccent` `textHi` `ok` `warn` |
+
 ## yami-shell.json
 
 ### Colour and look
@@ -71,6 +96,10 @@ yami-shell binds list | print | write     # keybindings
 |---|---|---|
 | `palette` | `"blood"` | preset: `blood` `ash` `sakura` `amber` `venom` `ice` `dusk` |
 | `accent` | `""` | own accent `#rrggbb`; empty: the preset's |
+| `preset` | `"yami"` | the style of every module: `yami` (pixel) or `plain` (neutral), [details](#the-look-of-every-module) |
+| `corners`, `shadow` | `""` | `notch` `round` `square`; `hard` `soft` `none`; empty: from the style |
+| `radius` | `-1` | corner radius in pixels; `-1`: from the style |
+| `colors` | `{}` | your colours over those derived from the accent |
 | `tint` | `1.0` | how strongly the graphite takes the accent's hue |
 | `glass` | `0.78` | panel opacity, 0.15 (glass) … 1 (solid); lower values are raised to 0.15, where panels would be all but invisible |
 | `lift` | `0.0` | panel brightness: 0 near-black graphite, 1 noticeably lighter |
@@ -191,10 +220,6 @@ Settings → look → «pixel look» moves these keys, `iconPixel` and `cursor` 
 | `dockSize`, `dockAnim` | `40`, `"grow"` | icon size; hover: `grow` `wave` `lift` `none` |
 | `dockBounce`, `dockLabels`, `dockRunning`, `dockLauncher`, `dockTrash` | `true` | |
 | `dockPins` | | app ids (desktop file names) pinned to the dock |
-| `shotDir` | `""` | screenshot folder; empty: Pictures/Screenshots |
-| `shotCopy`, `shotSave`, `shotLoupe`, `shotNotify` | `true` | copy, save, magnifier, notification |
-| `shotDelay` | `3` | timer, seconds |
-| `shotConfirm` | `space` | `space`: select, then Space or Enter takes the shot; `instant`: the shot is taken as soon as the mouse is released (area, window), and a full-screen shot without the overlay |
 | `curtainStyle` | `"blur"` | what stream viewers see while the screen is hidden (Mod+Shift+H), no labels: `blur` the frozen screen blurred, `pixels` in big pixels, `wall` the wallpaper |
 | `curtainCell` | `24` | pixel size of `pixels` |
 | `lockAfter`, `screenOffAfter` | `10`, `15` | idle minutes; 0: never |
@@ -240,16 +265,14 @@ long as its first line is yami's; delete that line and theme.py never touches it
 ### Services
 
 What on D-Bus and in the portals yami does itself. Turned off, it is left to another program
-(mako or dunst, waybar's tray, polkit-gnome, the GTK/GNOME portals). Notifications, tray and
-polkit change after a shell restart (`yami restart`), portals from the next login.
+(mako or dunst, waybar's tray, polkit-gnome, the GTK/GNOME portals). Notifications and the
+tray change after a shell restart (`yami restart`), portals from the next login. The polkit window,
+the screen-share picker and automount belong to [yami-agents](#yami-agents).
 
 | Key | Default | Meaning |
 |---|---|---|
 | `agentNotif` | `true` | the notification server (`org.freedesktop.Notifications`) |
 | `agentTray` | `true` | the tray (`org.kde.StatusNotifierWatcher`, at most 64 items) |
-| `agentPolkit` | `true` | the polkit password window |
-| `automount` | `true` | drives, memory cards, discs, phones (Android file transfer), cameras and iPhones mount by themselves when they are plugged in, like in GNOME and KDE: what the volume itself asks to be mounted (removable media yes, partitions of internal disks no), once per plug, so what you unmount stays unmounted. The shell listens to udev (a netlink socket filtered in the kernel to `block` and `usb`, no polling) and asks `gio`. Encrypted drives are not opened by themselves: their card opens yami-files' password window. Nothing mounts while the screen is locked: it waits for the unlock. Settings → services |
-| `automountOpen` | `false` | open what was mounted in yami-files at once; off: a card with «open» |
 | `notifMax`, `notifHistory` | `4`, `50` | cards on screen at once; how many the history keeps |
 | `notifPos` | `"top-right"` | where the cards appear: `top-right`, `top-left`, `top`, `bottom-right`, `bottom-left`, `bottom` (settings → notifications); they keep clear of the bar and the dock |
 | `osdPos` | `"bottom"` | the volume and brightness OSD: `bottom`, `top` (under the bar) or `center` |
@@ -260,7 +283,7 @@ polkit change after a shell restart (`yami restart`), portals from the next logi
 | `mediaArtNet` | `true` | album covers from the player's web links (`curl`, https after redirects, ≤ 16 MB); off: only local files |
 | `lyricsNet` | `true` | lyrics from lrclib.net (artist, title and length are sent) when the player has none and there is no `.lrc` or `.txt` file next to the track; asked only while the music popup shows lyrics, answers cached in `~/.cache/yami/lyrics` |
 | `weatherCity`, `weatherUnits` | `""`, `"c"` | the `weather` bar module and widget: a city (`Berlin`) or `latitude, longitude`, asked from open-meteo.com every 20 minutes while one of them is shown; `f` gives °F and mph. Settings → services → network |
-| `portalFiles`, `portalCast` | `true`, `true` | file dialogs from yami-files, the screen-share picker from the shell (else GTK / GNOME) |
+| `portalFiles` | `true` | file dialogs from yami-files (else GTK) |
 
 ### Updates
 
@@ -359,7 +382,7 @@ Phones, cameras and network shares go through gvfs (`gio mount`): the packages `
 (Android), `gvfs-gphoto2` (cameras), `gvfs-afc` (iPhone) and `gvfs-smb` (Windows shares) add the
 backends; sftp, ftp and WebDAV are in gvfs itself. A password is asked in the window and handed
 to `gio` over a pipe; it is not stored. Kernel mounts (cifs, nfs, sshfs, rclone) show up too.
-A phone shows in the sidebar as soon as file transfer is on (the shell's `automount` mounts it by
+A phone shows in the sidebar as soon as file transfer is on (yami-agents mounts it by
 itself). An encrypted drive (LUKS, BitLocker) asks for its password on a click (`yami-files
 --unlock /dev/…` opens that window); udisks opens it, and «eject» locks it again before the
 drive is powered off. A right click on a place or a drive opens it in a new tab or the other pane.
@@ -376,3 +399,27 @@ Keys: space pause, ←/→ 5 s (Shift 1 s, Ctrl 30 s), ↑/↓ or the wheel volu
 N/P next/previous, [ ] speed, A audio track, S subtitles, L repeat, X pixel scaling, C save a
 frame, `,` `.` frame step, 1…9 jump to 10…90 %, I details, Q quit. `YAMI_PLAY_OPTS="hwdec=no,…"`
 passes extra mpv options. The look (palette, language, font) is the viewer's (`fontView`).
+
+## yami-shot
+
+`~/.config/yami/shot.json`, also edited by settings → screenshots.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `dir` | `""` | screenshot folder; empty: Pictures/Screenshots |
+| `copy`, `save`, `loupe`, `notify` | `true` | copy, save, magnifier, notification |
+| `delay` | `3` | timer, seconds |
+| `confirm` | `space` | `space`: select, then Space or Enter takes the shot; `instant`: the shot is taken as soon as the mouse is released (area, window), and a full-screen shot at once, without the overlay |
+| `prefix` | `yami` | the start of the file name |
+
+## yami-agents
+
+`~/.config/yami/agents.json`, also edited by settings → services and by `yami-agents enable|disable PART`.
+`yami-agents status` says what is on and who does the job.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `polkit` | `true` | the polkit password window; off: another agent |
+| `screencast` | `true` | the screen-share picker and portal backend (niri); off: GNOME's window |
+| `automount` | `true` | drives, memory cards, discs, phones (Android file transfer), cameras and iPhones mount by themselves when plugged in |
+| `automountOpen` | `false` | open what was mounted at once; off: a notification with «open» |
