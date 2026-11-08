@@ -96,10 +96,17 @@ do_niri_config() {
   fi
   touch "$n/.yami"
   write_local_kdl >"$n/yami-local.kdl"
-  # niri spawns `yami-shell` by name: make ~/.local/bin visible to the systemd session
+  # niri spawns `yami-shell` by name: make ~/.local/bin visible to the systemd session.
+  # environment.d alone is not enough: niri-session imports the login shell's PATH over it (bash on
+  # Arch has no ~/.local/bin, fish on CachyOS adds it), so niri.service puts it back right before niri
+  # starts; the manager's environment changed in ExecStartPre is what ExecStart gets
   if ((SYSTEMD)); then
-    mkdir -p "$CFG/environment.d"
+    mkdir -p "$CFG/environment.d" "$CFG/systemd/user/niri.service.d"
     printf '# YAMI: the shell lives in ~/.local/bin\nPATH=${HOME}/.local/bin:${PATH}\n' >"$CFG/environment.d/60-yami-path.conf"
+    printf '%s\n' "# yami: ~/.local/bin in niri's PATH even when niri-session imported a PATH without it" "[Service]" \
+      "ExecStartPre=/bin/sh -c 'case \":\$PATH:\" in *\":\$HOME/.local/bin:\"*) ;; *) systemctl --user set-environment PATH=\"\$HOME/.local/bin:\$PATH\";; esac'" \
+      >"$CFG/systemd/user/niri.service.d/60-yami-path.conf"
+    systemctl --user daemon-reload 2>/dev/null
   fi
   if command -v niri >/dev/null && ! niri validate -c "$n/config.kdl"; then
     # this niri does not load the new config: the previous one goes back, so the next login keeps working

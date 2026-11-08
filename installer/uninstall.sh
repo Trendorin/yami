@@ -18,7 +18,7 @@ uninstall() {
   pgrep -x yami-shell >/dev/null && "$BIN/yami-shell" msg quit 2>/dev/null
   [[ -x $HOME/.local/lib/yami-niri/yami-niri.sh ]] && "$HOME/.local/lib/yami-niri/yami-niri.sh" off
   rm -rf "$HOME/.local/lib/yami-niri" "$HOME/.local/lib/yami"
-  rm -f "$BIN/yami-shell" "$BIN/yami" "$STATE/install.json" "$STATE/no-monocraft" "$STATE/update.json" "$STATE/update-keys" "$CFG/environment.d/60-yami-path.conf" "$CFG/fontconfig/conf.d/50-yami-pixel.conf" \
+  rm -f "$BIN/yami-shell" "$BIN/yami" "$STATE/install.json" "$STATE/no-monocraft" "$STATE/update.json" "$STATE/update-keys" "$CFG/environment.d/60-yami-path.conf" "$CFG/systemd/user/niri.service.d/60-yami-path.conf" "$CFG/fontconfig/conf.d/50-yami-pixel.conf" \
     "$CFG/niri/yami-binds.kdl" "$CFG/niri/yami-fx.kdl"
   local data="${XDG_DATA_HOME:-$HOME/.local/share}"
   pkill -f "$BIN/yami-files --portal" 2>/dev/null

@@ -15,7 +15,7 @@ snapshot_list() {
   local data="${XDG_DATA_HOME:-$HOME/.local/share}" b n
   for b in yami-shell yami-setup yami-files yami-view yami-play yami-shot yami-agents; do printf 'G %s\n' "$BIN/$b"; done
   for n in config.kdl yami-local.kdl yami-binds.kdl yami-fx.kdl yami-colors.kdl yami-cursor.kdl; do printf 'G %s\n' "$CFG/niri/$n"; done
-  printf 'G %s\n' "$CFG/xdg-desktop-portal/niri-portals.conf" "$CFG/environment.d/60-yami-path.conf" "$STATE/install.json" \
+  printf 'G %s\n' "$CFG/xdg-desktop-portal/niri-portals.conf" "$CFG/environment.d/60-yami-path.conf" "$CFG/systemd/user/niri.service.d/60-yami-path.conf" "$STATE/install.json" \
     "$data/applications/yami-files.desktop" "$data/applications/yami-view.desktop" "$data/applications/yami-play.desktop" \
     "$data/xdg-desktop-portal/portals/yami.portal" "$data/xdg-desktop-portal/portals/yami-agents.portal" \
     "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yami.service" \
