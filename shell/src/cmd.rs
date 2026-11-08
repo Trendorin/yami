@@ -464,7 +464,6 @@ pub fn run(args: &[String], me: &str) -> i32 {
             0
         }
         Some("run") => {
-            crate::config::migrate();
             crate::app::run();
             0
         }

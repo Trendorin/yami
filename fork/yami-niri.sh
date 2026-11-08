@@ -87,7 +87,6 @@ on() {
   mkdir -p "$UNITS" "${LINK%/*}"
   install -m 0755 "$HERE/session.sh" "$LIB/session"
   [[ "$HERE" == "$LIB" ]] || install -m 0755 "$HERE/yami-niri.sh" "$LIB/yami-niri.sh"
-  rm -f -- "$UNITS/dark-niri.conf" # the old fork's drop-in
   # NotifyAccess=all: READY=1 comes from niri, a child of the wrapper
   printf '%s\n' "# yami: the session runs yami-niri, falling back to the packaged niri (off: yami-niri.sh off)" \
     "[Service]" "NotifyAccess=all" "ExecStart=" "ExecStart=$LIB/session" >"$DROPIN"
@@ -100,7 +99,7 @@ on() {
 }
 
 off() {
-  rm -f -- "$DROPIN" "$UNITS/dark-niri.conf"
+  rm -f -- "$DROPIN"
   # rules only the fork knows would break the packaged niri's config (it would start with its
   # default config, without the shell): the same edit as session.sh's fallback; a running shell
   # keeps them out too from now on (it checks the link below before each write: niri::config_level)

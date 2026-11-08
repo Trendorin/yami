@@ -34,7 +34,7 @@ fi
 # ── colors: back up the old files, then run the generator ──────────────────
 want qt && keep "$CFG/kdeglobals"
 if want gtk; then for v in 3.0 4.0; do keep "$CFG/gtk-$v/gtk.css"; done; fi
-want fastfetch && [[ -f "$CFG/fastfetch/config.jsonc" ]] && ! grep -qE "YAMI|DARK-4RMY" "$CFG/fastfetch/config.jsonc" && keep "$CFG/fastfetch/config.jsonc"
+want fastfetch && [[ -f "$CFG/fastfetch/config.jsonc" ]] && ! grep -q YAMI "$CFG/fastfetch/config.jsonc" && keep "$CFG/fastfetch/config.jsonc"
 python3 -I "$THEME" "$PALETTE"
 
 # ── Qt: qt6ct with Fusion, palette, QSS, font ──────────────────────────────

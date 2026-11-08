@@ -27,8 +27,6 @@
 #   drives  udisks2, gvfs: drives mount by themselves, phones, network shares
 #   tools   night light, screen text and QR (wlsunset, tesseract, zbar)
 #   games   GameMode and MangoHud (on when Steam is here)
-#   nvidia  niri's profile against VRAM growth (the proprietary driver): one file in /etc/nvidia,
-#           nothing else of the driver (no environment, modprobe options or initramfs)
 #   fork    yami-niri, built from source (5–25 min; off with less than 6 GB of memory or 4 threads)
 #   --shell-only     niri and the shell alone: none of the above, nothing of others restyled
 #   --restyle LIST   what yami may restyle in other programs (all, none, or a list of: gtk qt cursor
@@ -75,9 +73,8 @@ CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/yami"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/yami"
 BIN="$HOME/.local/bin"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-# settings of this shell; an install under the old name (DARK-4RMY) is read until it is moved
+# settings of this shell
 SET_JSON="$CFG/yami-shell.json"
-[[ ! -f $SET_JSON && -f $CFG/dark4rmy-shell.json ]] && SET_JSON="$CFG/dark4rmy-shell.json"
 LOG="$CACHE/install.log"
 MISSING_F="$CACHE/missing-packages"
 RUST_MIN="1.89"
@@ -127,7 +124,7 @@ done
 export GIT_TERMINAL_PROMPT=0
 
 # ── the modules: each only defines (installer/*.sh) ─────────────────────────
-for m in ui detect root packages components restyle menu build apps desktop niri login nvidia migrate uninstall summary; do
+for m in ui detect root packages components restyle menu build apps desktop niri login uninstall summary; do
   # shellcheck source=/dev/null
   . "$ROOT/installer/$m.sh" || { echo "yami: $ROOT/installer/$m.sh is missing" >&2; exit 1; }
 done
@@ -187,7 +184,6 @@ if ((UPDATE)); then
   plan_build    # build.sh: the shell and the chosen apps
   plan_apps     # apps.sh: yami-files, yami-view, yami-play (or out, when unticked)
   plan_desktop  # desktop.sh: fonts, niri config, everything from the palette
-  plan_legacy   # migrate.sh
   plan_record   # desktop.sh: install record, packages-needed, counter, restart
   run_steps
   fork_after    # niri.sh: yami-niri when its patch series moved
@@ -208,14 +204,11 @@ root_begin      # root.sh: the password once
 # root steps first: the root shell closes before the build (run_steps, root.sh)
 plan_packages   # packages.sh
 plan_niri       # niri.sh: upstream niri when the packaged one is too old
-plan_nvidia     # nvidia.sh: niri's VRAM profile
 plan_services   # desktop.sh
-plan_migrate    # migrate.sh: DARK-4RMY
 plan_login      # login.sh: greetd (the last root step)
 plan_build
 plan_apps
 plan_desktop
-plan_legacy
 plan_record
 run_steps
 root_end        # root.sh

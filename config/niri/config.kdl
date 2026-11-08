@@ -203,7 +203,6 @@ layer-rule {
 // (settings → services → notifications in recordings)
 
 // ─── environment ───────────────────────────────────────────────────────────
-// GPU-specific variables (NVIDIA etc.) live in yami-local.kdl, written by install.sh
 environment {
     // Wayland wherever possible
     ELECTRON_OZONE_PLATFORM_HINT "auto"

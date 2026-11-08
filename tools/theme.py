@@ -1185,7 +1185,7 @@ def fastfetch(p):
         first = main.read_text(errors="replace").lstrip().split("\n", 1)[0]
     except OSError:
         first = None
-    own = first is not None and not first.startswith(("// YAMI", "// DARK-4RMY"))
+    own = first is not None and not first.startswith("// YAMI")
     target = CFG / "fastfetch/yami.jsonc" if own else main
     write(target, "// YAMI: пишет tools/theme.py по палитре шелла\n" + json.dumps(conf, ensure_ascii=False, indent=2) + "\n")
     status("fastfetch", {"file": tilde(target)} if own else None)

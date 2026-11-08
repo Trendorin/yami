@@ -1,6 +1,6 @@
 # What this machine is. The distro family and its package manager, sudo or
-# doas, memory and threads (how hard to build, whether yami-niri is worth it), the GPU (NVIDIA alone
-# or next to another one), systemd, a running niri, the login manager in use and Steam. Defaults
+# doas, memory and threads (how hard to build, whether yami-niri is worth it), systemd,
+# a running niri, the login manager in use and Steam. Defaults
 # of the components come from here; the flags of install.sh override them.
 # shellcheck shell=bash
 
@@ -60,9 +60,7 @@ detect_machine() {
     export CARGO_BUILD_JOBS=$j
   fi
 
-  NVIDIA=0 RUNNING_NIRI=0 SYSTEMD=0
-  # the proprietary driver, loaded or installed (nouveau needs nothing from us)
-  { [[ -e /proc/driver/nvidia/version ]] || modinfo nvidia >/dev/null 2>&1; } && NVIDIA=1
+  RUNNING_NIRI=0 SYSTEMD=0
   [[ -n "${NIRI_SOCKET:-}" ]] && RUNNING_NIRI=1
   [[ -d /run/systemd/system ]] && SYSTEMD=1
   return 0

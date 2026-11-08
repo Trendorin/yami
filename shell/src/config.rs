@@ -10,20 +10,6 @@ pub fn settings_path() -> PathBuf {
     config_dir().join("yami-shell.json")
 }
 
-/// переезд со старого имени (DARK-4RMY): настройки, состояние и закреплённое в буфере
-pub fn migrate() {
-    let state = std::env::var_os("XDG_STATE_HOME").map(PathBuf::from).filter(|p| p.is_absolute()).unwrap_or_else(|| home().join(".local/state"));
-    for (old, new) in [
-        (config_dir().join("dark4rmy-shell.json"), settings_path()),
-        (state.join("dark4rmy"), state.join("yami")),
-        (data_dir().join("dark4rmy-clip"), data_dir().join("yami-clip")),
-    ] {
-        if old.exists() && !new.exists() {
-            let _ = std::fs::rename(&old, &new);
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Widget {

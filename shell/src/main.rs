@@ -97,7 +97,6 @@ fn main() {
     // `yami` (ссылка на этот бинарь) без команды — справка; `yami-shell` без команды — шелл
     let me = args.first().map(|a| a.rsplit('/').next().unwrap_or(a).to_string()).unwrap_or_default();
     if args.len() == 1 && me != "yami" {
-        config::migrate();
         app::run();
         return;
     }
