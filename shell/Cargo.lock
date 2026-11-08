@@ -1531,6 +1531,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "yami-setup"
+version = "2.7.0"
+dependencies = [
+ "calloop",
+ "calloop-wayland-source",
+ "image",
+ "libc",
+ "serde_json",
+ "smithay-client-toolkit",
+ "wayland-client",
+ "wayland-protocols",
+ "yami-px",
+]
+
+[[package]]
 name = "yami-shell"
 version = "2.7.0"
 dependencies = [
