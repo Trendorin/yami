@@ -39,14 +39,19 @@ if ((WITH_MODULES)); then
     [[ -x $MODS/$m/install.sh ]] || { echo "deploy: no $MODS/$m" >&2; exit 1; }
     "$MODS/$m/install.sh"
   done
-  # running services move to the new binaries as soon as nothing is open (a stream is not cut)
+  # a running file dialog keeps its binary until it closes; D-Bus learns about new service files
   "$HOME/.local/bin/yami-files" --portal-reload || true
-  "$HOME/.local/bin/yami-agents" --reload || true
+  busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig >/dev/null 2>&1 || true
 fi
 if ((ONLY_MODULES)); then
+  "$HOME/.local/bin/yami-agents" --reload || true
   echo "deploy: modules installed"
   exit 0
 fi
+# before 2.8 screen sharing was the yami backend's: the portal frontend reads this file only at start
+pc="${XDG_CONFIG_HOME:-$HOME/.config}/xdg-desktop-portal/niri-portals.conf"
+old_cast=0
+grep -qs 'ScreenCast=yami;' "$pc" && old_cast=1
 cargo build --release --locked --workspace --manifest-path "$ROOT/shell/Cargo.toml"
 put yami-setup
 put yami-shell
@@ -76,6 +81,13 @@ fi
 if ((!started)) && [[ -n ${NIRI_SOCKET:-} ]]; then
   niri msg action spawn-sh -- "until $BIN; do sleep 1; done"
   up && started=1
+fi
+if ((WITH_MODULES)); then
+  # after the shell: the old one held the polkit agent's place until it was replaced
+  "$HOME/.local/bin/yami-agents" --reload || true
+  if ((old_cast)) && ! pgrep -x obs >/dev/null; then
+    systemctl --user restart xdg-desktop-portal || true
+  fi
 fi
 # the shell itself: yami-shell without arguments (CLI commands like `update apply` have them)
 pid="$(pgrep -ax yami-shell | awk 'NF == 2 { print $1; exit }' || true)"
