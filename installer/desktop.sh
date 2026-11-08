@@ -22,13 +22,31 @@ plan_desktop() {
   on look && add "$(t "тема программ: Qt, KDE, GTK" "app theme: Qt, KDE, GTK" "tema dos aplicativos: Qt, KDE e GTK")" do_look
   return 0
 }
+# the setup window chose what to restyle: into the settings, then everything from the palette
+plan_apply_look() {
+  add "$(t "что перекрасить" "what to restyle" "o que recolorir")" do_apply_restyle
+  add "$(t "палитра: всё, что из неё выводится" "palette: everything derived from it" "paleta: tudo deriva dela")" do_refresh
+  on look && add "$(t "тема программ: Qt, KDE, GTK" "app theme: Qt, KDE, GTK" "tema dos aplicativos: Qt, KDE e GTK")" do_look
+  return 0
+}
+do_apply_restyle() {
+  [[ -f $SET_JSON ]] || return 99
+  python3 -I - "$SET_JSON" "$(restyle_json)" <<'PY_'
+import json, sys
+p, new = sys.argv[1], json.loads(sys.argv[2])
+d = json.load(open(p))
+d.update(new)
+open(p, "w").write(json.dumps(d, ensure_ascii=False, indent=2) + "\n")
+PY_
+}
+
 # last: what was installed, what the chosen components still miss (an update has no sudo: the
 # shell offers one command for it), the counter, the running shell restarted
 plan_record() {
   add "$(t "запись об установке (для yami update)" "install record (for yami update)" "registro de instalação (para yami update)")" do_stamp
   add "$(t "каких пакетов ещё не хватает" "packages still missing" "pacotes ainda ausentes")" do_need_pkgs
   add "$(t "счётчик установок (один раз, без данных)" "install counter (once, no data)" "contador de instalações (uma vez, sem dados)")" do_count
-  ((RUNNING_NIRI)) && add "$(t "перезапуск шелла" "restart the shell" "reiniciar o shell")" do_restart_shell
+  ((RUNNING_NIRI && !APPLY)) && add "$(t "перезапуск шелла" "restart the shell" "reiniciar o shell")" do_restart_shell
   return 0
 }
 
@@ -188,6 +206,9 @@ do_stamp() {
   for i in "${!C_ID[@]}"; do ((C_WANT[i])) && c+="${C_ID[$i]} "; done
   "$BIN/yami-shell" update stamp "$ROOT" --components "${c% }" || return 1
   printf '%s\n' "${C_ID[*]}" >"$KNOWN_F"
+  # откуда ставить модули потом (окно настройки); первый вход откроет это окно
+  printf '%s\n' "$ROOT" >"$STATE/source"
+  ((UPDATE || APPLY || FULL)) || : >"$STATE/first-run"
 }
 
 # services the desktop needs; NetworkManager only when nothing else manages the network

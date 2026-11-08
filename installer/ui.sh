@@ -82,7 +82,7 @@ logo_row() { # row text frame sweep
 }
 SUBTITLE=""
 banner() { # 1 — animate
-  SUBTITLE="$(t "пиксельный райс для niri" "pixel rice for niri" "personalização em pixel para niri")"
+  SUBTITLE="$(t "рабочий стол для niri" "a desktop for niri" "uma área de trabalho para niri")"
   local f sw
   printf '\n'
   if (($1)) && ((ANIM)); then
@@ -108,11 +108,34 @@ banner() { # 1 — animate
     for ((i = 0; i < ${#line}; i += 4)); do printf '%s' "${line:i:4}"; sleep 0.008; done
     printf '%s\n  %s' "$R" "$D"
     for ((i = 0; i < ${#SUBTITLE}; i++)); do printf '%s' "${SUBTITLE:i:1}"; sleep 0.012; done
-    printf '%s  %s// %s%s\n\n' "$R" "$F" "$(t "установка" "installer" "instalador")" "$R"
+    printf '%s\n\n' "$R"
   else
     printf '  %s────────────────────────────────────────%s\n' "$F" "$R"
-    printf '  %s%s%s  %s// %s%s\n\n' "$D" "$SUBTITLE" "$R" "$F" "$(t "установка" "installer" "instalador")" "$R"
+    printf '  %s%s%s\n\n' "$D" "$SUBTITLE" "$R"
   fi
+}
+
+# ── the first screen: what is about to happen, in plain words ───────────────
+welcome_rows() { printf '  %s%s%s  %s%s%s\n' "$F" "$(pad "$1" 12)" "$R" "$T" "$2" "$R"; }
+welcome() {
+  while :; do
+    printf '\e[H\e[J'
+    banner 1
+    printf '  %s%s%s\n' "$T" "$(t "Сейчас поставлю только основу: niri и шелл yami." "I will install only the base now: niri and the yami shell." "Vou instalar só a base agora: niri e o shell yami.")" "$R"
+    printf '  %s%s%s\n\n' "$D" "$(t "Файлы, плеер, скриншоты, экран входа и темы выберешь в окне настройки при первом входе." "Files, player, screenshots, login screen and themes are chosen in a setup window at the first login." "Arquivos, player, capturas, tela de login e temas são escolhidos numa janela no primeiro login.")" "$R"
+    welcome_rows "$(t "система" "system" "sistema")" "$OS_NAME · $MEM_GB $(t "ГБ" "GB" "GB") · $THREADS $(t "потоков" "threads" "núcleos")"
+    welcome_rows "$(t "пароль" "password" "senha")" "$(t "спрошу один раз, для пакетов" "asked once, for the packages" "pedida uma vez, para os pacotes")"
+    welcome_rows "$(t "место" "location" "local")" "~/.local/bin, ~/.config/niri ($(t "прежнее сохраню рядом" "what was there is kept next to it" "o que existia fica ao lado"))"
+    welcome_rows "$(t "время" "time" "tempo")" "$(t "обычно 5–10 минут" "usually 5–10 minutes" "em geral 5–10 minutos")"
+    ((DRY)) && welcome_rows "--dry-run" "$(t "только покажу план, ничего не изменю" "only showing the plan, nothing changes" "só mostro o plano, nada muda")"
+    ((RUNNING_NIRI)) && welcome_rows "niri" "$(t "уже запущен: шелл появится сразу" "already running: the shell appears right away" "já em execução: o shell aparece na hora")"
+    printf '\n  %s%s%s  %s  %s%s%s  %s  %s%s%s\n' "$A" "enter" "$R" "$(t "поставить" "install" "instalar")" "$A" "l" "$R" "$(t "язык" "language" "idioma")" "$A" "q" "$R" "$(t "выйти" "quit" "sair")"
+    case "$(key)" in
+      enter | y) printf '\n'; return 0 ;;
+      l | "д") case $L in ru) L=en ;; en) L=pt-BR ;; *) L=ru ;; esac ;;
+      q | "й" | esc | eof) bye ;;
+    esac
+  done
 }
 
 # ── keys ────────────────────────────────────────────────────────────────────
@@ -201,18 +224,18 @@ run_steps() {
     # every root step comes before the build: the root shell is closed here, so no build script of
     # a crate (minutes of code from crates.io) runs while its pipes are open (see root_start). A step
     # after this point that still asked for root would fail (asroot: «the root shell is gone»)
-    [[ ${STEPS_F[$i]%% *} == do_build_shell ]] && root_stop
+    [[ ${STEPS_F[$i]%% *} == do_build_* ]] && root_stop
     step "$i"
     # a build that failed stops here. An update: the old binaries stay with the configs they match,
     # and the install record keeps the old version, so the update is offered again. A first
     # install: no niri config that starts a shell which is not there (the packages are in, a rerun
     # continues from the build)
-    if [[ ${STEPS_F[$i]%% *} == do_build_shell ]] && ((${#FAILED[@]} > nf)); then
+    if [[ ${STEPS_F[$i]%% *} == do_build_* ]] && ((${#FAILED[@]} > nf)); then
       BUILD_FAILED=1
       if ((UPDATE)); then
         warn "$(t "сборка не удалась — обновление остановлено, стоит прежняя версия" "the build failed: update stopped, the previous version stays" "a compilação falhou: atualização interrompida, a versão anterior é mantida")"
       else
-        warn "$(t "шелл не собрался — конфиги не тронуты; поправь причину (лог ниже) и запусти установку снова" "the shell did not build: your configs are untouched; fix the cause (log below) and run the installer again" "o shell não compilou: suas configurações foram preservadas; corrija a causa (registro abaixo) e execute o instalador novamente")"
+        warn "$(t "сборка не удалась — конфиги не тронуты; поправь причину (лог ниже) и запусти установку снова" "the build failed: configs untouched; fix the cause (log below) and run the install again" "a compilação falhou: configurações intactas; corrija a causa (log abaixo) e rode de novo")"
       fi
       break
     fi

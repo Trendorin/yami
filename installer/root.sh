@@ -19,7 +19,9 @@ root_start() {
   ROOT_TOOL=$tool
   coproc ROOTSH {
     # shellcheck disable=SC2016
-    "$tool" bash -c 'while IFS= read -r p && IFS= read -r c; do
+    # окно настройки отдаёт пароль через askpass: терминала у него нет
+    if [[ $tool == sudo && -n ${SUDO_ASKPASS:-} ]]; then set -- sudo -A; else set -- "$tool"; fi
+    "$@" bash -c 'while IFS= read -r p && IFS= read -r c; do
       i=/proc/$p/fd/0 o=/proc/$p/fd/1 e=/proc/$p/fd/2
       { : <"$i"; } 2>/dev/null || i=/dev/null
       { : >>"$o"; } 2>/dev/null || o=/dev/null

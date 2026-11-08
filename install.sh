@@ -1,47 +1,28 @@
 #!/usr/bin/env bash
-# YAMI installer: the yami desktop on niri (the shell, files, viewer, player, login screen, themes
-# and fonts) on any mainstream Linux distro. One command, from anywhere, as yourself (not root):
+# YAMI: the minimal install. One command, from anywhere, as yourself (not root):
 #
 #   bash <(curl -fsSL https://raw.githubusercontent.com/Trendorin/yami/main/install.sh)
 #
-# It asks the language, shows what it will install and goes on Enter («c» changes the choice). Every
-# default is picked for this machine: nothing below is needed for a normal install.
+# It puts in niri, the yami shell and what the desktop cannot start without. Everything else (files,
+# player, screenshots, login screen, themes) is chosen in the graphical setup at the first login.
 #
-#   ./install.sh --yes            no questions, the defaults
+#   ./install.sh --full           the old way: everything now, no setup window
+#   ./install.sh --yes            no questions
 #   ./install.sh --dry-run        show the plan, change nothing
-#   ./install.sh --uninstall      remove the shell and its files, restore what it replaced
-#   ./install.sh --update         rebuild from this tree, keep every setting, no sudo (what
-#                                 `yami update` runs after checking the release)
+#   ./install.sh --uninstall      remove yami, restore what it replaced
+#   ./install.sh --update         rebuild from this tree, keep every setting, no sudo (`yami update`)
+#   ./install.sh --apply "files view …"   install exactly these modules (what the setup window runs)
 #
-# Choices (the interactive installer asks them; settings change them later):
-#   --lang en|ru|pt-BR     --palette blood|ash|sakura|amber|venom|ice|dusk     --theme dark|light
-#   --look matte|glass|light|solid     --font sans|pixel     --fetch mini|full
-#
-# Components: each on its own, --no-ID leaves it out, --ID takes it (defaults fit this machine;
-# an update repeats the choice):
-#   core    niri, portals, polkit, pipewire, network: what the shell needs
-#   files   yami-files: folders, the file dialog of every app, «show in folder»
-#   view    yami-view: pictures          play    yami-play: video and music (libmpv)
-#   login   our login screen (off when another login manager is set)
-#   apps    kitty, fastfetch, pavucontrol, btop
-#   drives  udisks2, gvfs: drives mount by themselves, phones, network shares
-#   tools   night light, screen text and QR (wlsunset, tesseract, zbar)
-#   games   GameMode and MangoHud (on when Steam is here)
-#   fork    yami-niri, built from source (5–25 min; off with less than 6 GB of memory or 4 threads)
-#   --shell-only     niri and the shell alone: none of the above, nothing of others restyled
-#   --restyle LIST   what yami may restyle in other programs (all, none, or a list of: gtk qt cursor
-#                    kitty fastfetch btop firefox mangohud foot cava starship); --no-restyle = none.
-#                    Kept in the shell's settings (themeApps), settings → color → apps changes it
-#   --no-sudo        the home folder only: no packages, no system files
-#
-# Rarely needed: --no-monocraft (skip the 31 MB terminal font), --no-count (do not count this
-# install, docs/SECURITY.md), --keep-build (keep the ~4 GB yami-niri sources), --no-anim,
-# --print-packages (the package lists for this distro, CI checks them).
+# Choices: --lang en|ru|pt-BR  --palette blood|ash|sakura|amber|venom|ice|dusk  --theme dark|light
+#   --look matte|glass|light|solid  --font sans|pixel  --fetch mini|full
+#   --restyle LIST (all, none, or: gtk qt cursor kitty fastfetch btop firefox mangohud foot cava starship)
+# Modules (with --full or --apply): files view play shot agents login apps drives tools games fork
+#   --no-ID leaves one out, --ID takes it. --no-sudo: the home folder only, no packages.
+# Rarely needed: --no-monocraft, --no-count, --keep-build, --no-anim, --print-packages.
 #
 # Families: Arch, Fedora (incl. atomic), Debian/Ubuntu, openSUSE, Void, Alpine, Gentoo. NixOS: the
-# flake (flake.nix, docs/PACKAGING.md); this script installs only the home folder there. Anything
-# replaced is kept next to itself as *.bak-DATE. Log: ~/.cache/yami/install.log. Each module in
-# installer/*.sh holds one job and adds its own steps (plan_*); this file is the flags and their order.
+# flake (docs/PACKAGING.md). Anything replaced is kept next to itself as *.bak-DATE.
+# Log: ~/.cache/yami/install.log. Each module in installer/*.sh holds one job.
 set -uo pipefail
 # the whole script is one block and the modules are read whole when sourced: bash parses all of it
 # before running, so an update of these files mid-run (git pull, an editor) cannot shift lines
@@ -88,12 +69,14 @@ MONOCRAFT_SHA256="67f88ff9e7c6560f6cf60fb062fd353a72f62dc2654462950c65b63ed53d97
 [[ -d $HOME/.cargo/bin ]] && export PATH="$HOME/.cargo/bin:$PATH"
 
 # ── flags ───────────────────────────────────────────────────────────────────
-YES=0 SUDO=1 SHELL_ONLY=0 RESTYLE="" COMP_FLAGS=() PALETTE="" LOOK_OPT="" THEME_OPT="" LANG_OPT="" FONT_OPT="" FETCH_OPT="" ANIM=1 DRY=0 UNINSTALL=0 UPDATE=0 COUNT=1 KEEP_BUILD=0 MONO="" PRINT_PKGS=0
+YES=0 SUDO=1 SHELL_ONLY=0 FULL=0 APPLY=0 APPLY_LIST="" RESTYLE="" COMP_FLAGS=() PALETTE="" LOOK_OPT="" THEME_OPT="" LANG_OPT="" FONT_OPT="" FETCH_OPT="" ANIM=1 DRY=0 UNINSTALL=0 UPDATE=0 COUNT=1 KEEP_BUILD=0 MONO="" PRINT_PKGS=0
 while (($#)); do
   case "$1" in
     -y | --yes) YES=1 ;;
     --no-sudo) SUDO=0 ;;
     --shell-only) SHELL_ONLY=1 ;;
+    --full) FULL=1 ;;
+    --apply) APPLY=1 APPLY_LIST="${2:-}" YES=1 ANIM=0; shift ;;
     --restyle) RESTYLE="${2:-}"; shift ;;
     --no-restyle) RESTYLE=none ;;
     --font) FONT_OPT="${2:-}"; shift ;;
@@ -120,11 +103,13 @@ while (($#)); do
   shift
 done
 [[ -t 0 && -t 1 ]] || { YES=1; ANIM=0; }
+# the first install is the base alone; the rest comes from the setup window
+((UPDATE || FULL || APPLY)) || SHELL_ONLY=1
 # git never asks for a login on the terminal: a moved or private repo fails instead of hanging
 export GIT_TERMINAL_PROMPT=0
 
 # ── the modules: each only defines (installer/*.sh) ─────────────────────────
-for m in ui detect root packages components restyle menu build apps desktop niri login uninstall summary; do
+for m in ui detect root packages components restyle choices modules build apps desktop niri login uninstall summary; do
   # shellcheck source=/dev/null
   . "$ROOT/installer/$m.sh" || { echo "yami: $ROOT/installer/$m.sh is missing" >&2; exit 1; }
 done
@@ -191,11 +176,24 @@ if ((UPDATE)); then
   summary_update
 fi
 
-if ((!YES)); then
-  printf '\e[H\e[J'
-  banner 1
-  ask_all
+# what the setup window asked for: only these modules, nothing of the base again
+if ((APPLY)); then
+  say "$(t "ставлю выбранное" "installing what you chose" "instalando o que você escolheu")"
+  root_begin
+  plan_packages
+  plan_login
+  plan_build
+  plan_apps
+  plan_apply_look
+  plan_record
+  run_steps
+  root_end
+  login_after
+  fork_after
+  summary_update
 fi
+
+((YES)) || welcome
 paint
 [[ -t 1 ]] && printf '\e[H\e[J'
 banner $((YES))

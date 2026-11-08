@@ -5,7 +5,7 @@
 # shellcheck shell=bash
 
 # the order of the components page; look is not on it (restyle.sh sets it)
-C_ID=(core files view play login apps drives tools games fork look)
+C_ID=(core files view play shot agents login apps drives tools games fork look)
 # components this installer offered last time: one that came later starts at its default on an
 # update instead of «off because it was not in the list»
 KNOWN_F="$STATE/components-known"
@@ -16,8 +16,8 @@ c_idx() { local i; for i in "${!C_ID[@]}"; do [[ ${C_ID[$i]} == "$1" ]] && { ech
 c_set() { local i; i="$(c_idx "$1")" && C_ON[i]=$2; }
 
 components_init() {
-  # core files view play login apps drives tools games fork look
-  C_ON=(1 1 1 1 "$LOGIN_ON" 1 1 1 "$GAMES_ON" "$FORK_ON" 1)
+  # core files view play shot agents login apps drives tools games fork look
+  C_ON=(1 1 1 1 1 1 "$LOGIN_ON" 1 1 1 "$GAMES_ON" "$FORK_ON" 1)
   COMP=""
   local known i f id
   if ((UPDATE)); then
@@ -36,9 +36,16 @@ components_init() {
       c_set fork 0
     fi
   fi
-  # --shell-only: niri and the shell, nothing else of ours, nothing of anyone else's restyled
+  # the first install is the base alone: the rest comes from the setup window (--full: everything now)
   if ((SHELL_ONLY)); then
     for i in "${!C_ID[@]}"; do [[ ${C_ID[$i]} == core ]] || C_ON[i]=0; done
+  fi
+  # the setup window sends the whole choice: what is not listed goes
+  if ((APPLY)); then
+    for i in "${!C_ID[@]}"; do
+      [[ ${C_ID[$i]} == core || ${C_ID[$i]} == look ]] && continue
+      if [[ " $APPLY_LIST " == *" ${C_ID[$i]} "* ]]; then C_ON[i]=1; else C_ON[i]=0; fi
+    done
   fi
   for f in "${COMP_FLAGS[@]}"; do
     id="${f%=*}"
@@ -56,6 +63,8 @@ c_name() {
     files) t "файлы (yami-files)" "files (yami-files)" "arquivos (yami-files)" ;;
     view) t "картинки (yami-view)" "images (yami-view)" "imagens (yami-view)" ;;
     play) t "плеер (yami-play)" "player (yami-play)" "player (yami-play)" ;;
+    shot) t "скриншоты (yami-shot)" "screenshots (yami-shot)" "capturas (yami-shot)" ;;
+    agents) t "службы (yami-agents)" "services (yami-agents)" "serviços (yami-agents)" ;;
     login) t "экран входа" "login screen" "tela de login" ;;
     apps) t "программы" "apps" "aplicativos" ;;
     drives) t "диски и телефоны" "drives and phones" "discos e telefones" ;;
@@ -71,6 +80,8 @@ c_desc() {
     files) t "файловый менеджер, диалог выбора файлов во всех программах, «показать в папке»; миниатюры видео, архивы" "the file manager, the file dialog of every app, «show in folder»; video thumbnails, archives" "o gerenciador de arquivos, o diálogo de arquivos de todos os aplicativos, «mostrar na pasta»; miniaturas de vídeo, arquivos compactados" ;;
     view) t "открывает картинки по умолчанию; быстрые правки: поворот, обрезка" "opens pictures by default; quick edits: rotate, crop" "abre imagens por padrão; edições rápidas: girar, recortar" ;;
     play) t "открывает видео и музыку по умолчанию (libmpv)" "opens videos and music by default (libmpv)" "abre vídeos e músicas por padrão (libmpv)" ;;
+    shot) t "заморозить экран, разметить, скопировать; текст и QR" "freeze the screen, mark up, copy; text and QR" "congelar a tela, anotar, copiar; texto e QR" ;;
+    agents) t "окна паролей, выбор экрана для трансляций, автоподключение" "password windows, the screen-share picker, automount" "janelas de senha, seleção de tela, montagem automática" ;;
     login) if [[ -n $OTHER_DM ]]; then t "свой, как экран блокировки: greetd + yami-greet, без Qt; заменит $OTHER_DM" "our own, like the lock screen: greetd + yami-greet, no Qt; replaces $OTHER_DM" "a nossa, como a tela de bloqueio: greetd + yami-greet, sem Qt; substitui $OTHER_DM"
       else t "свой, как экран блокировки: greetd + yami-greet, без Qt, вход в niri" "our own, like the lock screen: greetd + yami-greet, no Qt, logs into niri" "a nossa, como a tela de bloqueio: greetd + yami-greet, sem Qt, entra no niri"; fi ;;
     apps) t "kitty, fastfetch, pavucontrol, btop" "kitty, fastfetch, pavucontrol, btop" "kitty, fastfetch, pavucontrol, btop" ;;
@@ -92,7 +103,7 @@ c_shown() {
 }
 # packages or files outside the home folder; the rest installs into it (missing packages of those go
 # to packages-needed)
-needs_root() { case $1 in files | view | play | fork | look) return 1 ;; *) return 0 ;; esac; }
+needs_root() { case $1 in files | view | play | shot | agents | fork | look) return 1 ;; *) return 0 ;; esac; }
 can() { ! needs_root "$1" || ((SUDO)); }
 on() { local i; i="$(c_idx "$1")" || return 1; ((C_ON[i])); }
 off() { c_set "$1" 0; }

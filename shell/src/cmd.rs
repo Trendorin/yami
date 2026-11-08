@@ -501,6 +501,13 @@ pub fn run(args: &[String], me: &str) -> i32 {
         Some("doctor") if a.get(1) == Some(&"games") => crate::gameboost::doctor(&y),
         Some("doctor") => crate::doctor::run(&y),
         Some("report") => crate::report::run(&y, &a[1..]),
+        Some("setup") => match std::process::Command::new("yami-setup").status() {
+            Ok(s) => s.code().unwrap_or(1),
+            Err(_) => {
+                eprintln!(" {} {}", y.bad("✕"), crate::tf!("нет yami-setup: поставь заново install.sh", "yami-setup is missing: run install.sh again", "yami-setup ausente: rode install.sh de novo"));
+                1
+            }
+        },
         // распознавание живёт в модуле yami-shot
         Some("ocr") => match std::process::Command::new("yami-shot").arg("ocr").args(&a[1..]).status() {
             Ok(s) => s.code().unwrap_or(1),

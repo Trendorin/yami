@@ -6,14 +6,20 @@
 # shellcheck shell=bash
 
 plan_apps() {
+  if on shot; then add "$(t "скриншоты: yami-shot" "screenshots: yami-shot" "capturas: yami-shot")" true
+  elif may_drop && app_here yami-shot; then add "$(t "скриншоты: убрать yami-shot (не выбран)" "screenshots: remove yami-shot (not chosen)" "capturas: remover o yami-shot (não escolhido)")" drop_app yami-shot; fi
+  if on agents; then add "$(t "службы: yami-agents" "services: yami-agents" "serviços: yami-agents")" do_agents
+  elif may_drop && app_here yami-agents; then add "$(t "службы: убрать yami-agents (не выбран)" "services: remove yami-agents (not chosen)" "serviços: remover o yami-agents (não escolhido)")" drop_agents; fi
   if on files; then add "$(t "файлы: yami-files и диалог выбора файлов" "files: yami-files and the file dialog" "arquivos: yami-files e diálogo de arquivos")" do_files
-  elif app_here yami-files; then add "$(t "файлы: убрать yami-files (не выбран)" "files: remove yami-files (not chosen)" "arquivos: remover o yami-files (não escolhido)")" drop_files; fi
+  elif may_drop && app_here yami-files; then add "$(t "файлы: убрать yami-files (не выбран)" "files: remove yami-files (not chosen)" "arquivos: remover o yami-files (não escolhido)")" drop_files; fi
   if on view; then add "$(t "картинки: yami-view" "images: yami-view" "imagens: yami-view")" do_view
-  elif app_here yami-view; then add "$(t "картинки: убрать yami-view (не выбран)" "images: remove yami-view (not chosen)" "imagens: remover o yami-view (não escolhido)")" drop_app yami-view; fi
+  elif may_drop && app_here yami-view; then add "$(t "картинки: убрать yami-view (не выбран)" "images: remove yami-view (not chosen)" "imagens: remover o yami-view (não escolhido)")" drop_app yami-view; fi
   if on play; then add "$(t "плеер: yami-play" "player: yami-play" "player: yami-play")" do_play
-  elif app_here yami-play; then add "$(t "плеер: убрать yami-play (не выбран)" "player: remove yami-play (not chosen)" "player: remover o yami-play (não escolhido)")" drop_app yami-play; fi
+  elif may_drop && app_here yami-play; then add "$(t "плеер: убрать yami-play (не выбран)" "player: remove yami-play (not chosen)" "player: remover o yami-play (não escolhido)")" drop_app yami-play; fi
   return 0
 }
+# unticked modules go only when someone chose: a base install over an old one removes nothing
+may_drop() { ((UPDATE || FULL || APPLY)); }
 app_here() { [[ -e $BIN/$1 || -e ${XDG_DATA_HOME:-$HOME/.local/share}/applications/$1.desktop ]]; }
 # the .desktop file and the default for its MimeType list
 app_desktop() {
@@ -56,6 +62,24 @@ for l in lines:
 if out != lines:
     p.write_text("\n".join(out) + "\n")
 PY
+}
+
+# ── services: the screen-share portal backend and the agent process ─────────
+do_agents() {
+  local data="${XDG_DATA_HOME:-$HOME/.local/share}"
+  install -Dm644 "$ROOT/config/portal/yami-agents.portal" "$data/xdg-desktop-portal/portals/yami-agents.portal" || return 1
+  mkdir -p "$data/dbus-1/services"
+  sed "s|@BIN@|$BIN/yami-agents|" "$ROOT/config/portal/org.freedesktop.impl.portal.desktop.yamiagents.service" \
+    >"$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service"
+  # работающая служба переходит на новый бинарь, как только свободна, остановленная запускается
+  ((RUNNING_NIRI)) && "$BIN/yami-agents" --reload 2>/dev/null
+  return 0
+}
+drop_agents() {
+  local data="${XDG_DATA_HOME:-$HOME/.local/share}"
+  "$BIN/yami-agents" --version >/dev/null 2>&1 && pkill -x yami-agents 2>/dev/null
+  rm -f -- "$BIN/yami-agents" "$data/xdg-desktop-portal/portals/yami-agents.portal" "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service" "$CFG/yami/agents.json"
+  return 0
 }
 
 # ── files: yami-files as the folder handler, the portal file dialog ─────────

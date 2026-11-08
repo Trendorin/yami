@@ -118,7 +118,8 @@ impl W {
         W {
             page: Page::Hello,
             reveal: Instant::now(),
-            lang: look.lang.clone(),
+            // язык системы сразу отмечен на первой странице
+            lang: if yami_px::i18n::pt_br() { "pt-BR".into() } else if yami_px::i18n::translated() { "en".into() } else { "ru".into() },
             plain: false,
             accent: PRESETS.iter().find(|p| p.id == "ash").map_or(PRESETS[0].accent, |p| p.accent),
             light: false,

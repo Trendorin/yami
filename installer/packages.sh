@@ -143,8 +143,10 @@ plan_packages() {
   if on core || on apps || on drives || on files || on play || on look || on tools || on games || on login; then
     add "$(t "пакеты: обновить списки" "packages: refresh index" "pacotes: atualizar índice")" pm_refresh
   fi
-  on core && add "$(t "пакеты: niri" "packages: niri" "pacotes: niri")" pkgs "${P_niri[@]}"
-  on core && add "$(t "пакеты: сеанс и шелл" "packages: session and shell" "pacotes: sessão e shell")" pkgs "${P_base[@]}"
+  if ((!APPLY)) && on core; then
+    add "$(t "пакеты: niri" "packages: niri" "pacotes: niri")" pkgs "${P_niri[@]}"
+    add "$(t "пакеты: сеанс и шелл" "packages: session and shell" "pacotes: sessão e shell")" pkgs "${P_base[@]}"
+  fi
   # a working toolchain (rustup included) is kept: only the libraries and pkg-config are added
   local p need=()
   for p in "${P_build[@]}"; do
@@ -161,7 +163,7 @@ plan_packages() {
   on games && add "$(t "пакеты: GameMode, MangoHud" "packages: GameMode, MangoHud" "pacotes: GameMode e MangoHud")" pkgs "${P_games[@]}"
   on login && add "$(t "пакеты: greetd" "packages: greetd" "pacotes: greetd")" pkgs "${P_login[@]}"
   # niri's build libraries: for yami-niri, or for upstream niri when the packaged one is too old
-  if on fork || { on core && ! niri_ok && ((!DRY)); }; then
+  if on fork || { ((!APPLY)) && on core && ! niri_ok && ((!DRY)); }; then
     add "$(t "пакеты: сборка niri" "packages: niri build deps" "pacotes: dependências de compilação do niri")" pkgs "${P_nirisrc[@]}"
   fi
   return 0
