@@ -6,7 +6,7 @@
 # shellcheck shell=bash
 
 plan_apps() {
-  if on shot; then add "$(t "скриншоты: yami-shot" "screenshots: yami-shot" "capturas: yami-shot")" true
+  if on shot; then :
   elif may_drop && app_here yami-shot; then add "$(t "скриншоты: убрать yami-shot (не выбран)" "screenshots: remove yami-shot (not chosen)" "capturas: remover o yami-shot (não escolhido)")" drop_app yami-shot; fi
   if on agents; then add "$(t "службы: yami-agents" "services: yami-agents" "serviços: yami-agents")" do_agents
   elif may_drop && app_here yami-agents; then add "$(t "службы: убрать yami-agents (не выбран)" "services: remove yami-agents (not chosen)" "serviços: remover o yami-agents (não escolhido)")" drop_agents; fi
@@ -44,31 +44,47 @@ drop_app() {
 }
 # mimeapps.list without the given .desktop (xdg-mime default wrote it); other entries stay as they are
 mime_forget() {
-  python3 -I - "$CFG/mimeapps.list" "$1" <<'PY'
-import sys
-from pathlib import Path
-p, app = Path(sys.argv[1]), sys.argv[2]
-try:
-    lines = p.read_text().splitlines()
-except OSError:
-    sys.exit(0)
-out = []
-for l in lines:
-    k, eq, v = l.partition("=")
-    if eq and not l.startswith(("[", "#")) and app in v.split(";"):
-        rest = [a for a in v.split(";") if a and a != app]
-        if not rest:
-            continue
-        l = f"{k}={';'.join(rest)};"
-    out.append(l)
-if out != lines:
-    p.write_text("\n".join(out) + "\n")
-PY
+  local f="$CFG/mimeapps.list" tmp
+  [[ -f $f ]] || return 0
+  tmp="$f.yami-new"
+  awk -v app="$1" '
+    /^\[/ || /^#/ || index($0, "=") == 0 { print; next }
+    {
+      eq = index($0, "=")
+      n = split(substr($0, eq + 1), a, ";")
+      out = ""; hit = 0
+      for (i = 1; i <= n; i++) {
+        if (a[i] == app) hit = 1
+        else if (a[i] != "") out = out a[i] ";"
+      }
+      if (!hit) { print; next }
+      if (out != "") print substr($0, 1, eq) out
+    }
+  ' "$f" >"$tmp" && { cmp -s "$tmp" "$f" && rm -f -- "$tmp" || mv -f -- "$tmp" "$f"; }
+}
+
+# niri-portals.conf follows what is installed: file dialogs from yami-files, the screen-share picker from
+# yami-agents; a file of your own (no «# yami:» line) stays yours. The portal frontend reads it only at
+# its start, so a change restarts it
+portal_sync() {
+  local pc="$CFG/xdg-desktop-portal/niri-portals.conf" before=""
+  [[ -f $pc ]] && before="$(cat "$pc")"
+  if [[ ! -x $BIN/yami-files && ! -x $BIN/yami-agents ]]; then
+    head -1 "$pc" 2>/dev/null | grep -q '^# yami:' && rm -f -- "$pc"
+  else
+    "$BIN/yami-shell" config portals
+  fi
+  [[ "$before" == "$(cat "$pc" 2>/dev/null)" ]] && return 0
+  if ((SYSTEMD)) && systemctl --user is-active -q xdg-desktop-portal 2>/dev/null; then
+    busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig >/dev/null 2>&1
+    systemctl --user restart xdg-desktop-portal
+  fi
+  return 0
 }
 
 # ── services: the screen-share portal backend and the agent process ─────────
 do_agents() {
-  local data="${XDG_DATA_HOME:-$HOME/.local/share}" src pc="$CFG/xdg-desktop-portal/niri-portals.conf"
+  local data="${XDG_DATA_HOME:-$HOME/.local/share}" src
   src="$(m_src yami-agents)" || return 1
   install -Dm644 "$src/config/yami-agents.portal" "$data/xdg-desktop-portal/portals/yami-agents.portal" || return 1
   mkdir -p "$data/dbus-1/services"
@@ -76,20 +92,13 @@ do_agents() {
     >"$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service"
   # работающая служба переходит на новый бинарь, как только свободна, остановленная запускается
   ((RUNNING_NIRI)) && "$BIN/yami-agents" --reload 2>/dev/null
-  # до 2.8 показ экрана был у бэкенда yami: фронтенд читает конфиг только при старте
-  if grep -qs 'ScreenCast=yami;' "$pc" && head -1 "$pc" | grep -q '^# yami:'; then
-    sed -i 's/ScreenCast=yami;/ScreenCast=yami-agents;/' "$pc"
-    if ((SYSTEMD)) && systemctl --user is-active -q xdg-desktop-portal 2>/dev/null; then
-      systemctl --user restart xdg-desktop-portal
-    fi
-  fi
-  return 0
+  portal_sync
 }
 drop_agents() {
   local data="${XDG_DATA_HOME:-$HOME/.local/share}"
   "$BIN/yami-agents" --version >/dev/null 2>&1 && pkill -x yami-agents 2>/dev/null
   rm -f -- "$BIN/yami-agents" "$data/xdg-desktop-portal/portals/yami-agents.portal" "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service" "$CFG/yami/agents.json"
-  return 0
+  portal_sync
 }
 
 # ── files: yami-files as the folder handler, the portal file dialog ─────────
@@ -99,9 +108,6 @@ do_files() {
   app_desktop yami-files || return 1
   # xdg-desktop-portal: FileChooser → yami-files (browsers, Telegram, GTK/KDE apps)
   install -Dm644 "$src/config/yami.portal" "$data/xdg-desktop-portal/portals/yami.portal"
-  # which backend serves what: a niri-portals.conf of your own (no «# yami:» line) stays yours
-  local pc="$CFG/xdg-desktop-portal/niri-portals.conf"
-  if [[ ! -e $pc ]] || head -1 "$pc" | grep -q '^# yami:'; then install -Dm644 "$ROOT/config/portal/niri-portals.conf" "$pc"; fi
   mkdir -p "$data/dbus-1/services"
   sed "s|@BIN@|$BIN/yami-files|" "$src/config/org.freedesktop.impl.portal.desktop.yami.service" \
     >"$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yami.service"
@@ -115,7 +121,7 @@ do_files() {
     [[ -f $prof/prefs.js ]] || continue
     grep -qs 'use-xdg-desktop-portal.file-picker' "$prof/user.js" ||
       printf '// yami: file dialogs through the portal (yami-files)\nuser_pref("widget.use-xdg-desktop-portal.file-picker", 1);\n' >>"$prof/user.js"
-  done < <(python3 -I "$ROOT/tools/theme.py" --profiles 2>/dev/null)
+  done < <("$BIN/yami-shell" recolor --profiles 2>/dev/null)
   # the backend left from the previous build moves to the new binary as soon as no screencast or
   # file dialog is open (a running stream is not cut), and is started when it is not running:
   # xdg-desktop-portal takes ScreenCast's source types from the live backend, without it OBS and
@@ -124,25 +130,14 @@ do_files() {
   if ((RUNNING_NIRI)) || pgrep -f '^[^ ]*yami-files --portal$' >/dev/null; then
     "$BIN/yami-files" --portal-reload 2>/dev/null
   fi
-  # a first install: the portal frontend reads niri-portals.conf only when it starts
-  if ((!UPDATE && SYSTEMD)) && systemctl --user is-active -q xdg-desktop-portal 2>/dev/null; then
-    busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig >/dev/null 2>&1
-    systemctl --user restart xdg-desktop-portal
-  fi
-  return 0
+  portal_sync
 }
-# yami-files unchecked: the backend stops, the portal and D-Bus files go (dialogs fall back to GTK),
-# niri-portals.conf goes if it is ours
+# yami-files unchecked: the backend stops, the portal and D-Bus files go (dialogs fall back to GTK)
 drop_files() {
-  local data="${XDG_DATA_HOME:-$HOME/.local/share}" pc="$CFG/xdg-desktop-portal/niri-portals.conf"
+  local data="${XDG_DATA_HOME:-$HOME/.local/share}"
   pkill -f "^$BIN/yami-files --portal" 2>/dev/null
   drop_app yami-files
   rm -f -- "$data/xdg-desktop-portal/portals/yami.portal" "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yami.service" \
     "$data/dbus-1/services/org.freedesktop.FileManager1.service"
-  head -1 "$pc" 2>/dev/null | grep -q '^# yami:' && rm -f -- "$pc"
-  if ((SYSTEMD)) && systemctl --user is-active -q xdg-desktop-portal 2>/dev/null; then
-    busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig >/dev/null 2>&1
-    systemctl --user restart xdg-desktop-portal
-  fi
-  return 0
+  portal_sync
 }

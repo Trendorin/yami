@@ -5,7 +5,10 @@
 # shellcheck shell=bash
 
 # the order of the components page; look is not on it (restyle.sh sets it)
-C_ID=(core files view play shot agents login apps drives tools games fork look)
+C_ID=(core files view play shot agents login games fork look)
+# groups of packages that used to be components: their packages now come with core (apps, the night
+# light) or with what uses them (drives with files and agents, text and QR with shot)
+C_RETIRED=" apps drives tools "
 # components this installer offered last time: one that came later starts at its default on an
 # update instead of «off because it was not in the list»
 KNOWN_F="$STATE/components-known"
@@ -16,20 +19,19 @@ c_idx() { local i; for i in "${!C_ID[@]}"; do [[ ${C_ID[$i]} == "$1" ]] && { ech
 c_set() { local i; i="$(c_idx "$1")" && C_ON[i]=$2; }
 
 components_init() {
-  # core files view play shot agents login apps drives tools games fork look
-  C_ON=(1 1 1 1 1 1 "$LOGIN_ON" 1 1 1 "$GAMES_ON" "$FORK_ON" 1)
+  # core files view play shot agents login games fork look
+  C_ON=(1 1 1 1 1 1 "$LOGIN_ON" "$GAMES_ON" "$FORK_ON" 1)
   COMP=""
   local known i f id
-  if ((UPDATE)); then
-    [[ -f $INSTALLED ]] && COMP="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1])).get("components",""))' "$INSTALLED" 2>/dev/null)"
+  if ((UPDATE || REPAIR)); then
+    [[ -f $INSTALLED ]] && COMP="$(json_field "$INSTALLED" components 2>/dev/null)"
     if [[ -n $COMP ]]; then
-      # files, view, play and drives came in 2.7: before that they went with core and apps
+      # files, view, play came in 2.7: before that they went with core
       known="$(cat "$KNOWN_F" 2>/dev/null || echo "core apps look login fork")"
       for i in "${!C_ID[@]}"; do
         if [[ " $COMP " == *" ${C_ID[$i]} "* ]]; then C_ON[i]=1
         elif [[ " $known " == *" ${C_ID[$i]} "* ]]; then C_ON[i]=0; fi
       done
-      [[ " $known " == *" drives "* ]] || c_set drives "$(on apps && echo 1 || echo 0)"
     elif [[ ! -x $HOME/.local/lib/yami-niri/current/niri ]]; then
       # no record of the choice (a home-only install of an old version): the fork, a 5–25 minute
       # build and ~4 GB, only for those who already run it
@@ -40,15 +42,19 @@ components_init() {
   if ((SHELL_ONLY)); then
     for i in "${!C_ID[@]}"; do [[ ${C_ID[$i]} == core ]] || C_ON[i]=0; done
   fi
-  # the setup window sends the whole choice: what is not listed goes
+  # the setup window sends the whole choice: what is not listed goes. Games are not on its list
+  # unless Steam is here: they keep their default
   if ((APPLY)); then
     for i in "${!C_ID[@]}"; do
       [[ ${C_ID[$i]} == core || ${C_ID[$i]} == look ]] && continue
+      [[ ${C_ID[$i]} == games && " $APPLY_LIST " != *" games "* ]] && continue
       if [[ " $APPLY_LIST " == *" ${C_ID[$i]} "* ]]; then C_ON[i]=1; else C_ON[i]=0; fi
     done
   fi
   for f in "${COMP_FLAGS[@]}"; do
     id="${f%=*}"
+    # an old script may still pass them
+    [[ $C_RETIRED == *" $id "* ]] && continue
     if [[ $id == look ]] || ! c_idx "$id" >/dev/null; then
       if [[ ${f#*=} == 0 ]]; then echo "unknown option: --no-$id (see --help)" >&2; else echo "unknown option: --$id (see --help)" >&2; fi
       exit 2
@@ -66,9 +72,6 @@ c_name() {
     shot) t "скриншоты (yami-shot)" "screenshots (yami-shot)" "capturas (yami-shot)" ;;
     agents) t "службы (yami-agents)" "services (yami-agents)" "serviços (yami-agents)" ;;
     login) t "экран входа" "login screen" "tela de login" ;;
-    apps) t "программы" "apps" "aplicativos" ;;
-    drives) t "диски и телефоны" "drives and phones" "discos e telefones" ;;
-    tools) t "инструменты" "tools" "ferramentas" ;;
     games) t "игры" "games" "jogos" ;;
     fork) t "yami-niri (форк)" "yami-niri (fork)" "yami-niri (fork)" ;;
     look) t "тема Qt и GTK" "Qt and GTK theme" "tema Qt e GTK" ;;
@@ -76,17 +79,14 @@ c_name() {
 }
 c_desc() {
   case $1 in
-    core) t "niri, порталы, polkit, pipewire, сеть, bluetooth, буфер, скриншоты — шеллу без них не жить" "niri, portals, polkit, pipewire, network, bluetooth, clipboard, screenshots: the shell needs them" "niri, portais, polkit, pipewire, rede, bluetooth, área de transferência e capturas: o shell precisa deles" ;;
-    files) t "файловый менеджер, диалог выбора файлов во всех программах, «показать в папке»; миниатюры видео, архивы" "the file manager, the file dialog of every app, «show in folder»; video thumbnails, archives" "o gerenciador de arquivos, o diálogo de arquivos de todos os aplicativos, «mostrar na pasta»; miniaturas de vídeo, arquivos compactados" ;;
+    core) t "niri, порталы, polkit, pipewire, сеть, bluetooth, буфер, терминал, btop, ночной свет — шеллу без них не жить" "niri, portals, polkit, pipewire, network, bluetooth, clipboard, a terminal, btop, the night light: the shell needs them" "niri, portais, polkit, pipewire, rede, bluetooth, área de transferência, um terminal, btop, luz noturna: o shell precisa deles" ;;
+    files) t "файловый менеджер, диалог выбора файлов во всех программах, «показать в папке»; миниатюры, архивы, флешки, телефоны, сетевые папки" "the file manager, the file dialog of every app, «show in folder»; thumbnails, archives, drives, phones, network shares" "o gerenciador de arquivos, o diálogo de arquivos de todos os aplicativos, «mostrar na pasta»; miniaturas, compactados, pendrives, telefones, pastas de rede" ;;
     view) t "открывает картинки по умолчанию; быстрые правки: поворот, обрезка" "opens pictures by default; quick edits: rotate, crop" "abre imagens por padrão; edições rápidas: girar, recortar" ;;
     play) t "открывает видео и музыку по умолчанию (libmpv)" "opens videos and music by default (libmpv)" "abre vídeos e músicas por padrão (libmpv)" ;;
-    shot) t "заморозить экран, разметить, скопировать; текст и QR" "freeze the screen, mark up, copy; text and QR" "congelar a tela, anotar, copiar; texto e QR" ;;
+    shot) t "заморозить экран, разметить, скопировать; текст и QR (tesseract, zbar)" "freeze the screen, mark up, copy; text and QR (tesseract, zbar)" "congelar a tela, anotar, copiar; texto e QR (tesseract, zbar)" ;;
     agents) t "окна паролей, выбор экрана для трансляций, автоподключение" "password windows, the screen-share picker, automount" "janelas de senha, seleção de tela, montagem automática" ;;
     login) if [[ -n $OTHER_DM ]]; then t "свой, как экран блокировки: greetd + yami-greet, без Qt; заменит $OTHER_DM" "our own, like the lock screen: greetd + yami-greet, no Qt; replaces $OTHER_DM" "a nossa, como a tela de bloqueio: greetd + yami-greet, sem Qt; substitui $OTHER_DM"
       else t "свой, как экран блокировки: greetd + yami-greet, без Qt, вход в niri" "our own, like the lock screen: greetd + yami-greet, no Qt, logs into niri" "a nossa, como a tela de bloqueio: greetd + yami-greet, sem Qt, entra no niri"; fi ;;
-    apps) t "kitty, fastfetch, pavucontrol, btop" "kitty, fastfetch, pavucontrol, btop" "kitty, fastfetch, pavucontrol, btop" ;;
-    drives) t "udisks2 и gvfs: флешки монтируются сами, телефоны, камеры, сетевые папки" "udisks2 and gvfs: drives mount by themselves, phones, cameras, network shares" "udisks2 e gvfs: pendrives montam sozinhos, telefones, câmeras, pastas de rede" ;;
-    tools) t "ночной свет (wlsunset), текст и QR со скриншота (tesseract, zbar)" "night light (wlsunset), text and QR from screenshots (tesseract, zbar)" "luz noturna (wlsunset), texto e QR de capturas de tela (tesseract, zbar)" ;;
     games) t "GameMode и MangoHud в палитре" "GameMode and MangoHud in the palette" "GameMode e MangoHud na paleta" ;;
     fork)
       if ((LIGHT)); then t "наш niri из исходников: здесь ($MEM_GB ГБ, $THREADS потоков) сборка идёт около часа, поэтому выключен; пакетный niri — тот же стол" "our niri from source: here ($MEM_GB GB, $THREADS threads) the build takes about an hour, so it is off; the packaged niri is the same desktop" "nosso niri compilado: aqui ($MEM_GB GB, $THREADS threads) a compilação leva cerca de uma hora, por isso está desativada; o niri do pacote oferece o mesmo desktop"
@@ -104,6 +104,7 @@ c_shown() {
 # packages or files outside the home folder; the rest installs into it (missing packages of those go
 # to packages-needed)
 needs_root() { case $1 in files | view | play | shot | agents | fork | look) return 1 ;; *) return 0 ;; esac; }
+# the packages of a component are optional: without sudo they go to packages-needed
 can() { ! needs_root "$1" || ((SUDO)); }
 on() { local i; i="$(c_idx "$1")" || return 1; ((C_ON[i])); }
 off() { c_set "$1" 0; }

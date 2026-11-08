@@ -16,9 +16,10 @@
 # Choices: --lang en|ru|pt-BR  --palette blood|ash|sakura|amber|venom|ice|dusk  --theme dark|light
 #   --look matte|glass|light|solid  --font sans|pixel  --fetch mini|full
 #   --restyle LIST (all, none, or: gtk qt cursor kitty fastfetch btop firefox mangohud foot cava starship)
-# Modules (with --full or --apply): files view play shot agents login apps drives tools games fork
+# Modules (with --full or --apply): files view play shot agents login games fork
 #   --no-ID leaves one out, --ID takes it. --no-sudo: the home folder only, no packages.
 # Rarely needed: --no-monocraft, --no-count, --keep-build, --no-anim, --print-packages.
+# Run again over an installed yami: it updates and repairs, your choices and settings stay.
 #
 # Families: Arch, Fedora (incl. atomic), Debian/Ubuntu, openSUSE, Void, Alpine, Gentoo. NixOS: the
 # flake (docs/PACKAGING.md). Anything replaced is kept next to itself as *.bak-DATE.
@@ -33,12 +34,34 @@ YAMI_REPO="${YAMI_REPO:-https://github.com/Trendorin/yami.git}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
 if [[ ! -f $ROOT/shell/Cargo.toml || ! -f $ROOT/installer/ui.sh ]]; then
   SRC_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/yami/src"
-  command -v git >/dev/null || { echo "yami: git is needed to fetch the installer (install git first)" >&2; exit 1; }
+  if ! command -v git >/dev/null; then
+    # a bare system: git is the one thing needed before the installer proper
+    pm="" su=""
+    for c in "pacman -S --needed --noconfirm git" "dnf install -y git" "apt-get install -y git" "zypper --non-interactive install git" "xbps-install -y git" "apk add git"; do
+      command -v "${c%% *}" >/dev/null && { pm=$c; break; }
+    done
+    if ((EUID != 0)); then
+      if command -v sudo >/dev/null; then su=sudo; elif command -v doas >/dev/null; then su=doas; fi
+    fi
+    if [[ -n $pm ]] && { ((EUID == 0)) || [[ -n $su ]]; } && { : </dev/tty; } 2>/dev/null; then
+      echo "yami: git is needed to fetch the installer, installing it (the administrator password is asked once more later)" >&2
+      # shellcheck disable=SC2086 # the command and its arguments
+      $su $pm </dev/tty || { echo "yami: could not install git; install it yourself and run this again: $su $pm" >&2; exit 1; }
+    else
+      echo "yami: git is needed to fetch the installer; install it and run this again${pm:+: $su $pm}" >&2
+      exit 1
+    fi
+  fi
   if [[ -d $SRC_DIR/.git ]]; then
-    # a clone of an older address follows the current one
+    # a clone of an older address follows the current one; it may stand on a release tag
     [[ "$(git -C "$SRC_DIR" remote get-url origin 2>/dev/null)" == "$YAMI_REPO" ]] || git -C "$SRC_DIR" remote set-url origin "$YAMI_REPO"
-    git -C "$SRC_DIR" pull --ff-only --quiet || echo "yami: could not update $SRC_DIR, using it as is" >&2
+    if git -C "$SRC_DIR" fetch --quiet origin main; then
+      git -C "$SRC_DIR" checkout --quiet --detach FETCH_HEAD || echo "yami: could not update $SRC_DIR, using it as is" >&2
+    else
+      echo "yami: could not update $SRC_DIR, using it as is" >&2
+    fi
   else
+    echo "yami: downloading the installer…" >&2
     mkdir -p "${SRC_DIR%/*}"
     # history without file contents: small like --depth 1, but updates can compare versions
     git clone --filter=blob:none "$YAMI_REPO" "$SRC_DIR" || { echo "yami: git clone $YAMI_REPO failed" >&2; exit 1; }
@@ -69,7 +92,7 @@ MONOCRAFT_SHA256="67f88ff9e7c6560f6cf60fb062fd353a72f62dc2654462950c65b63ed53d97
 [[ -d $HOME/.cargo/bin ]] && export PATH="$HOME/.cargo/bin:$PATH"
 
 # ── flags ───────────────────────────────────────────────────────────────────
-YES=0 SUDO=1 SHELL_ONLY=0 FULL=0 APPLY=0 APPLY_LIST="" RESTYLE="" COMP_FLAGS=() PALETTE="" LOOK_OPT="" THEME_OPT="" LANG_OPT="" FONT_OPT="" FETCH_OPT="" ANIM=1 DRY=0 UNINSTALL=0 UPDATE=0 COUNT=1 KEEP_BUILD=0 MONO="" PRINT_PKGS=0
+YES=0 SUDO=1 SHELL_ONLY=0 FULL=0 APPLY=0 REPAIR=0 APPLY_LIST="" RESTYLE="" COMP_FLAGS=() PALETTE="" LOOK_OPT="" THEME_OPT="" LANG_OPT="" FONT_OPT="" FETCH_OPT="" ANIM=1 DRY=0 UNINSTALL=0 UPDATE=0 COUNT=1 KEEP_BUILD=0 MONO="" PRINT_PKGS=0
 while (($#)); do
   case "$1" in
     -y | --yes) YES=1 ;;
@@ -103,13 +126,17 @@ while (($#)); do
   shift
 done
 [[ -t 0 && -t 1 ]] || { YES=1; ANIM=0; }
-# the first install is the base alone; the rest comes from the setup window
-((UPDATE || FULL || APPLY)) || SHELL_ONLY=1
+# the first install is the base alone; the rest comes from the setup window. Run again over an
+# installed yami it is a repair: the same choice, nothing is dropped and no first-run window
+if ((!UPDATE && !FULL && !APPLY && !UNINSTALL)) && [[ -f $STATE/install.json && -x $BIN/yami-shell ]]; then
+  REPAIR=1
+fi
+((UPDATE || FULL || APPLY || REPAIR)) || SHELL_ONLY=1
 # git never asks for a login on the terminal: a moved or private repo fails instead of hanging
 export GIT_TERMINAL_PROMPT=0
 
 # ── the modules: each only defines (installer/*.sh) ─────────────────────────
-for m in ui detect root packages components restyle choices modules build apps desktop niri login uninstall summary; do
+for m in ui json detect root packages components restyle choices modules build apps desktop niri login backup uninstall summary; do
   # shellcheck source=/dev/null
   . "$ROOT/installer/$m.sh" || { echo "yami: $ROOT/installer/$m.sh is missing" >&2; exit 1; }
 done
@@ -138,7 +165,7 @@ if [[ -n $LANG_OPT ]]; then
   L="$(lang_code "$LANG_OPT")"
   [[ -n $L ]] || { echo "--lang: en, ru or pt-BR" >&2; exit 2; }
 elif ((UPDATE)) && [[ -f $SET_JSON ]]; then
-  L="$(lang_code "$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1])).get("lang",""))' "$SET_JSON" 2>/dev/null)")"
+  L="$(lang_code "$(json_field "$SET_JSON" lang 2>/dev/null)")"
 fi
 if [[ -z $L ]]; then
   L="$(lang_code "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}")"
@@ -166,6 +193,7 @@ components_limit
 if ((UPDATE)); then
   # rebuild from this tree with the choices of the first install; no packages, no sudo
   say "$(t "обновление из" "update from" "atualizar de") $ROOT"
+  plan_snapshot # backup.sh: the rollback point
   plan_fetch    # modules.sh: each module's source, signature checked
   plan_build    # build.sh: the shell and the chosen apps
   plan_apps     # apps.sh: the modules' files (or out, when unticked)
@@ -181,8 +209,9 @@ fi
 if ((APPLY)); then
   say "$(t "ставлю выбранное" "installing what you chose" "instalando o que você escolheu")"
   root_begin
-  plan_fetch
+  plan_snapshot
   plan_packages
+  plan_fetch
   plan_login
   plan_build
   plan_apps
@@ -200,10 +229,11 @@ paint
 [[ -t 1 ]] && printf '\e[H\e[J'
 banner $((YES))
 root_begin      # root.sh: the password once
-plan_fetch      # modules.sh: the source of each chosen module
+plan_snapshot   # backup.sh: only over an installed yami
 
 # root steps first: the root shell closes before the build (run_steps, root.sh)
-plan_packages   # packages.sh
+plan_packages   # packages.sh (git and ssh-keygen too: the next step needs them)
+plan_fetch      # modules.sh: the source of each chosen module
 plan_niri       # niri.sh: upstream niri when the packaged one is too old
 plan_services   # desktop.sh
 plan_login      # login.sh: greetd (the last root step)

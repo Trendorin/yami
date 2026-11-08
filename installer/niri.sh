@@ -16,7 +16,7 @@ fork_after() {
     return 0
   fi
   ((!BUILD_FAILED)) || return 0
-  if ((UPDATE)); then
+  if ((UPDATE || REPAIR)); then
     # an update builds it only when the patch series moved and nothing else failed
     ((${#FAILED[@]} == 0)) && fork_stale || return 0
     say "$(t "yami-niri: новая серия патчей — сборка (5–25 минут)" "yami-niri: a new patch series, building (5–25 minutes)" "yami-niri: nova série de patches, compilando (5–25 minutos)")"

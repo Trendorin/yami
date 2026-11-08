@@ -44,7 +44,7 @@ root_begin() {
   ((SUDO && !DRY)) && [[ -n $SU ]] || return 0
   say "$(t "нужен пароль администратора — один раз на всю установку" "the administrator password, once for the whole install" "a senha de administrador, uma vez para toda a instalação")"
   if ! root_start; then
-    if $SU true; then
+    if su_true; then
       # the password is right but the root shell did not come up (an unusual sudo setup): every
       # root command asks on its own, the steps run in the foreground so the prompts are seen
       warn "$(t "общий root-сеанс не поднялся — пароль может спрашиваться не раз" "the shared root session did not start: the password may be asked more than once" "a sessão root compartilhada não iniciou: a senha pode ser solicitada mais de uma vez")"
@@ -63,7 +63,11 @@ root_end() {
   [[ $SU == asroot ]] || return 0
   root_stop
   SU=$ROOT_TOOL
+  # the setup window: no terminal, the password comes from its askpass
+  [[ $SU == sudo && -n ${SUDO_ASKPASS:-} ]] && SU="sudo -A"
+  return 0
 }
+su_true() { if [[ $SU == sudo && -n ${SUDO_ASKPASS:-} ]]; then sudo -A true; else $SU true; fi; }
 asroot() {
   local q rc me=$BASHPID
   [[ -n $ROOT_W ]] || return 1

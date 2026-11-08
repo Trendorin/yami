@@ -14,12 +14,13 @@ greet_script() {
 
 # the root half is the last root step (run_steps closes the root shell before the build)
 plan_login() {
+  ((REPAIR)) && return 0
   on login && add "$(t "экран входа: greetd, вид и страховка" "login screen: greetd, look and safety net" "tela de login: greetd, aparência e rede de segurança")" do_greet
   return 0
 }
 # after the steps: the binary (an update only offers it, login_offer)
 login_after() {
-  if ((UPDATE)); then
+  if ((UPDATE || REPAIR)); then
     login_offer
     return 0
   fi
@@ -40,23 +41,24 @@ greet_stale() {
 # failed build never leaves the machine without a login
 do_greet() {
   command -v greetd >/dev/null || return 1
-  local acc=(--accent "#${PAL_HEX[$pal]}")
-  ((theme == 1)) && acc+=(--light)
-  # the pixel cursor on the login screen too: niri there reads /usr/share/icons only
-  rm -rf -- "$CACHE/yami-cursor"
-  python3 -I "$ROOT/tools/theme.py" --cursor-to "$CACHE/yami-cursor" "${acc[@]}" || return 1
   if ((SYSTEMD)) && [[ -n $OTHER_DM && ! -s $STATE/login-dm ]]; then
     # the login manager it replaces, from the next boot (this session is untouched); --uninstall brings it back
     mkdir -p "$STATE" && printf '%s\n' "$OTHER_DM" >"$STATE/login-dm"
   fi
-  $SU "$(greet_script)" --system "$(id -un)" --cursor "$CACHE/yami-cursor" || return 1
-  rm -rf -- "$CACHE/yami-cursor"
+  $SU "$(greet_script)" --system "$(id -un)" || return 1
 }
 # after the build: the binary, root-owned in /usr/local/bin (the root shell is closed by then: the
 # password is asked once more), and the shell's look for it
 greet_bin() {
   [[ -x $CACHE/target/release/yami-greet ]] || return 1
-  $SU "$(greet_script)" --system "$(id -un)" --bin "$CACHE/target/release/yami-greet" --bin-only || return 1
+  # the pixel cursor on the login screen too: niri there reads /usr/share/icons only; the shell draws
+  # it, so it comes after the build
+  local acc=(--accent "#${PAL_HEX[$pal]}") cur=()
+  ((theme == 1)) && acc+=(--light)
+  rm -rf -- "$CACHE/yami-cursor"
+  if "$BIN/yami-shell" recolor --cursor-to "$CACHE/yami-cursor" "${acc[@]}"; then cur=(--cursor "$CACHE/yami-cursor"); fi
+  $SU "$(greet_script)" --system "$(id -un)" --bin "$CACHE/target/release/yami-greet" "${cur[@]}" --bin-only || return 1
+  rm -rf -- "$CACHE/yami-cursor"
   "$BIN/yami-shell" login sync >/dev/null 2>&1 || true
 }
 

@@ -25,24 +25,24 @@ FETCH_ID=(mini full)
 # index of $2 in the array named $1, or nothing
 idx_of() { local -n a=$1; local i; for i in "${!a[@]}"; do [[ ${a[$i]} == "$2" ]] && { echo "$i"; return 0; }; done; return 1; }
 
+# a number of the settings in percent, the default when it is not one
+pct_of() { # key default
+  local v
+  v="$(json_field "$SET_JSON" "$1")" || v=$2
+  [[ $v =~ ^-?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$ ]] || v=$2
+  awk -v v="$v" 'BEGIN { printf "%d", v * 100 + 0.5 }'
+}
 # flags first, then what the settings file already says (one read), else the defaults
 choices_init() {
   pal=0 look=0 theme=0 font=0 fetch=0 LOOK_SET=0 THEME_SET=0 FETCH_SET=0
   local cur=() i
   if [[ -f $SET_JSON ]]; then
-    # palette, glass lift inner (percent), light, app font, fastfetch
-    read -r -a cur < <(python3 -I -c '
-import json, sys
-try:
-    d = json.load(open(sys.argv[1]))
-except (OSError, ValueError):
-    d = {}
-d = d if isinstance(d, dict) else {}
-num = lambda k, v: round(float(d.get(k, v)) * 100) if isinstance(d.get(k, v), (int, float)) else round(v * 100)
-# an older install without fontUi had the pixel font in apps
-pixel = "fontUi" not in d or d.get("fontUi") == ""
-print(d.get("palette") or "-", num("glass", 0.78), num("lift", 0), num("inner", 1), int(bool(d.get("light"))), int(pixel), int(bool(d.get("fetchFull"))))
-' "$SET_JSON" 2>/dev/null)
+    # palette, glass lift inner (percent), light, app font (an older install without fontUi had the
+    # pixel font in apps), fastfetch
+    local pa ui pixel=1
+    pa="$(json_field "$SET_JSON" palette)" || pa=""
+    if ui="$(json_field "$SET_JSON" fontUi)" && [[ -n $ui ]]; then pixel=0; fi
+    cur=("${pa:--}" "$(pct_of glass 0.78)" "$(pct_of lift 0)" "$(pct_of inner 1)" "$(json_true "$SET_JSON" light && echo 1 || echo 0)" "$pixel" "$(json_true "$SET_JSON" fetchFull && echo 1 || echo 0)")
   fi
   if [[ -n $PALETTE ]]; then
     pal="$(idx_of PAL_ID "$PALETTE")" || { echo "--palette: ${PAL_ID[*]}" >&2; exit 2; }

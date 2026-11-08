@@ -27,14 +27,23 @@ do_fetch_module() {
   dir="$(m_fetch "$1")" || return 1
   printf '%s\n' "$dir" >"$CACHE/src-$1"
 }
-# первым делом: дальше root-шаги и сборка берут всё из готовых папок
-plan_fetch() {
+# выбранные модули: одной строкой на экране; дальше root-шаги и сборка берут всё из готовых папок
+fetch_list() {
   local id repo
   for id in files view play shot agents login fork; do
     wants "$id" || continue
-    repo="$(m_repo "$id")" || continue
-    add "$(t "исходники:" "sources:" "código-fonte:") $repo" do_fetch_module "$repo"
+    repo="$(m_repo "$id")" && printf '%s\n' "$repo"
   done
+}
+do_fetch_modules() {
+  local repo
+  for repo in $(fetch_list); do
+    echo "$repo"
+    do_fetch_module "$repo" || return 1
+  done
+}
+plan_fetch() {
+  [[ -n "$(fetch_list)" ]] && add "$(t "исходники модулей" "module sources" "código-fonte dos módulos")" do_fetch_modules
   return 0
 }
 
@@ -53,6 +62,10 @@ m_fetch() {
   else
     mkdir -p "${dir%/*}"
     git clone --quiet --filter=blob:none "$YAMI_MODULES_URL/$repo.git" "$dir" >&2 || return 1
+  fi
+  if ! git -C "$dir" rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+    echo "$repo $tag: no such version in its repository" >&2
+    return 1
   fi
   # подпись проверяется ключами из этой копии шелла: подмена модуля не пройдёт вместе с ним
   if ! git -C "$dir" -c gpg.format=ssh -c "gpg.ssh.allowedSignersFile=$ROOT/keys/allowed_signers" verify-tag "$tag" >/dev/null 2>&1; then

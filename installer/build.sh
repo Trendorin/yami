@@ -1,6 +1,8 @@
-# Rust (the distro's if new enough, else rustup into ~/.cargo) and the build of
-# the shell and of each chosen module into the cache, then the binaries into ~/.local/bin, each swapped
-# in whole. The login screen's binary goes to /usr/local/bin (login.sh).
+# Rust (the distro's if new enough, else rustup into ~/.cargo) and the build of the shell and of each
+# chosen module into the cache. Nothing reaches ~/.local/bin until every build has passed: then all
+# binaries are swapped in one step (do_install_bins), so a failed module cannot leave a new shell with
+# old modules. A module whose source has not changed since it was installed is not rebuilt. The login
+# screen's binary goes to /usr/local/bin (login.sh).
 # shellcheck shell=bash
 
 plan_build() {
@@ -11,6 +13,7 @@ plan_build() {
     on "$id" && add "$(t "сборка:" "build:" "compilar:") yami-$id" do_build_module "$id"
   done
   wants login && add "$(t "сборка:" "build:" "compilar:") yami-greet" do_build_greet
+  add "$(t "ставлю собранное" "installing what was built" "instalando o que foi compilado")" do_install_bins
   return 0
 }
 
@@ -51,20 +54,55 @@ cargo_build() {
 # copy leaves the previous binary in place, never half of a new one
 put_bin() { install -Dm755 "$CACHE/target/release/$1" "$BIN/.$1.new" && mv -f "$BIN/.$1.new" "$BIN/$1" || { rm -f "$BIN/.$1.new"; return 1; }; }
 
+# the commit of a source tree; nothing for a tree with edits (never counted as unchanged)
+src_rev() { [[ -z "$(git -C "$1" status --porcelain --untracked-files=no 2>/dev/null)" ]] && git -C "$1" rev-parse HEAD 2>/dev/null; }
+# this exact source is what is installed: no need to build it again (a repair rebuilds anyway)
+src_installed() { # binary source-tree
+  local rev
+  ((!REPAIR)) && [[ -x $BIN/$1 ]] && rev="$(src_rev "$2")" && [[ -n $rev && "$(cat "$STATE/built/$1" 2>/dev/null)" == "$rev" ]]
+}
+# built and waiting for do_install_bins: the commit it came from, or «-» for a tree with edits
+built_mark() { # binary source-tree
+  local rev
+  rev="$(src_rev "$2")"
+  printf '%s\n' "${rev:--}" >"$CACHE/built-$1"
+}
 do_build_shell() {
+  rm -f "$CACHE/built-yami-shell" "$CACHE/built-yami-setup"
+  if src_installed yami-shell "$ROOT" && [[ -x $BIN/yami-setup ]]; then return 99; fi
   need_rust || return 1
   cargo_build "$ROOT/shell/Cargo.toml" -p yami-shell -p yami-setup || return 1
-  put_bin yami-shell && put_bin yami-setup || return 1
-  # `yami <command>`: the same binary, help instead of the shell when started without a command
-  ln -sfn yami-shell "$BIN/yami"
+  built_mark yami-shell "$ROOT"
+  built_mark yami-setup "$ROOT"
 }
 do_build_module() {
-  need_rust || return 1
   local repo src
   repo="$(m_repo "$1")" || return 1
+  rm -f "$CACHE/built-$repo"
   src="$(m_src "$repo")" || return 1
+  src_installed "$repo" "$src" && return 99
+  need_rust || return 1
   cargo_build "$src/Cargo.toml" || return 1
-  put_bin "$repo"
+  built_mark "$repo" "$src"
+}
+# every build has passed: all at once. A record per binary says which source it came from
+do_install_bins() {
+  local b rev any=0
+  for b in yami-shell yami-setup yami-files yami-view yami-play yami-shot yami-agents; do
+    [[ -f $CACHE/built-$b ]] || continue
+    put_bin "$b" || return 1
+    any=1
+  done
+  ((any)) || return 99
+  # `yami <command>`: the same binary, help instead of the shell when started without a command
+  [[ -x $BIN/yami-shell ]] && ln -sfn yami-shell "$BIN/yami"
+  mkdir -p "$STATE/built"
+  for b in yami-shell yami-setup yami-files yami-view yami-play yami-shot yami-agents; do
+    [[ -f $CACHE/built-$b ]] || continue
+    rev="$(cat "$CACHE/built-$b")"
+    if [[ $rev == - ]]; then rm -f "$STATE/built/$b"; else printf '%s\n' "$rev" >"$STATE/built/$b"; fi
+    rm -f "$CACHE/built-$b"
+  done
 }
 do_build_greet() {
   need_rust || return 1

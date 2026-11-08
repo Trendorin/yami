@@ -21,27 +21,7 @@ restyle_init() {
   local cur id
   if [[ -f $SET_JSON ]]; then
     # a second run or an update: what the settings already say
-    cur="$(python3 -I - "$SET_JSON" "${T_ID[*]}" "$T_OPTIN_OLD" <<'PY'
-import json, sys
-try:
-    d = json.load(open(sys.argv[1]))
-except (OSError, ValueError):
-    d = {}
-d = d if isinstance(d, dict) else {}
-ids, old = sys.argv[2].split(), sys.argv[3].split()
-v, legacy = d.get("themeApps"), d.get("appThemes")
-if isinstance(v, list):
-    on = {x for x in v if isinstance(x, str)}
-elif isinstance(legacy, list):
-    on = {x for x in ids if x not in old} | {x for x in legacy if isinstance(x, str)}
-else:
-    on = set(ids)
-on.discard("cursor")
-if d.get("cursor", "yami") != "system":
-    on.add("cursor")
-print(" ".join(x for x in ids if x in on) or "-")
-PY
-)" || cur=""
+    cur="$(restyle_saved)"
     if [[ -n $cur ]]; then
       t_all 0
       for id in $cur; do t_idx "$id" >/dev/null && T_ON[$(t_idx "$id")]=1; done
@@ -60,6 +40,27 @@ PY
       done ;;
   esac
   look_sync
+}
+# the list the settings keep: themeApps, or the older appThemes (its three on top of the rest), or
+# everything; the cursor comes from its own key
+restyle_saved() {
+  local list="" id legacy=0
+  if list="$(json_field "$SET_JSON" themeApps)"; then :
+  elif list="$(json_field "$SET_JSON" appThemes)"; then legacy=1
+  else list="${T_ID[*]}"; fi
+  list=" ${list//$'\n'/ } "
+  local out=() c
+  c="$(json_field "$SET_JSON" cursor)" || c=yami
+  for id in "${T_ID[@]}"; do
+    if [[ $id == cursor ]]; then
+      [[ $c != system ]] && out+=("$id")
+    elif ((legacy)) && [[ " $T_OPTIN_OLD " != *" $id "* ]]; then
+      out+=("$id")
+    elif [[ $list == *" $id "* ]]; then
+      out+=("$id")
+    fi
+  done
+  ((${#out[@]})) && printf '%s' "${out[*]}" || printf -- '-'
 }
 # the Qt/GTK theme packages and apply-theme.sh: only when GTK or Qt is restyled
 look_sync() {
@@ -95,30 +96,4 @@ t_desc() {
 }
 
 # settings → yami-shell.json (do_dotfiles): themeApps and the cursor
-restyle_json() {
-  python3 -I - "$SET_JSON" "$(t_list)" "$(t_on cursor && echo yami || echo system)" <<'PY'
-import json, sys
-from pathlib import Path
-p = Path(sys.argv[1])
-try:
-    d = json.loads(p.read_text())
-except (OSError, ValueError):
-    d = {}
-d = d if isinstance(d, dict) else {}
-d["themeApps"] = sys.argv[2].split()
-d.pop("appThemes", None)
-# the pixel cursor: on keeps a size or kind already set, off is the system one
-if sys.argv[3] == "system":
-    d["cursor"] = "system"
-elif d.get("cursor") in (None, "system"):
-    d["cursor"] = "yami"
-text = json.dumps(d, ensure_ascii=False, indent=2) + "\n"
-p.parent.mkdir(parents=True, exist_ok=True)
-try:
-    same = p.read_text() == text
-except OSError:
-    same = False
-if not same:
-    p.write_text(text)
-PY
-}
+restyle_json() { "$BIN/yami-shell" config restyle "$(t_list)" "$(t_on cursor && echo yami || echo system)"; }

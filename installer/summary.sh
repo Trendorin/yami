@@ -10,6 +10,7 @@ summary_update() {
     exit 1
   fi
   say "$(t "обновлено" "updated" "atualizado")"
+  [[ -s $STATE/packages-needed ]] && note "$("$BIN/yami-shell" update need --print 2>/dev/null)"
   exit 0
 }
 
@@ -22,7 +23,7 @@ summary_install() {
     printf '  %s%s%s %s%s %s%s\n' "$OK" "$(t "готово." "done." "concluído.")" "$R" "$D" "$(t "лог:" "log:" "registro:")" "$LOG" "$R"
   fi
   if [[ -s $MISSING_F ]]; then
-    warn "$(t "этих пакетов нет в репозиториях" "not in the repositories" "fora dos repositórios") ($OS_NAME): $(sort -u "$MISSING_F" | tr '\n' ' ')"
+    warn "$(t "эти пакеты не поставились (нет в репозиториях или конфликтуют)" "these packages did not install (not in the repositories or in conflict)" "estes pacotes não foram instalados (fora dos repositórios ou em conflito)") ($OS_NAME): $(sort -u "$MISSING_F" | tr '\n' ' ')"
     note "$(t "шелл работает и без них; поставь аналоги вручную, если нужно" "the shell works without them; install equivalents by hand if needed" "o shell funciona sem eles; instale equivalentes manualmente, se necessário")"
   fi
   if [[ -s $STATE/packages-needed ]] && ((!DRY)); then
@@ -36,7 +37,11 @@ summary_install() {
   fi
   niri_ok || ((DRY)) || on fork || warn "$(t "нужен niri $NIRI_MIN или новее — поставь его или запусти без --no-fork" "niri $NIRI_MIN or newer is required: install it or rerun without --no-fork" "niri $NIRI_MIN ou superior é necessário: instale ou execute novamente sem --no-fork")"
 
-  if ((FULL)); then
+  if ((${#FAILED[@]})) && ((BUILD_FAILED)); then
+    printf '\n  %s%s%s\n' "$T" "$(t "Запусти установщик снова: продолжу с того же места." "Run the installer again: it continues from where it stopped." "Rode o instalador novamente: ele continua de onde parou.")" "$R"
+  elif ((REPAIR)); then
+    printf '\n  %s%s%s\n' "$T" "$(t "Всё обновлено и на месте." "Everything is up to date and in place." "Tudo atualizado e no lugar.")" "$R"
+  elif ((FULL)); then
     if ((RUNNING_NIRI)); then
       printf '
   %s%s%s
@@ -50,12 +55,13 @@ summary_install() {
     printf '
   %s%s%s
 ' "$T" "$(t "Основа готова. Сейчас откроется окно настройки." "The base is ready. The setup window opens now." "A base está pronta. A janela de configuração abre agora.")" "$R"
+  elif ((NO_DM)); then
+    printf '\n  %s%s%s\n' "$T" "$(t "Основа готова. Экрана входа в системе нет, поэтому запусти стол из этой консоли:" "The base is ready. This system has no login screen, so start the desktop from this console:" "A base está pronta. Este sistema não tem tela de login, então inicie a área de trabalho neste console:")" "$R"
+    printf '  %s%s%s\n' "$A" "niri-session" "$R"
+    printf '  %s%s%s\n' "$D" "$(t "Окно настройки предложит поставить экран входа, и в следующий раз войдёшь обычным способом." "The setup window offers a login screen, and next time you log in the usual way." "A janela de configuração oferece uma tela de login, e na próxima vez você entra normalmente.")" "$R"
   else
-    printf '
-  %s%s%s
-' "$T" "$(t "Основа готова. Выйди из системы и войди в сеанс «Niri»:" "The base is ready. Log out and log in to the «Niri» session:" "A base está pronta. Saia e entre na sessão «Niri»:")" "$R"
-    printf '  %s%s%s
-' "$D" "$(t "там тебя встретит окно настройки и спросит, что поставить." "a setup window will meet you there and ask what to install." "uma janela de configuração vai perguntar o que instalar.")" "$R"
+    printf '\n  %s%s%s\n' "$T" "$(t "Основа готова. Выйди из системы и войди в сеанс «Niri»:" "The base is ready. Log out and log in to the «Niri» session:" "A base está pronta. Saia e entre na sessão «Niri»:")" "$R"
+    printf '  %s%s%s\n' "$D" "$(t "там тебя встретит окно настройки и спросит, что поставить." "a setup window will meet you there and ask what to install." "uma janela de configuração vai perguntar o que instalar.")" "$R"
   fi
   printf '
   %s%s%s

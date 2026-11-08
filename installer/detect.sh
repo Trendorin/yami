@@ -82,12 +82,17 @@ detect_login() {
       done
     done
   fi
+  # our own login screen counts as nothing to replace
+  GREET_OURS=0
   case $OTHER_DM in
-    greetd) grep -qs 'yami/greet-session' /etc/greetd/config.toml && OTHER_DM="" ;;
-    sddm) [[ -d /usr/share/sddm/themes/yami ]] && OTHER_DM="" ;;
+    greetd) grep -qs 'yami/greet-session' /etc/greetd/config.toml && { OTHER_DM="" GREET_OURS=1; } ;;
+    sddm) [[ -d /usr/share/sddm/themes/yami ]] && { OTHER_DM="" GREET_OURS=1; } ;;
   esac
   LOGIN_ON=1
   [[ -n $OTHER_DM ]] && LOGIN_ON=0
+  # no login manager at all: a machine that boots to a console, the session starts by hand
+  NO_DM=0
+  [[ -z $OTHER_DM ]] && ((!GREET_OURS)) && NO_DM=1
   # games: on by default only when Steam is here (a package, flatpak or its folder)
   GAMES_ON=0
   { command -v steam >/dev/null || [[ -d $HOME/.local/share/Steam || -d $HOME/.steam || -d $HOME/.var/app/com.valvesoftware.Steam ]]; } && GAMES_ON=1

@@ -7,6 +7,12 @@ uninstall() {
   banner 1
   say "$(t "удаляю YAMI" "removing YAMI" "removendo YAMI")"
   ((DRY)) && { note "--dry-run"; return; }
+  if ((!YES)); then
+    printf '  %s%s%s %s[%s]%s ' "$T" "$(t "Удалить yami с этой машины? Прежний конфиг niri вернётся, настройки шелла останутся." "Remove yami from this machine? The previous niri config comes back, the shell settings stay." "Remover o yami desta máquina? A configuração anterior do niri volta, as configurações do shell ficam.")" "$R" "$F" "$(t "y — да, enter — нет" "y yes, enter no" "y sim, enter não")" "$R"
+    local a
+    read -r a || a=n
+    [[ $a =~ ^[yYдД] ]] || bye
+  fi
   # первым: скрипт экрана входа лежит в том, что удаляется ниже
   uninstall_login
   pgrep -x yami-shell >/dev/null && "$BIN/yami-shell" msg quit 2>/dev/null
@@ -27,11 +33,15 @@ uninstall() {
   # pixel cursors: yami-<accent>, and yami-<accent>-l for the light theme
   find "$data/icons" -maxdepth 1 -type d -regextype posix-extended -regex '.*/yami-[0-9a-f]{6}(-l)?' -exec rm -rf {} + 2>/dev/null
   # the MangoHud config theme.py wrote (one without its mark is the user's own)
-  head -1 "$CFG/MangoHud/MangoHud.conf" 2>/dev/null | grep -q '^# yami: written by tools/theme.py' && rm -f "$CFG/MangoHud/MangoHud.conf"
+  head -1 "$CFG/MangoHud/MangoHud.conf" 2>/dev/null | grep -qE '^# yami: written by (tools/theme.py|yami recolor)' && rm -f "$CFG/MangoHud/MangoHud.conf"
   rm -rf "$HOME/.local/share/fonts/yami" "$HOME/.local/share/yami" "$CFG/qt6ct/qss/yami"
   # the one file 2.7 could put outside the home folder for NVIDIA
   { [[ -n $SU ]] || ((EUID == 0)); } && $SU rm -f /etc/nvidia/nvidia-application-profiles-rc.d/50-niri-vram.json
-  rm -f "$STATE/packages-needed" "$STATE/components-known" "$STATE/settings-newer.json"
+  rm -f "$STATE/packages-needed" "$STATE/components-known" "$STATE/settings-newer.json" "$STATE/theme.py" "$STATE/restyle.json" "$STATE/templates.json"
+  rm -rf -- "$STATE/built" "$STATE/snapshots"
+  mime_forget yami-files.desktop
+  mime_forget yami-view.desktop
+  mime_forget yami-play.desktop
   # the build cache (gigabytes); yami-niri sources only without patch work in them
   rm -rf -- "$CACHE/target" "$CACHE/sddm-yami" "$CACHE/yami-cursor" "$CACHE/update.log" "$CACHE/update.lock"
   local src="${YAMI_NIRI_SRC:-$CACHE/niri-src}"

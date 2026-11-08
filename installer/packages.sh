@@ -4,106 +4,106 @@
 # flake.nix with its NixOS and Home Manager modules is the way there.
 # shellcheck shell=bash
 
-# niri — the compositor; base — what the shell and the session use at runtime;
-# build — to compile the shell; apps — kitty, fastfetch, pavucontrol, btop; drives — udisks2 and gvfs
-# (drives, phones, network shares); files — yami-files' thumbnails and archives; play — libmpv for
-# yami-play; look — the Qt/GTK theme; games — GameMode, MangoHud;
-# tools — night light, text and QR from screenshots; login — greetd for yami-greet (agreety: the text
-# fallback); nirisrc — to build niri itself
+# niri — the compositor; base — what the shell and the session use at runtime (git and ssh-keygen:
+# sources and their signatures); build — to compile the shell; apps — the terminal and the everyday
+# tools, with the base; drives — udisks2 and gvfs (drives, phones, network shares), with yami-files or
+# yami-agents; files — yami-files' thumbnails and archives; play — libmpv for yami-play; shot — text
+# and QR from screenshots; look — the Qt/GTK theme; games — GameMode, MangoHud; login — greetd for
+# yami-greet (agreety: the text fallback); nirisrc — to build niri itself
 packages_for_family() {
 case "$FAM" in
   arch)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
     P_base=(polkit gnome-keyring pipewire pipewire-pulse wireplumber libpulse networkmanager bluez bluez-utils
-      cliphist wl-clipboard grim brightnessctl playerctl python python-pillow noto-fonts noto-fonts-cjk noto-fonts-emoji
+      cliphist wl-clipboard grim brightnessctl playerctl git openssh noto-fonts noto-fonts-cjk noto-fonts-emoji
       power-profiles-daemon libxkbcommon pam fontconfig curl)
     P_build=(rust gcc pkgconf libxkbcommon pam)
-    P_apps=(kitty fastfetch pavucontrol btop)
+    P_apps=(kitty fastfetch pavucontrol btop wlsunset)
     P_drives=(udisks2 gvfs gvfs-mtp gvfs-gphoto2 gvfs-afc gvfs-smb)
     P_files=(ffmpegthumbnailer libarchive)
     P_play=(mpv)
     P_look=(qt6ct adw-gtk-theme)
     P_games=(gamemode mangohud)
-    P_tools=(wlsunset tesseract tesseract-data-eng tesseract-data-rus zbar)
+    P_shot=(tesseract tesseract-data-eng tesseract-data-rus zbar)
     P_login=(greetd greetd-agreety)
     P_nirisrc=(git clang pkgconf libinput libxkbcommon mesa libdisplay-info seatd pango cairo pipewire systemd-libs) ;;
   fedora)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
     P_base=(polkit gnome-keyring pipewire pipewire-pulseaudio wireplumber pulseaudio-utils NetworkManager bluez
-      cliphist wl-clipboard grim brightnessctl playerctl python3 python3-pillow google-noto-sans-fonts google-noto-sans-cjk-fonts
+      cliphist wl-clipboard grim brightnessctl playerctl git openssh-clients google-noto-sans-fonts google-noto-sans-cjk-fonts
       google-noto-color-emoji-fonts tuned-ppd libxkbcommon pam fontconfig curl)
     P_build=(rust cargo gcc pkgconf-pkg-config libxkbcommon-devel pam-devel)
-    P_apps=(kitty fastfetch pavucontrol btop)
+    P_apps=(kitty fastfetch pavucontrol btop wlsunset)
     P_drives=(udisks2 gvfs gvfs-mtp gvfs-gphoto2 gvfs-afc gvfs-smb gvfs-fuse)
     P_files=(ffmpegthumbnailer bsdtar)
     P_play=(mpv-libs)
     P_look=(qt6ct adw-gtk3-theme)
     P_games=(gamemode mangohud)
-    P_tools=(wlsunset tesseract tesseract-langpack-eng tesseract-langpack-rus zbar)
+    P_shot=(tesseract tesseract-langpack-eng tesseract-langpack-rus zbar)
     P_login=(greetd)
     P_nirisrc=(git clang libudev-devel libgbm-devel libxkbcommon-devel wayland-devel libinput-devel dbus-devel systemd-devel
       libseat-devel pipewire-devel pango-devel cairo-gobject-devel libdisplay-info-devel) ;;
   debian)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
     P_base=(polkit gnome-keyring pipewire pipewire-pulse wireplumber pulseaudio-utils network-manager bluez
-      cliphist wl-clipboard grim brightnessctl playerctl python3 python3-pil fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
+      cliphist wl-clipboard grim brightnessctl playerctl git openssh-client fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
       power-profiles-daemon libxkbcommon0 libpam0g fontconfig curl)
     P_build=(cargo rustc gcc pkg-config libxkbcommon-dev libpam0g-dev)
-    P_apps=(kitty fastfetch pavucontrol btop)
+    P_apps=(kitty fastfetch pavucontrol btop wlsunset)
     P_drives=(udisks2 gvfs gvfs-backends gvfs-fuse)
     P_files=(ffmpegthumbnailer libarchive-tools)
     P_play=(libmpv2)
     P_look=(qt6ct adw-gtk3)
     P_games=(gamemode mangohud)
-    P_tools=(wlsunset tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus zbar-tools)
+    P_shot=(tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus zbar-tools)
     P_login=(greetd)
     P_nirisrc=(git clang libudev-dev libgbm-dev libxkbcommon-dev libegl1-mesa-dev libwayland-dev libinput-dev libdbus-1-dev
       libsystemd-dev libseat-dev libpipewire-0.3-dev libpango1.0-dev libdisplay-info-dev) ;;
   suse)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
     P_base=(polkit gnome-keyring pipewire pipewire-pulseaudio wireplumber pulseaudio-utils NetworkManager bluez
-      cliphist wl-clipboard grim brightnessctl playerctl python3 python3-Pillow google-noto-sans-fonts google-noto-sans-cjk-fonts
+      cliphist wl-clipboard grim brightnessctl playerctl git openssh-clients google-noto-sans-fonts google-noto-sans-cjk-fonts
       noto-coloremoji-fonts power-profiles-daemon libxkbcommon0 pam fontconfig curl)
     P_build=(rust cargo gcc pkgconf libxkbcommon-devel pam-devel)
-    P_apps=(kitty fastfetch pavucontrol btop)
+    P_apps=(kitty fastfetch pavucontrol btop wlsunset)
     P_drives=(udisks2 gvfs gvfs-backends gvfs-backend-afc gvfs-fuse)
     P_files=(ffmpegthumbnailer bsdtar)
     P_play=(libmpv2)
     P_look=(qt6ct gtk3-metatheme-adwaita)
     P_games=(gamemode mangohud)
-    P_tools=(wlsunset tesseract-ocr tesseract-ocr-traineddata-eng tesseract-ocr-traineddata-rus zbar)
+    P_shot=(tesseract-ocr tesseract-ocr-traineddata-eng tesseract-ocr-traineddata-rus zbar)
     P_login=(greetd)
     P_nirisrc=(git clang libudev-devel libgbm-devel libxkbcommon-devel wayland-devel libinput-devel dbus-1-devel systemd-devel
       libseat-devel pipewire-devel pango-devel cairo-devel libdisplay-info-devel) ;;
   void)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
     P_base=(polkit gnome-keyring pipewire wireplumber pulseaudio-utils NetworkManager bluez
-      cliphist wl-clipboard grim brightnessctl playerctl python3 python3-Pillow noto-fonts-ttf noto-fonts-cjk noto-fonts-emoji
+      cliphist wl-clipboard grim brightnessctl playerctl git openssh noto-fonts-ttf noto-fonts-cjk noto-fonts-emoji
       power-profiles-daemon libxkbcommon pam fontconfig curl)
     P_build=(rust cargo gcc pkg-config libxkbcommon-devel pam-devel)
-    P_apps=(kitty fastfetch pavucontrol btop)
+    P_apps=(kitty fastfetch pavucontrol btop wlsunset)
     P_drives=(udisks2 gvfs gvfs-mtp gvfs-gphoto2 gvfs-afc gvfs-smb)
     P_files=(ffmpegthumbnailer bsdtar)
     P_play=(mpv)
     P_look=(qt6ct adw-gtk3)
     P_games=(gamemode MangoHud)
-    P_tools=(wlsunset tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus zbar)
+    P_shot=(tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus zbar)
     P_login=(greetd)
     P_nirisrc=(git clang eudev-libudev-devel libgbm-devel libxkbcommon-devel wayland-devel libinput-devel dbus-devel
       libseat-devel pipewire-devel pango-devel libdisplay-info-devel) ;;
   alpine)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
     P_base=(polkit gnome-keyring pipewire pipewire-pulse wireplumber pulseaudio-utils networkmanager networkmanager-cli bluez
-      cliphist wl-clipboard grim brightnessctl playerctl python3 py3-pillow font-noto font-noto-cjk font-noto-emoji
+      cliphist wl-clipboard grim brightnessctl playerctl git openssh-keygen font-noto font-noto-cjk font-noto-emoji
       power-profiles-daemon libxkbcommon linux-pam fontconfig curl)
     P_build=(rust cargo gcc musl-dev pkgconf libxkbcommon-dev linux-pam-dev)
-    P_apps=(kitty fastfetch pavucontrol btop)
+    P_apps=(kitty fastfetch pavucontrol btop wlsunset)
     P_drives=(udisks2 gvfs gvfs-mtp gvfs-gphoto2 gvfs-afc gvfs-smb gvfs-fuse)
     P_files=(ffmpegthumbnailer libarchive-tools)
     P_play=(mpv-libs)
     P_look=(qt6ct adw-gtk3)
     P_games=(gamemode mangohud)
-    P_tools=(wlsunset tesseract-ocr tesseract-ocr-data-rus zbar)
+    P_shot=(tesseract-ocr tesseract-ocr-data-rus zbar)
     P_login=(greetd greetd-agreety)
     P_nirisrc=(git clang eudev-dev mesa-dev libxkbcommon-dev wayland-dev libinput-dev dbus-dev libseat-dev pipewire-dev
       pango-dev libdisplay-info-dev) ;;
@@ -111,61 +111,59 @@ case "$FAM" in
     P_niri=(gui-wm/niri gui-apps/xwayland-satellite sys-apps/xdg-desktop-portal-gnome sys-apps/xdg-desktop-portal-gtk)
     P_base=(sys-auth/polkit gnome-base/gnome-keyring media-video/pipewire media-video/wireplumber
       net-misc/networkmanager net-wireless/bluez gui-apps/cliphist gui-apps/wl-clipboard gui-apps/grim
-      app-misc/brightnessctl media-sound/playerctl dev-python/pillow media-fonts/noto media-fonts/noto-cjk media-fonts/noto-emoji
+      app-misc/brightnessctl media-sound/playerctl dev-vcs/git net-misc/openssh media-fonts/noto media-fonts/noto-cjk media-fonts/noto-emoji
       sys-power/power-profiles-daemon x11-libs/libxkbcommon sys-libs/pam net-misc/curl)
     P_build=(virtual/rust virtual/pkgconfig)
-    P_apps=(x11-terms/kitty app-misc/fastfetch media-sound/pavucontrol sys-process/btop)
+    P_apps=(x11-terms/kitty app-misc/fastfetch media-sound/pavucontrol sys-process/btop gui-apps/wlsunset)
     P_drives=(sys-fs/udisks gnome-base/gvfs)
     P_files=(media-video/ffmpegthumbnailer app-arch/libarchive)
     P_play=(media-video/mpv)
     P_look=(gui-apps/qt6ct x11-themes/adw-gtk3)
     P_games=(games-util/gamemode games-util/mangohud)
-    P_tools=(gui-apps/wlsunset app-text/tesseract media-gfx/zbar)
+    P_shot=(app-text/tesseract media-gfx/zbar)
     P_login=(gui-libs/greetd)
     P_nirisrc=(dev-vcs/git llvm-core/clang dev-libs/libinput sys-auth/seatd media-libs/mesa x11-libs/pango media-libs/libdisplay-info) ;;
   *)
-    P_niri=() P_base=() P_build=() P_apps=() P_drives=() P_files=() P_play=() P_look=() P_games=() P_tools=() P_login=() P_nirisrc=() ;;
+    P_niri=() P_base=() P_build=() P_apps=() P_drives=() P_files=() P_play=() P_look=() P_games=() P_shot=() P_login=() P_nirisrc=() ;;
 esac
 }
 # name: packages, one list per line: tools/ci-distro.sh checks that each exists in the repositories
 print_packages() {
   local a
   printf 'family: %s\n' "$FAM"
-  for a in P_niri P_base P_build P_apps P_drives P_files P_play P_look P_games P_tools P_login P_nirisrc; do
+  for a in P_niri P_base P_build P_apps P_drives P_files P_play P_shot P_look P_games P_login P_nirisrc; do
     declare -n arr=$a
     printf '%s: %s\n' "$a" "${arr[*]}"
   done
 }
 
-# ── the package steps of the chosen components (root: they come first) ───────
-plan_packages() {
-  ((SUDO)) || return 0
-  if on core || on apps || on drives || on files || on play || on look || on tools || on games || on login; then
-    add "$(t "пакеты: обновить списки" "packages: refresh index" "pacotes: atualizar índice")" pm_refresh
-  fi
-  if ((!APPLY)) && on core; then
-    add "$(t "пакеты: niri" "packages: niri" "pacotes: niri")" pkgs "${P_niri[@]}"
-    add "$(t "пакеты: сеанс и шелл" "packages: session and shell" "pacotes: sessão e shell")" pkgs "${P_base[@]}"
-  fi
+# ── the packages of the chosen components, one step, one transaction (root: it comes first) ───
+wanted_packages() {
+  local p
+  if ((!APPLY)) && on core; then printf '%s\n' "${P_niri[@]}" "${P_base[@]}" "${P_apps[@]}"; fi
   # a working toolchain (rustup included) is kept: only the libraries and pkg-config are added
-  local p need=()
   for p in "${P_build[@]}"; do
     case "$p" in rust | rustc | cargo | virtual/rust) rust_ok && continue ;; esac
-    need+=("$p")
+    printf '%s\n' "$p"
   done
-  add "$(t "пакеты: сборка шелла" "packages: shell build deps" "pacotes: dependências de compilação do shell")" pkgs "${need[@]}"
-  on apps && add "$(t "пакеты: программы" "packages: apps" "pacotes: aplicativos")" pkgs "${P_apps[@]}"
-  on drives && add "$(t "пакеты: диски и телефоны" "packages: drives and phones" "pacotes: discos e telefones")" pkgs "${P_drives[@]}"
-  on files && add "$(t "пакеты: миниатюры видео и архивы для файлов" "packages: video thumbnails and archives for files" "pacotes: miniaturas de vídeo e arquivos compactados")" pkgs "${P_files[@]}"
-  on play && add "$(t "пакеты: libmpv для плеера" "packages: libmpv for the player" "pacotes: libmpv para o player")" pkgs "${P_play[@]}"
-  on look && add "$(t "пакеты: тема Qt и GTK" "packages: Qt and GTK theme" "pacotes: tema Qt e GTK")" pkgs "${P_look[@]}"
-  on tools && add "$(t "пакеты: ночной свет, текст и QR со скриншота" "packages: night light, text and QR from screenshots" "pacotes: luz noturna, texto e QR de capturas de tela")" pkgs "${P_tools[@]}"
-  on games && add "$(t "пакеты: GameMode, MangoHud" "packages: GameMode, MangoHud" "pacotes: GameMode e MangoHud")" pkgs "${P_games[@]}"
-  on login && add "$(t "пакеты: greetd" "packages: greetd" "pacotes: greetd")" pkgs "${P_login[@]}"
+  { on files || on agents; } && printf '%s\n' "${P_drives[@]}"
+  on files && printf '%s\n' "${P_files[@]}"
+  on play && printf '%s\n' "${P_play[@]}"
+  on shot && printf '%s\n' "${P_shot[@]}"
+  on look && printf '%s\n' "${P_look[@]}"
+  on games && printf '%s\n' "${P_games[@]}"
+  on login && printf '%s\n' "${P_login[@]}"
   # niri's build libraries: for yami-niri, or for upstream niri when the packaged one is too old
-  if on fork || { ((!APPLY)) && on core && ! niri_ok && ((!DRY)); }; then
-    add "$(t "пакеты: сборка niri" "packages: niri build deps" "pacotes: dependências de compilação do niri")" pkgs "${P_nirisrc[@]}"
-  fi
+  if on fork || { ((!APPLY)) && on core && ! niri_ok && ((!DRY)); }; then printf '%s\n' "${P_nirisrc[@]}"; fi
+  return 0
+}
+plan_packages() {
+  ((SUDO)) || return 0
+  local list=() p
+  while IFS= read -r p; do [[ -n $p ]] && list+=("$p"); done < <(wanted_packages | awk '!seen[$0]++')
+  ((${#list[@]})) || return 0
+  add "$(t "пакеты: обновить списки" "packages: refresh index" "pacotes: atualizar índice")" pm_refresh
+  add "$(t "пакеты системы:" "system packages:" "pacotes do sistema:") ${#list[@]}" pkgs "${list[@]}"
   return 0
 }
 
@@ -192,25 +190,28 @@ pm_install() {
     *) return 1 ;;
   esac
 }
-# whole list at once; if the batch fails (a name this distro lacks), one by one
+# whole list at once; if the batch fails (a name this distro lacks), one by one. A step that could
+# not install a single package failed: the package manager itself is in trouble (see explain)
 pkgs() {
   (($#)) || return 0
   pm_install "$@" && return 0
   # usually one name this release does not have (Alpine: cliphist, qt6ct): drop what the
   # repositories lack and try the rest at once again; one by one only if that fails too
-  local p have=()
+  local p have=() good=0
   if pkg_avail_known; then
     for p; do
       if pkg_avail "$p"; then have+=("$p"); else echo "$p" >>"$MISSING_F"; echo "not in the repositories: $p"; fi
     done
-    ((${#have[@]})) || return 0
+    ((${#have[@]})) || return 1
     pm_install "${have[@]}" && return 0
   else
     have=("$@")
   fi
   echo "batch failed, installing one by one"
-  for p in "${have[@]}"; do pm_install "$p" || echo "$p" >>"$MISSING_F"; done
-  return 0
+  for p in "${have[@]}"; do
+    if pm_install "$p"; then good=$((good + 1)); else echo "$p" >>"$MISSING_F"; fi
+  done
+  ((good > 0))
 }
 
 # ── packages the chosen components want but the system lacks ───────────────
@@ -245,11 +246,12 @@ pkg_avail() {
 do_need_pkgs() {
   local f="$STATE/packages-needed" want=() need=() p
   wants core && want+=("${P_base[@]}")
-  wants apps && want+=("${P_apps[@]}")
-  wants drives && want+=("${P_drives[@]}")
+  # the terminal and the everyday tools came with the first install; an update does not bring them back
+  wants core && ((!UPDATE)) && want+=("${P_apps[@]}")
+  { wants files || wants agents; } && want+=("${P_drives[@]}")
   wants files && want+=("${P_files[@]}")
   wants play && want+=("${P_play[@]}")
-  wants tools && want+=("${P_tools[@]}")
+  wants shot && want+=("${P_shot[@]}")
   wants games && want+=("${P_games[@]}")
   wants look && want+=("${P_look[@]}")
   [[ -n $PM && $PM != nix && $PM != emerge ]] || { rm -f "$f"; return 99; }

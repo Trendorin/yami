@@ -10,7 +10,7 @@ plan_services() {
 }
 # the home folder: a first install writes the settings it was given, an update only regenerates
 plan_desktop() {
-  if ((UPDATE)); then
+  if ((UPDATE || REPAIR)); then
     add "$(t "шрифты" "fonts" "fontes")" do_fonts
     add "$(t "niri: конфиг" "niri: config" "niri: configuração")" do_niri_config
     add "$(t "палитра: всё, что из неё выводится" "palette: everything derived from it" "paleta: tudo deriva dela")" do_refresh
@@ -34,7 +34,7 @@ plan_apply_look() {
 plan_record() {
   add "$(t "запись об установке (для yami update)" "install record (for yami update)" "registro de instalação (para yami update)")" do_stamp
   add "$(t "каких пакетов ещё не хватает" "packages still missing" "pacotes ainda ausentes")" do_need_pkgs
-  add "$(t "счётчик установок (один раз, без данных)" "install counter (once, no data)" "contador de instalações (uma vez, sem dados)")" do_count
+  count_wanted && add "$(t "счётчик установок (один анонимный запрос; --no-count — без него)" "install counter (one anonymous request; --no-count skips it)" "contador de instalações (uma requisição anônima; --no-count desativa)")" do_count
   ((RUNNING_NIRI && !APPLY)) && add "$(t "перезапуск шелла" "restart the shell" "reiniciar o shell")" do_restart_shell
   return 0
 }
@@ -89,16 +89,11 @@ do_niri_config() {
   # keybindings come from the shell (yami-binds.kdl); carry `output` blocks of the previous
   # config into user.kdl
   install -m644 "$ROOT/config/niri/config.kdl" "$n/config.kdl" || return 1
-  python3 -I - "$n/user.kdl" "$old" <<'PY' || return 1
-import re, sys
-from pathlib import Path
-user, old = sys.argv[1:]
-u = Path(user)
-if old and Path(old).is_file() and "output " not in u.read_text():
-    outs = re.findall(r'^output "[^"]*" \{.*?^\}', Path(old).read_text(), re.S | re.M)
-    if outs:
-        u.write_text(u.read_text().rstrip("\n") + "\n\n// outputs kept from the previous config\n" + "\n".join(outs) + "\n")
-PY
+  if [[ -n $old && -f $old ]] && ! grep -q 'output ' "$n/user.kdl"; then
+    local outs
+    outs="$(awk '/^output "[^"]*" \{/ { on = 1 } on { print } on && /^\}/ { on = 0 }' "$old")"
+    [[ -n $outs ]] && printf '\n// outputs kept from the previous config\n%s\n' "$outs" >>"$n/user.kdl"
+  fi
   touch "$n/.yami"
   write_local_kdl >"$n/yami-local.kdl"
   # niri spawns `yami-shell` by name: make ~/.local/bin visible to the systemd session
@@ -123,25 +118,9 @@ do_dotfiles() {
   local fe="" th=""
   ((FETCH_SET)) && fe="${FETCH_ID[$fetch]}"
   ((THEME_SET)) && th="${THEME_ID[$theme]}"
-  python3 -I - "$CFG/yami-shell.json" "${PAL_ID[$pal]}" "$L" "$lk" "${FONT_ID[$font]}" "$fe" "$th" <<'PY' || return 1
-import json, sys
-from pathlib import Path
-p = Path(sys.argv[1])
-try:
-    d = json.loads(p.read_text())
-except (OSError, ValueError):
-    d = {}
-d["palette"], d["accent"], d["lang"] = sys.argv[2], "", sys.argv[3]
-d["fontUi"] = "" if sys.argv[5] == "pixel" else "sans"
-if sys.argv[6]:
-    d["fetchFull"] = sys.argv[6] == "full"
-if sys.argv[7]:
-    d["light"] = sys.argv[7] == "light"
-if sys.argv[4]:
-    for k, v in zip(("glass", "lift", "inner", "dim"), sys.argv[4].split()):
-        d[k] = int(v) / 100
-p.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n")
-PY
+  "$BIN/yami-shell" config seed palette="${PAL_ID[$pal]}" accent= lang="$L" \
+    fontUi="$([[ ${FONT_ID[$font]} == pixel ]] || echo sans)" ${fe:+fetchFull="$([[ $fe == full ]] && echo true || echo false)"} \
+    ${th:+light="$([[ $th == light ]] && echo true || echo false)"} ${lk:+look="$lk"} || return 1
   # what to restyle (themeApps, the cursor): theme.py below and every later run keep to it
   restyle_json || return 1
   # kitty: our file next to kitty.conf and one include line at its end; the rest of kitty.conf is yours
@@ -154,7 +133,7 @@ PY
   # wallpaper, niri borders and what is chosen to restyle (kitty, fastfetch, GTK, Qt, the cursor…)
   local lt=()
   ((theme == 1)) && lt=(--light)
-  python3 -I "$ROOT/tools/theme.py" --accent "#${PAL_HEX[$pal]}" "${lt[@]}"
+  "$BIN/yami-shell" recolor --accent "#${PAL_HEX[$pal]}" "${lt[@]}"
   # a weak or virtual machine (old laptop, VM, no GPU acceleration) starts in lite mode: no blur,
   # no animations; settings → look turns it off. A file that already says `lite` is left alone
   "$BIN/yami-shell" config lite-auto
@@ -164,28 +143,29 @@ PY
 }
 
 # the first Qt/GTK setup, only for the ones chosen to restyle
-do_look() { YAMI_RESTYLE="$(t_list)" "$ROOT/tools/apply-theme.sh"; }
+do_look() { YAMI_RESTYLE="$(t_list)" YAMI_BIN="$BIN/yami-shell" "$ROOT/tools/apply-theme.sh"; }
 
 # update: everything generated from the palette again (new theme.py outputs), settings untouched
 do_refresh() {
   # an older settings file (appThemes) gets themeApps; a --restyle flag lands here too
   restyle_json || return 1
-  python3 -I "$ROOT/tools/theme.py" || return 1
+  "$BIN/yami-shell" recolor || return 1
   "$BIN/yami-shell" binds write || return 1
   "$BIN/yami-shell" config kdl >"$CFG/niri/yami-fx.kdl"
 }
 
-# the install counter: one download of a tiny release file per machine, ever. GitHub counts
-# downloads of release files; the request carries nothing about the machine (no id, no version, no
-# data: what any download from GitHub sends) and the file is thrown away. --no-count,
-# YAMI_NO_COUNT=1 or CI skip it. A marker in the state dir keeps it to one time per machine
-COUNT_URL="https://github.com/Trendorin/yami/releases/latest/download/yami-installs.txt"
+# the install counter: one GET of a one-line file at a fixed address, once per machine, only after a
+# finished install. GitHub counts downloads of release files; the request says nothing about the machine
+# (no id, no version, a fixed User-Agent) and the answer is thrown away. It runs in the background and
+# can neither delay nor fail anything. --no-count, YAMI_NO_COUNT=1, DO_NOT_TRACK=1 or CI: no request at all
+COUNT_URL="${YAMI_COUNT_URL:-https://github.com/Trendorin/yami/releases/download/installs/yami-installs.txt}"
+count_wanted() { ((COUNT && !DRY)) && [[ -z ${YAMI_NO_COUNT:-} && -z ${DO_NOT_TRACK:-} && -z ${CI:-} && ! -e $STATE/counted ]] && command -v curl >/dev/null; }
 do_count() {
+  count_wanted || return 99
   local mark="$STATE/counted"
-  ((COUNT)) && [[ -z ${YAMI_NO_COUNT:-} && -z ${CI:-} && ! -e $mark ]] || return 99
-  command -v curl >/dev/null || return 99
-  curl -fsSL --max-time 15 -o /dev/null "$COUNT_URL" || { note "$(t "счётчик недоступен — не страшно" "counter unreachable, never mind" "contador indisponível, sem problema")"; return 0; }
-  mkdir -p "${mark%/*}" && : >"$mark"
+  mkdir -p "$STATE"
+  ( curl -fsSL -A yami --connect-timeout 4 --max-time 8 -o /dev/null "$COUNT_URL" && : >"$mark" ) >/dev/null 2>&1 &
+  return 0
 }
 # what is installed and from where: `yami update` compares against it
 do_stamp() {
@@ -197,7 +177,7 @@ do_stamp() {
   printf '%s\n' "${C_ID[*]}" >"$KNOWN_F"
   # откуда ставить модули потом (окно настройки); первый вход откроет это окно
   printf '%s\n' "$ROOT" >"$STATE/source"
-  ((UPDATE || APPLY || FULL)) || : >"$STATE/first-run"
+  ((UPDATE || APPLY || FULL || REPAIR)) || : >"$STATE/first-run"
 }
 
 # services the desktop needs; NetworkManager only when nothing else manages the network
