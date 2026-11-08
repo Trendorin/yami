@@ -297,6 +297,7 @@ impl App {
                 self.fonts = Fonts::with(self.fm.look.font("files"));
             }
             crate::i18n::set(&self.fm.look.lang);
+            crate::picons::reset_system();
             self.icons.set_style(self.fm.look.theme.icon_ramp(), self.fm.look.icon_pixel, self.fm.look.icon_tint);
             self.dirty = true;
         }

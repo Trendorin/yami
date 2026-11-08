@@ -68,27 +68,6 @@ impl App {
     pub(crate) fn on_pointer(&mut self, e: &PointerEvent) {
         let Some(sid) = self.surf_of(&e.surface) else { return };
         let (x, y) = e.position;
-        // скриншот: протяжка, рисование и лупа — мимо обычных зон
-        if self.surf_kind(sid) == Some(SKind::Snap) {
-            let on_btn = self.zone_at(sid, x, y).map(|z| matches!(z.act, Act::SnapBtn(_))).unwrap_or(false);
-            let took = match e.kind {
-                PointerEventKind::Motion { .. } => self.snap_pointer(sid, 0, x, y, 0, on_btn),
-                PointerEventKind::Press { button, .. } => self.snap_pointer(sid, 1, x, y, button, on_btn),
-                PointerEventKind::Release { button, .. } if self.press.is_none() => self.snap_pointer(sid, 2, x, y, button, on_btn),
-                PointerEventKind::Axis { vertical, .. } => {
-                    let d = if vertical.value120 != 0 { vertical.value120.signum() } else { vertical.discrete.signum() };
-                    if d != 0 {
-                        self.snap_wheel(d);
-                    }
-                    true
-                }
-                _ => false,
-            };
-            if took {
-                self.ptr = Some((sid, x, y));
-                return;
-            }
-        }
         match e.kind {
             PointerEventKind::Enter { serial } => {
                 if matches!(self.surf_kind(sid), Some(SKind::Dock | SKind::DockEdge)) {
@@ -370,10 +349,6 @@ impl App {
             Some(SKind::Popup) => self.popup_key(e),
             Some(SKind::Menu) => self.menu_key(e),
             Some(SKind::Widget(_)) => self.widget_key(e),
-            Some(SKind::Snap) => {
-                self.snap_key(e);
-                return;
-            }
             Some(SKind::EditBar) => {
                 if matches!(e.keysym, Keysym::Escape | Keysym::Return) {
                     self.set_editing(false);

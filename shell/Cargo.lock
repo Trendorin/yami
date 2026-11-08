@@ -1531,6 +1531,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "yami-shot"
+version = "2.7.0"
+dependencies = [
+ "blocking",
+ "calloop",
+ "calloop-wayland-source",
+ "image",
+ "libc",
+ "serde",
+ "serde_json",
+ "smithay-client-toolkit",
+ "wayland-client",
+ "wayland-protocols",
+ "yami-px",
+ "zbus",
+]
+
+[[package]]
 name = "yami-view"
 version = "2.7.0"
 dependencies = [

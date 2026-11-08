@@ -90,8 +90,6 @@ const TARGETS: &[&str] = &[
     "osd:curtain",
     "auth",
     "screen-pick",
-    "screenshot",
-    "screenshot:pick",
     "settings:shots",
     "settings:windows",
     "settings:dock",
@@ -604,11 +602,6 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             st.set.dock_pins = vec!["org.kde.dolphin".into(), "kitty".into(), "firefox".into(), "steam".into()];
             crate::dock::size(st)
         }
-        "screenshot" => {
-            let (w, h, px) = frame().unwrap_or((1280, 720, None));
-            st.snap = Some(crate::snap::Snap::mock(w, h, arg != "pick", &st.t, px));
-            (w, h)
-        }
         _ => (300, 200),
     };
     let mut buf = vec![0u32; (w * h) as usize];
@@ -653,7 +646,6 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             "lock" => crate::lock::draw(&mut ui, st, w, h, true),
             "curtain" if arg == "badge" => crate::curtain::draw_badge(&mut ui, w, h),
             "curtain" => crate::curtain::draw(&mut ui, st, "shot", w, h),
-            "screenshot" => crate::snap::draw(&mut ui, st, "", w, h),
             "dock" => crate::dock::draw(&mut ui, st, w, h),
             "icons" => icons_grid(&mut ui, st),
             "auth" => crate::auth::draw(&mut ui, st, w, h),

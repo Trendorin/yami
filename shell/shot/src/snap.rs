@@ -1,20 +1,17 @@
-// Скриншоты: экран замораживается (grim), поверх — оверлей на каждом мониторе в пиксельном
-// стиле шелла: вуаль со строками развёртки, выделение «бегущими муравьями» с ручками, лупа
-// с пиксельной сеткой и пипеткой, панель инструментов (перо, рамка, стрелка, маркер,
-// мозаика, номерки), палитра из темы. Enter — готово: в буфер и/или в папку, уведомление
-// с миниатюрой. Режимы: область, окно (по раскладке niri), экран. Таймер — 3/5/10 с.
-//
-//   yami-shell msg screenshot [area|window|screen]   (Print, Alt+Print, Ctrl+Print)
+// Скриншоты: экран замораживается (grim), поверх — оверлей на каждом мониторе: вуаль, выделение
+// «бегущими муравьями» с ручками, лупа с пиксельной сеткой и пипеткой, панель инструментов (перо,
+// рамка, стрелка, маркер, мозаика, номерки), палитра из темы. Enter — готово: в буфер и/или в папку,
+// уведомление с миниатюрой. Режимы: область, окно (раскладка niri; на других композиторах окон
+// не видно, щелчок берёт весь экран), экран. Таймер — 3/5/10 с.
 
-pub use crate::snapdraw::{draw, paint};
-use crate::app::{App, Msg, SKind};
-use crate::gfx::{Canvas, Img, C, R};
+pub use crate::draw::paint;
+use crate::app::{App, Msg};
 use smithay_client_toolkit::seat::keyboard::{KeyEvent, Keysym};
-use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 use std::collections::HashMap;
+use yami_px::gfx::{Canvas, Img, C, R};
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Mode {
@@ -88,7 +85,7 @@ pub struct Snap {
 }
 
 impl Snap {
-    pub fn colors(t: &crate::theme::Theme) -> [C; 6] {
+    pub fn colors(t: &yami_px::theme::Theme) -> [C; 6] {
         [t.red, C::hex(0xffffff), C::hex(0x0b0909), t.ok, t.warn, C::hex(0x3a9fd0)]
     }
     pub(crate) fn cur_sel(&self, out: &str) -> Option<R> {
@@ -100,7 +97,7 @@ impl Snap {
     /// для `yami-shell shot`: «рабочий стол» из полос, выделение и пара меток
     /// снимок для `shot`: шахматка с «окном» или настоящий кадр (`shot --frame`, картинки README);
     /// разметка задана для 1280×720 и масштабируется под кадр
-    pub fn mock(w: i32, h: i32, edit: bool, t: &crate::theme::Theme, frame: Option<Vec<u32>>) -> Snap {
+    pub fn mock(w: i32, h: i32, edit: bool, t: &yami_px::theme::Theme, frame: Option<Vec<u32>>) -> Snap {
         let px = frame.unwrap_or_else(|| {
             let mut px = vec![0u32; (w * h) as usize];
             for y in 0..h {
@@ -153,47 +150,11 @@ impl Snap {
     }
 }
 
-/// grim -t ppm: P6, ширина, высота, 255, RGB
-pub(crate) fn parse_ppm(b: &[u8]) -> Option<Img> {
-    let mut fields = vec![];
-    let mut i = 0;
-    while fields.len() < 4 && i < b.len() {
-        while i < b.len() && b[i].is_ascii_whitespace() {
-            i += 1;
-        }
-        if b.get(i) == Some(&b'#') {
-            while i < b.len() && b[i] != b'\n' {
-                i += 1;
-            }
-            continue;
-        }
-        let s = i;
-        while i < b.len() && !b[i].is_ascii_whitespace() {
-            i += 1;
-        }
-        fields.push(String::from_utf8_lossy(&b[s..i]).to_string());
-    }
-    i += 1;
-    if fields.first().map(|f| f != "P6").unwrap_or(true) {
-        return None;
-    }
-    let w: i32 = fields.get(1)?.parse().ok()?;
-    let h: i32 = fields.get(2)?.parse().ok()?;
-    let data = b.get(i..i + (w * h * 3) as usize)?;
-    let px = data.chunks_exact(3).map(|p| 0xff000000 | (p[0] as u32) << 16 | (p[1] as u32) << 8 | p[2] as u32).collect();
-    Some(Img { w, h, px })
-}
-
-pub fn grab(out: &str) -> Option<Img> {
-    let o = std::process::Command::new("grim").args(["-o", out, "-t", "ppm", "-"]).output().ok()?;
-    if !o.status.success() {
-        return None;
-    }
-    parse_ppm(&o.stdout)
-}
-
-/// окна видимых рабочих столов в координатах их мониторов
+/// окна видимых рабочих столов в координатах их мониторов (только niri: его раскладку знаем)
 pub(crate) fn niri_windows() -> Vec<(String, R, String)> {
+    if std::env::var_os("NIRI_SOCKET").is_none() {
+        return vec![];
+    }
     let run = |what: &str| -> serde_json::Value {
         std::process::Command::new("niri").args(["msg", "-j", what]).output().ok().and_then(|o| serde_json::from_slice(&o.stdout).ok()).unwrap_or(serde_json::Value::Null)
     };
@@ -240,15 +201,6 @@ pub(crate) fn handles(r: R) -> [R; 8] {
 }
 
 // ── поведение ──────────────────────────────────────────────────────────────
-pub fn shots_dir(set: &crate::config::Settings) -> PathBuf {
-    let d = set.shot_dir.trim();
-    if !d.is_empty() {
-        return yami_px::paths::expand(d);
-    }
-    // XDG_PICTURES_DIR/Screenshots
-    yami_px::paths::pictures().join("Screenshots")
-}
-
 pub(crate) fn copy_text(s: &str) {
     use std::io::Write;
     if let Ok(mut ch) = std::process::Command::new("wl-copy").stdin(std::process::Stdio::piped()).spawn() {
@@ -270,87 +222,58 @@ fn in_corner(x: i32, y: i32, w: i32, h: i32) -> bool {
     near(x, w) && near(y, h)
 }
 
-pub(crate) fn file_name() -> String {
-    let tm = crate::clock::local_now();
-    format!("yami-{:04}-{:02}-{:02}_{:02}-{:02}-{:02}.png", tm.year, tm.mon, tm.day, tm.hour, tm.min, tm.sec)
+pub(crate) fn file_name(prefix: &str) -> String {
+    let tm = yami_px::time::local_now();
+    format!("{prefix}-{:04}-{:02}-{:02}_{:02}-{:02}-{:02}.png", tm.year, tm.mon, tm.day, tm.hour, tm.min, tm.sec)
 }
 
 impl App {
-    /// начать: таймер (если есть) → снимок всех мониторов в нити → оверлей
-    pub fn snap_start(&mut self, mode: Mode, delay: u32) {
-        if self.st.locked || self.st.snap.is_some() {
-            return;
-        }
-        self.close_all();
-        let outs = self.output_names();
-        let tx = self.tx.clone();
-        if delay > 0 {
-            self.st.snap_countdown = Some((Instant::now(), delay));
-            self.show_osd("snap");
-        }
-        std::thread::spawn(move || {
-            if delay > 0 {
-                std::thread::sleep(Duration::from_secs(delay as u64));
-            } else {
-                // меню и всплывашки успевают исчезнуть
-                std::thread::sleep(Duration::from_millis(60));
-            }
-            let imgs: HashMap<String, Img> = outs.iter().filter_map(|o| grab(o).map(|i| (o.clone(), i))).collect();
-            let wins = niri_windows();
-            let _ = tx.send(Msg::Snap(imgs, wins, mode));
-        });
-    }
-
     pub fn on_snap_ready(&mut self, imgs: HashMap<String, Img>, wins: Vec<(String, R, String)>, mode: Mode) {
-        self.st.snap_countdown = None;
         if imgs.is_empty() {
             self.toast_note("скриншот не вышел", "нужен grim (пакет grim)");
+            self.closing = true;
             return;
         }
         let outs: Vec<String> = imgs.keys().cloned().collect();
-        let mut sn = Snap { imgs: imgs.into_iter().map(|(k, v)| (k, Rc::new(v))).collect(), mode, sel: None, drag: None, tool: Tool::Select, color: 0, size: 4, marks: vec![], redo: vec![], ptr: None, flash: None, wins, busy: false, hint: None, ocr: crate::doctor::which("tesseract"), qr: crate::doctor::which("zbarimg") };
-        let focus = self.focus_out();
+        let mut sn = Snap { imgs: imgs.into_iter().map(|(k, v)| (k, Rc::new(v))).collect(), mode, sel: None, drag: None, tool: Tool::Select, color: 0, size: 4, marks: vec![], redo: vec![], ptr: None, flash: None, wins, busy: false, hint: None, ocr: yami_px::paths::find_exe("tesseract").is_some(), qr: yami_px::paths::find_exe("zbarimg").is_some() };
+        let focus = self.focus_out(&outs);
         if mode == Mode::Screen {
             let (w, h) = self.output_size(&focus);
             sn.sel = Some((focus.clone(), R::new(0, 0, w, h)));
         }
-        self.st.snap = Some(sn);
+        self.snap = Some(sn);
         // мгновенный режим: снимок экрана — без оверлея, сразу в буфер и/или в папку
-        if mode == Mode::Screen && self.st.set.shot_confirm == "instant" {
+        if mode == Mode::Screen && self.cfg.instant() {
             self.snap_done();
             self.snap_close();
             return;
         }
         for o in outs {
-            let kb = if o == focus { KeyboardInteractivity::Exclusive } else { KeyboardInteractivity::None };
-            self.mk(SKind::Snap, &o, Layer::Overlay, "yami-screenshot", Anchor::all(), (0, 0), (0, 0, 0, 0), -1, kb);
-        }
-    }
-
-    pub fn snap_close(&mut self) {
-        self.st.snap = None;
-        for id in self.find(&SKind::Snap) {
-            self.destroy(id);
+            let kb = o == focus;
+            self.make_surface(&o, kb);
         }
     }
 
     fn snap_hint(&mut self, s: &str) {
-        if let Some(sn) = &mut self.st.snap {
+        if let Some(sn) = &mut self.snap {
             sn.hint = Some((s.to_string(), Instant::now()));
         }
     }
 
+    /// простое уведомление: своё окно уже закрывается, показать результат может только сервер уведомлений
     pub fn toast_note(&mut self, summary: &str, body: &str) {
-        let n = crate::dbus::Incoming { id: 9_000_000 + (self.st.started.elapsed().as_millis() % 1_000_000) as u32, app: "yami".into(), icon: String::new(), summary: crate::i18n::tr(summary).into(), body: crate::i18n::tr(body).into(), actions: vec![], urgency: 1, image: None, timeout: -1 };
-        self.on_notif(n);
+        let (s, b) = (crate::i18n::tr(summary).to_string(), crate::i18n::tr(body).to_string());
+        self.work(move || {
+            crate::notify::send(&s, &b, None, &[], 0);
+        });
     }
 
     /// мышь над оверлеем; true — событие наше
     pub fn snap_pointer(&mut self, sid: u32, kind: u8, x: f64, y: f64, button: u32, on_btn: bool) -> bool {
-        let Some(out) = self.surfs.get(&sid).map(|s| s.output.clone()) else { return false };
-        let (w, h) = self.surfs.get(&sid).map(|s| (s.w, s.h)).unwrap_or((0, 0));
-        let colors = Snap::colors(&self.st.t);
-        let Some(sn) = &mut self.st.snap else { return false };
+        let Some(out) = self.surf_output(sid) else { return false };
+        let (w, h) = self.surf_size(sid);
+        let colors = Snap::colors(&self.look.theme);
+        let Some(sn) = &mut self.snap else { return false };
         let (xi, yi) = ((x as i32).clamp(0, w - 1), (y as i32).clamp(0, h - 1));
         if sn.flash.is_some() || sn.busy {
             // снимок сделан: курсор нужен только snap_tick — ушёл ли он из угла
@@ -358,8 +281,8 @@ impl App {
             return true;
         }
         sn.ptr = Some((out.clone(), xi, yi));
-        self.dirty(&SKind::Snap);
-        let Some(sn) = &mut self.st.snap else { return false };
+        self.dirty();
+        let Some(sn) = &mut self.snap else { return false };
         match kind {
             // движение
             0 => {
@@ -481,7 +404,7 @@ impl App {
                     }
                 }
                 // мгновенный режим: выделил (протянул или щёлкнул по окну) — снимок готов
-                if picked && sn.sel.is_some() && self.st.set.shot_confirm == "instant" {
+                if picked && sn.sel.is_some() && self.cfg.instant() {
                     self.snap_done();
                 }
                 true
@@ -490,16 +413,16 @@ impl App {
     }
 
     pub fn snap_wheel(&mut self, d: i32) {
-        if let Some(sn) = &mut self.st.snap {
+        if let Some(sn) = &mut self.snap {
             let sizes = [2, 4, 8];
             let i = sizes.iter().position(|&s| s == sn.size).unwrap_or(1) as i32;
             sn.size = sizes[(i - d).clamp(0, 2) as usize];
-            self.dirty(&SKind::Snap);
+            self.dirty();
         }
     }
 
     pub fn snap_btn(&mut self, a: &str) {
-        let Some(sn) = &mut self.st.snap else { return };
+        let Some(sn) = &mut self.snap else { return };
         if let Some(t) = TOOLS.iter().find(|t| t.2 == a) {
             sn.tool = t.0;
         } else if let Some(c) = a.strip_prefix("c:") {
@@ -520,17 +443,17 @@ impl App {
                     }
                 }
                 "delay" => {
-                    let d = match self.st.set.shot_delay {
+                    let d = match self.cfg.delay {
                         0 => 3,
                         3 => 5,
                         5 => 10,
                         _ => 3,
                     };
-                    self.st.set.shot_delay = d;
-                    self.settings_changed();
-                    let mode = self.st.snap.as_ref().map(|s| s.mode).unwrap_or(Mode::Area);
+                    self.cfg.delay = d;
+                    self.cfg.save();
+                    let mode = self.snap.as_ref().map(|s| s.mode).unwrap_or(Mode::Area);
                     self.snap_close();
-                    self.snap_start(mode, d);
+                    self.restart_delayed(mode, d);
                     return;
                 }
                 "copy" => self.snap_finish(true, false, false),
@@ -543,13 +466,13 @@ impl App {
                 _ => {}
             }
         }
-        self.dirty(&SKind::Snap);
+        self.dirty();
     }
 
     pub fn snap_key(&mut self, e: &KeyEvent) {
         let (ctrl, shift) = (self.mods.ctrl, self.mods.shift);
-        let ptr_w = self.st.snap.as_ref().and_then(|s| s.ptr.as_ref()).map(|p| self.output_size(&p.0).0).unwrap_or(1);
-        let Some(sn) = &mut self.st.snap else { return };
+        let ptr_w = self.snap.as_ref().and_then(|s| s.ptr.as_ref()).map(|p| self.output_size(&p.0).0).unwrap_or(1);
+        let Some(sn) = &mut self.snap else { return };
         // снимок уже сделан (вспышка) или ждёт диалога: второй пробел, enter или автоповтор
         // клавиши не делают второй снимок (#13)
         if sn.flash.is_some() || sn.busy {
@@ -576,7 +499,7 @@ impl App {
                     let full = sn.imgs.get(&out).map(|i| R::new(0, 0, i.w, i.h)).unwrap_or_default();
                     sn.sel = Some((out, if sn.mode == Mode::Window { win.unwrap_or(full) } else { full }));
                     if e.keysym == Keysym::space {
-                        self.dirty(&SKind::Snap);
+                        self.dirty();
                         return;
                     }
                 }
@@ -664,13 +587,13 @@ impl App {
                 }
             }
         }
-        self.dirty(&SKind::Snap);
+        self.dirty();
     }
 
     /// собрать картинку: вырезать, нанести метки, закодировать в PNG
     fn snap_render(&mut self) -> Option<(Vec<u8>, Img)> {
         use image::ImageEncoder as _;
-        let sn = self.st.snap.as_ref()?;
+        let sn = self.snap.as_ref()?;
         let (out, r) = sn.sel.clone()?;
         let img = sn.imgs.get(&out)?.clone();
         // снимок — в физических пикселях, выделение — в точках экрана; масштаб бывает дробным
@@ -689,7 +612,7 @@ impl App {
             let mut cv = Canvas::new(&mut buf, w, h);
             cv.blit(&img, -x0, -y0);
             for m in &sn.marks {
-                paint(&mut cv, &mut self.res.fonts, m, &img, (r.x, r.y), k, k, self.st.t.on_accent);
+                paint(&mut cv, &mut self.fonts, m, &img, (r.x, r.y), k, k, self.look.theme.on_accent);
             }
         }
         let mut rgba = Vec::with_capacity(buf.len() * 4);
@@ -699,7 +622,7 @@ impl App {
         let mut png = vec![];
         image::codecs::png::PngEncoder::new(&mut png).write_image(&rgba, w as u32, h as u32, image::ExtendedColorType::Rgba8).ok()?;
         // миниатюра для уведомления
-        let thumb = image::RgbaImage::from_raw(w as u32, h as u32, rgba).map(|i| crate::icons::fit_in(i, crate::notif::IMG_W, crate::notif::IMG_H));
+        let thumb = image::RgbaImage::from_raw(w as u32, h as u32, rgba).map(|i| yami_px::icons::fit_in(i, crate::notify::THUMB_W, crate::notify::THUMB_H));
         Some((png, thumb?))
     }
 
@@ -709,7 +632,7 @@ impl App {
         let Some((png, _)) = self.snap_render() else { return };
         self.snap_close();
         let tx = self.tx.clone();
-        std::thread::spawn(move || {
+        self.work(move || {
             if !qr {
                 let text = image::load_from_memory(&png).ok().and_then(|i| crate::ocr::recognize(&i));
                 if let Some(t) = &text {
@@ -752,21 +675,21 @@ impl App {
 
     /// готово по настройкам: копировать и/или сохранить (без копирования — всегда сохранить)
     fn snap_done(&mut self) {
-        let (c, s) = (self.st.set.shot_copy, self.st.set.shot_save);
+        let (c, s) = (self.cfg.copy, self.cfg.save);
         self.snap_finish(c, s || !c, false);
     }
 
     /// готово: copy — в буфер, save — в папку, ask — спросить место диалогом yami-files
     pub fn snap_finish(&mut self, copy: bool, save: bool, ask: bool) {
         // один снимок на один оверлей: кнопка панели, клавиша и мгновенный режим сходятся сюда
-        if self.st.snap.as_ref().is_some_and(|s| s.flash.is_some() || s.busy) {
+        if self.snap.as_ref().is_some_and(|s| s.flash.is_some() || s.busy) {
             return;
         }
         let Some((png, thumb)) = self.snap_render() else { return };
-        let dir = shots_dir(&self.st.set);
-        let name = file_name();
+        let dir = self.cfg.folder();
+        let name = file_name(&self.cfg.prefix);
         let tx = self.tx.clone();
-        if let Some(sn) = &mut self.st.snap {
+        if let Some(sn) = &mut self.snap {
             sn.busy = ask;
             if !ask {
                 sn.flash = Some(Instant::now());
@@ -776,16 +699,16 @@ impl App {
             // диалог должен быть виден: убираем оверлей сразу
             self.snap_close();
         }
-        self.dirty(&SKind::Snap);
-        let notify = self.st.set.shot_notify;
-        std::thread::spawn(move || {
+        self.dirty();
+        let notify = self.cfg.notify;
+        self.work(move || {
             let mut path: Option<PathBuf> = None;
             let mut err = None;
             // «сохранить как» спрашивает окно yami-files; без него — в папку скриншотов, как «сохранить»
-            if ask && crate::proc::have("yami-files") {
+            if ask && crate::notify::picker_available() {
                 let _ = std::fs::create_dir_all(&dir);
-                match crate::proc::files_pick("save", &dir, &["--name", &name, "--filter", "PNG|*.png"]) {
-                    Some(p) => path = Some(PathBuf::from(p)),
+                match crate::notify::pick_save(&dir, &name) {
+                    Some(p) => path = Some(p),
                     None => return,
                 }
             } else if save || ask {
@@ -813,6 +736,7 @@ impl App {
         });
     }
 
+    /// файл записан: уведомление с миниатюрой; кнопки открывают файл или папку, пока уведомление живо
     pub fn on_snap_done(&mut self, path: Option<PathBuf>, copied: bool, err: Option<String>, thumb: Option<Img>) {
         if let Some(e) = err {
             self.toast_note("скриншот не сохранился", &e);
@@ -823,28 +747,26 @@ impl App {
             (Some(_), true) => crate::i18n::tr("скриншот сохранён и скопирован"),
             (Some(_), false) => crate::i18n::tr("скриншот сохранён"),
             _ => crate::i18n::tr("скриншот в буфере обмена"),
-        };
-        let body = path.as_ref().map(|p| p.display().to_string().replace(&crate::config::home().to_string_lossy().to_string(), "~")).unwrap_or_default();
-        let id = 9_500_000 + (self.st.started.elapsed().as_millis() % 400_000) as u32;
-        let actions = if path.is_some() { vec![("default".to_string(), crate::i18n::tr("открыть").to_string()), ("folder".to_string(), crate::i18n::tr("в папке").to_string())] } else { vec![] };
-        if let Some(p) = path {
-            // действия есть только у карточек в истории (≤ 50): старые пути не храним
-            let live: Vec<u32> = self.st.notifs.history.iter().map(|n| n.id).collect();
-            self.st.shot_files.retain(|k, _| live.contains(k));
-            self.st.shot_files.insert(id, p);
         }
-        let n = crate::dbus::Incoming { id, app: "yami-screenshot".into(), icon: String::new(), summary: summary.into(), body, actions, urgency: 1, image: Some(thumb), timeout: -1 };
-        self.on_notif(n);
-    }
-
-    /// уведомление скриншота: открыть файл или его папку (true — обработано)
-    pub fn shot_note_action(&mut self, id: u32, key: &str) -> bool {
-        let Some(p) = self.st.shot_files.get(&id).cloned() else { return false };
-        match key {
-            "folder" => App::open_dir(p.display().to_string()),
-            _ => App::spawn(&["xdg-open".into(), p.display().to_string()]),
-        }
-        true
+        .to_string();
+        let body = path.as_ref().map(|p| yami_px::paths::pretty(p)).unwrap_or_default();
+        let open = crate::i18n::tr("открыть").to_string();
+        let folder = crate::i18n::tr("в папке").to_string();
+        self.work(move || {
+            let actions: Vec<(String, String)> = if path.is_some() { vec![("default".to_string(), open), ("folder".to_string(), folder)] } else { vec![] };
+            let picked = crate::notify::send(&summary, &body, Some(&thumb), &actions, 30);
+            let Some(p) = path else { return };
+            match picked.as_deref() {
+                Some("folder") => {
+                    let d = p.parent().map(|d| d.to_path_buf()).unwrap_or_default();
+                    let _ = std::process::Command::new("xdg-open").arg(d).spawn();
+                }
+                Some("default") => {
+                    let _ = std::process::Command::new("xdg-open").arg(p).spawn();
+                }
+                _ => {}
+            }
+        });
     }
 
     /// раз в тик: вспышка догорела — закрыть оверлей. Курсор в углу экрана — подождать, пока уйдёт
@@ -852,7 +774,7 @@ impl App {
     /// оверлея первое же движение мыши в углу открыло бы обзор — так и было в мгновенном режиме,
     /// когда выделение тянут до угла экрана (#15)
     pub fn snap_tick(&mut self) {
-        let Some(sn) = &self.st.snap else { return };
+        let Some(sn) = &self.snap else { return };
         let Some(ms) = sn.flash.map(|f| f.elapsed().as_millis()) else { return };
         let cornered = sn.ptr.as_ref().is_some_and(|(o, x, y)| {
             let (w, h) = self.output_size(o);

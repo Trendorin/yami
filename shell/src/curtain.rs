@@ -149,7 +149,7 @@ impl App {
         // кадр — до того, как что-то успеет поменяться; обработка в нити
         let (n, tx, cell, outs) = (self.curtain_wanted, self.tx.clone(), self.st.set.curtain_cell, self.output_names());
         std::thread::spawn(move || {
-            let imgs: HashMap<String, Img> = outs.into_iter().filter_map(|o| crate::snap::grab(&o).and_then(|f| cover_of(&f, &style, cell)).map(|i| (o, i))).collect();
+            let imgs: HashMap<String, Img> = outs.into_iter().filter_map(|o| crate::gfx::grab_output(&o).and_then(|f| cover_of(&f, &style, cell)).map(|i| (o, i))).collect();
             let _ = tx.send(Msg::Curtain(n, imgs));
         });
     }

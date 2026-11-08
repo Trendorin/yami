@@ -425,17 +425,17 @@ fn merge(base: &[Word], eng: &[Word], rus: &[Word]) -> Vec<(Word, String)> {
 }
 
 /// `yami ocr FILE`: текст с картинки в stdout
-pub fn cli(y: &crate::cmd::Sty, args: &[&str]) -> i32 {
+pub fn cli(args: &[String]) -> i32 {
     let Some(f) = args.first().filter(|a| !a.starts_with('-')) else {
-        eprintln!(" {} yami ocr FILE", y.bad("✕"));
+        eprintln!("yami-shot ocr FILE");
         return 2;
     };
-    if !crate::doctor::which("tesseract") {
-        eprintln!(" {} {}", y.bad("✕"), crate::tf!("нужен tesseract (компонент «инструменты» установщика)", "tesseract is needed (the installer's «tools» component)", "tesseract é necessário (componente «ferramentas» do instalador)"));
+    if yami_px::paths::find_exe("tesseract").is_none() {
+        eprintln!("yami-shot: {}", crate::tf!("нужен tesseract (компонент пакет tesseract)", "tesseract is needed (the tesseract package)", "tesseract é necessário (pacote tesseract)"));
         return 1;
     }
     let Ok(img) = image::open(f) else {
-        eprintln!(" {} {}", y.bad("✕"), crate::tf!("не читается: {}", "cannot read: {}", "não foi possível ler: {}", f));
+        eprintln!("yami-shot: {}", crate::tf!("не читается: {}", "cannot read: {}", "não foi possível ler: {}", f));
         return 2;
     };
     match recognize(&img) {
@@ -444,7 +444,7 @@ pub fn cli(y: &crate::cmd::Sty, args: &[&str]) -> i32 {
             0
         }
         None => {
-            eprintln!(" {} {}", y.warn("·"), crate::tf!("текст не распознан", "no text recognised", "nenhum texto reconhecido"));
+            eprintln!("yami-shot: {}", crate::tf!("текст не распознан", "no text recognised", "nenhum texto reconhecido"));
             1
         }
     }

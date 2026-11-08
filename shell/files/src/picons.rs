@@ -1,4 +1,5 @@
-// Пиксельные значки файлов: битмапы 16×16 в цветах темы, масштаб — целыми клетками.
+// Значки файлов. В сглаженных стилях — из системного набора значков (если в нём нашёлся нужный).
+// В пиксельном — битмапы 16×16 в цветах темы, масштаб — целыми клетками.
 // Папка — в акценте, документ — светлый лист с загнутым углом и глифом типа (те же 7×7, что
 // в шелле). Особые папки (дом, загрузки…) несут свой глиф, ссылки — стрелку в углу.
 
@@ -272,6 +273,68 @@ pub fn kind_glyph(k: Kind) -> &'static str {
     }
 }
 
+thread_local! {
+    /// системный набор значков для сглаженных стилей: заводится при первом значке
+    static SYSTEM: std::cell::RefCell<Option<yami_px::icons::Icons>> = const { std::cell::RefCell::new(None) };
+}
+
+/// имя значка по спецификации freedesktop
+fn system_name(kind: Kind, sp: Special) -> &'static str {
+    match sp {
+        Special::Home => return "user-home",
+        Special::Desktop => return "user-desktop",
+        Special::Docs => return "folder-documents",
+        Special::Downloads => return "folder-download",
+        Special::Music => return "folder-music",
+        Special::Pictures => return "folder-pictures",
+        Special::Videos => return "folder-videos",
+        Special::Trash => return "user-trash",
+        Special::TrashFull => return "user-trash-full",
+        Special::Drive | Special::Root => return "drive-harddisk",
+        Special::Usb => return "drive-removable-media",
+        Special::Phone => return "phone",
+        Special::Camera => return "camera-photo",
+        Special::Net => return "folder-remote",
+        Special::Star | Special::None => {}
+    }
+    match kind {
+        Kind::Dir => "folder",
+        Kind::Image => "image-x-generic",
+        Kind::Video => "video-x-generic",
+        Kind::Audio => "audio-x-generic",
+        Kind::Code => "text-x-script",
+        Kind::Doc => "x-office-document",
+        Kind::Pdf => "application-pdf",
+        Kind::Archive | Kind::Package => "package-x-generic",
+        Kind::Exec => "application-x-executable",
+        Kind::Font => "font-x-generic",
+        Kind::Disk => "media-optical",
+        Kind::Web => "text-html",
+        Kind::Text | Kind::Other => "text-x-generic",
+    }
+}
+
+/// значок из системного набора; false — такого нет, рисуем свой
+fn draw_system(cv: &mut Canvas, kind: Kind, sp: Special, x: i32, y: i32, size: i32, k: f32) -> bool {
+    let img = SYSTEM.with(|s| {
+        let mut s = s.borrow_mut();
+        let ic = s.get_or_insert_with(|| yami_px::icons::Icons::new(&yami_px::icons::system_theme()));
+        ic.get(system_name(kind, sp), size)
+    });
+    match img {
+        Some(i) => {
+            cv.image(&i, x + (size - i.w) / 2, y + (size - i.h) / 2, k);
+            true
+        }
+        None => false,
+    }
+}
+
+/// забыть набор значков: сменилась тема
+pub fn reset_system() {
+    SYSTEM.with(|s| *s.borrow_mut() = None);
+}
+
 pub struct Look {
     pub dim: bool,
     pub link: bool,
@@ -283,6 +346,14 @@ pub fn draw(cv: &mut Canvas, t: &Theme, kind: Kind, sp: Special, x: i32, y: i32,
     let u = u.max(1);
     let k = if lk.dim { 0.55 } else { 1.0 };
     let dark = t.blood.lerp(C(0xff000000), 0.45);
+    if cv.style.smooth && draw_system(cv, kind, sp, x, y, 16 * u, k) {
+        if lk.link {
+            let b = R::new(x, y + 10 * u, 6 * u, 6 * u);
+            cv.fill(b, t.panel.fade(k));
+            cv.icon_in("arrow", b, u.max(1) / 2 + (u == 1) as i32, t.text.fade(k));
+        }
+        return;
+    }
     let accent = if lk.selected { t.ember } else { t.red };
     // бумага — светлая в обеих темах (в светлой текст тёмный, брать его нельзя)
     let (paper, fold) = if t.light {

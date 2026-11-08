@@ -64,6 +64,19 @@ impl App {
                 self.theme_rerun();
                 return true;
             }
+            Act::SBool(k) if k.starts_with("shot_") => {
+                // настройки скриншотов — файл yami-shot, а не настройки шелла
+                let c = &mut self.st.shot_cfg;
+                match *k {
+                    "shot_copy" => c.copy = !c.copy,
+                    "shot_save" => c.save = !c.save,
+                    "shot_loupe" => c.loupe = !c.loupe,
+                    "shot_notify" => c.notify = !c.notify,
+                    _ => {}
+                }
+                c.save();
+                self.dirty(&SKind::Modal);
+            }
             Act::SBool(k) => {
                 match *k {
                     "animations" => s.animations = !s.animations,
@@ -105,7 +118,6 @@ impl App {
                     "bat_hide_full" => s.bat_hide_full = !s.bat_hide_full,
                     "clock_date" => s.clock_date = !s.clock_date,
                     "dnd" => s.dnd = !s.dnd,
-                    "shot_copy" => s.shot_copy = !s.shot_copy,
                     "float_media" => s.float_media = !s.float_media,
                     "dock" => s.dock = !s.dock,
                     "dock_bounce" => s.dock_bounce = !s.dock_bounce,
@@ -114,9 +126,6 @@ impl App {
                     "dock_launcher" => s.dock_launcher = !s.dock_launcher,
                     "dock_trash" => s.dock_trash = !s.dock_trash,
                     "float_pip" => s.float_pip = !s.float_pip,
-                    "shot_save" => s.shot_save = !s.shot_save,
-                    "shot_loupe" => s.shot_loupe = !s.shot_loupe,
-                    "shot_notify" => s.shot_notify = !s.shot_notify,
                     "game_fullscreen" => s.game_fullscreen = !s.game_fullscreen,
                     "game_vrr" => s.game_vrr = !s.game_vrr,
                     "game_tearing" => s.game_tearing = !s.game_tearing,
@@ -198,8 +207,10 @@ impl App {
                     self.renew_notif(SKind::Osd);
                 }
                 "shot_confirm" => {
-                    s.shot_confirm = if s.shot_confirm == "instant" { "space" } else { "instant" }.into();
-                    self.settings_changed();
+                    let c = &mut self.st.shot_cfg;
+                    c.confirm = if c.confirm == "instant" { "space" } else { "instant" }.into();
+                    c.save();
+                    self.dirty(&SKind::Modal);
                 }
                 "media_view" => self.media_view_next(),
                 "media_viz" => {
@@ -289,12 +300,14 @@ impl App {
                     self.settings_changed();
                 }
                 "shot_delay" => {
-                    s.shot_delay = match s.shot_delay {
+                    let c = &mut self.st.shot_cfg;
+                    c.delay = match c.delay {
                         3 => 5,
                         5 => 10,
                         _ => 3,
                     };
-                    self.settings_changed();
+                    c.save();
+                    self.dirty(&SKind::Modal);
                 }
                 "set_add" => self.sets_add(),
                 "cursor_size" => {
@@ -383,9 +396,10 @@ impl App {
                 }
                 "shot_dir_apply" => {
                     let p = self.st.shot_field.text.trim().to_string();
-                    self.st.set.shot_dir = p;
+                    self.st.shot_cfg.dir = p;
+                    self.st.shot_cfg.save();
                     self.st.field_focus = None;
-                    self.settings_changed();
+                    self.dirty(&SKind::Modal);
                 }
                 "do_lock" => {
                     self.close_modal();
@@ -509,7 +523,7 @@ impl App {
                     self.st.game_field.set(&p);
                 }
                 if *k == "shot_dir" && self.st.shot_field.text.is_empty() {
-                    let p = self.st.set.shot_dir.clone();
+                    let p = self.st.shot_cfg.dir.clone();
                     self.st.shot_field.set(&p);
                 }
                 if *k == "wall" && self.st.wall_field.text.is_empty() {

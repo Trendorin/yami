@@ -445,24 +445,25 @@ pub(crate) fn tab_windows(ui: &mut Ui, st: &State, b: R) {
 
 pub(crate) fn tab_shots(ui: &mut Ui, st: &State, b: R) {
     let s = &st.set;
+    let c = &st.shot_cfg;
     let half = (b.w - 20) / 2;
     let mut y = title(ui, b.x, b.y, b.w, "куда");
-    ui.toggle(R::new(b.x, y, half, 40), "в буфер обмена", "сразу вставляй куда угодно", s.shot_copy, Act::SBool("shot_copy"));
-    ui.toggle(R::new(b.x + half + 20, y, half, 40), "в папку", "файл png с датой в имени", s.shot_save, Act::SBool("shot_save"));
+    ui.toggle(R::new(b.x, y, half, 40), "в буфер обмена", "сразу вставляй куда угодно", c.copy, Act::SBool("shot_copy"));
+    ui.toggle(R::new(b.x + half + 20, y, half, 40), "в папку", "файл png с датой в имени", c.save, Act::SBool("shot_save"));
     y += 50;
     let focused = st.field_focus == Some("shot_dir");
-    let shown = crate::snap::shots_dir(s).display().to_string().replace(&crate::config::home().to_string_lossy().to_string(), "~");
+    let shown = c.folder().display().to_string().replace(&crate::config::home().to_string_lossy().to_string(), "~");
     ui.field(R::new(b.x, y, b.w - 130, 30), &st.shot_field, &shown, focused, false, Act::SField("shot_dir"));
     ui.button(R::new(b.right() - 120, y + 2, 120, 26), "применить", "check", Tone::Primary, false, true, Act::SCycle("shot_dir_apply"));
     y += 46;
     y = title(ui, b.x, y, b.w, "оверлей");
-    ui.toggle(R::new(b.x, y, half, 40), "лупа", "пиксели под курсором, ctrl+c — цвет", s.shot_loupe, Act::SBool("shot_loupe"));
-    ui.toggle(R::new(b.x + half + 20, y, half, 40), "уведомление", "с миниатюрой и кнопками", s.shot_notify, Act::SBool("shot_notify"));
+    ui.toggle(R::new(b.x, y, half, 40), "лупа", "пиксели под курсором, ctrl+c — цвет", c.loupe, Act::SBool("shot_loupe"));
+    ui.toggle(R::new(b.x + half + 20, y, half, 40), "уведомление", "с миниатюрой и кнопками", c.notify, Act::SBool("shot_notify"));
     y += 50;
-    let d = crate::tf!("{} с", "{} s", "{} s", s.shot_delay);
+    let d = crate::tf!("{} с", "{} s", "{} s", c.delay);
     opt_btn(ui, R::new(b.x, y, b.w, 26), "таймер (кнопка ◷ в оверлее)", &d, Act::SCycle("shot_delay"));
     y += 32;
-    let conf = if s.shot_confirm == "instant" { "сразу, как отпустил мышь" } else { "пробелом или enter" };
+    let conf = if c.confirm == "instant" { "сразу, как отпустил мышь" } else { "пробелом или enter" };
     opt_btn(ui, R::new(b.x, y, b.w, 26), "снимок", conf, Act::SCycle("shot_confirm"));
     y += 40;
     // шторка: зрители трансляции видят её, ты — экран (curtain.rs)

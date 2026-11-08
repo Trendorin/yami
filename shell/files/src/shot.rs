@@ -87,7 +87,7 @@ pub fn run(args: &[String]) -> i32 {
     let root = std::env::temp_dir().join(format!("yami-files-shot-{}", std::process::id()));
     fixture(&root);
     let _ = std::fs::create_dir_all(&out);
-    let mut fonts = Fonts::new();
+    let mut fonts = Fonts::with(look.font("files"));
     let mut icons = Icons::new(&look.icon_theme);
     icons.set_style(look.theme.icon_ramp(), look.icon_pixel, look.icon_tint);
     let mut bad = 0;

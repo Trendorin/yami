@@ -222,16 +222,6 @@ pub struct Settings {
     /// отступ OSD от края экрана (сверху — от низа бара), px; по центру не нужен (#8)
     pub osd_offset: i32,
 
-    // скриншоты: папка ("" — Изображения/Screenshots), куда класть, лупа, таймер
-    pub shot_dir: String,
-    pub shot_copy: bool,
-    pub shot_save: bool,
-    pub shot_loupe: bool,
-    pub shot_notify: bool,
-    pub shot_delay: u32,
-    /// подтверждение снимка (#13): "space" — выделил, потом пробел или enter; "instant" — снимок,
-    /// как только отпущена мышь (область, окно), а снимок экрана — сразу, без оверлея
-    pub shot_confirm: String,
     /// шторка для трансляций (curtain.rs): "blur", "pixels", "wall"; клетка пикселей в px
     pub curtain_style: String,
     pub curtain_cell: i32,
@@ -441,7 +431,7 @@ pub const THEME_APPS: &[(&str, &str, &str)] = &[
     ("starship", "starship", "палитра приглашения"),
 ];
 /// ключи прошлых версий: их читает миграция (load), `config check` не зовёт их незнакомыми
-const RETIRED: &[&str] = &["appThemes"];
+const RETIRED: &[&str] = &["appThemes", "shotDir", "shotCopy", "shotSave", "shotLoupe", "shotNotify", "shotDelay", "shotConfirm"];
 
 pub const MEDIA_VIEWS: &[(&str, &str)] = &[("cover", "обложка"), ("both", "обложка и текст"), ("lyrics", "текст"), ("minimal", "коротко")];
 
@@ -555,13 +545,6 @@ impl Default for Settings {
             osd_pos: "bottom".into(),
             notif_offset: 10,
             osd_offset: 64,
-            shot_dir: String::new(),
-            shot_copy: true,
-            shot_save: true,
-            shot_loupe: true,
-            shot_notify: true,
-            shot_delay: 3,
-            shot_confirm: "space".into(),
             curtain_style: "blur".into(),
             curtain_cell: 24,
             float_media: true,
@@ -744,9 +727,6 @@ impl Settings {
         }
         if !crate::notif::OSD_POS.iter().any(|(k, _)| *k == self.osd_pos) {
             self.osd_pos = "bottom".into();
-        }
-        if self.shot_confirm != "instant" {
-            self.shot_confirm = "space".into();
         }
     }
 

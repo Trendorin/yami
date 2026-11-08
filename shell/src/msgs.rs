@@ -86,8 +86,6 @@ impl App {
             Msg::Volumes(v) => self.automount_volumes(v),
             Msg::AutoMounted(v, res) => self.automount_done(v, res),
             Msg::Update(i) => self.on_update(i),
-            Msg::Snap(imgs, wins, mode) => self.on_snap_ready(imgs, wins, mode),
-            Msg::SnapDone { path, copied, err, thumb } => self.on_snap_done(path, copied, err, thumb),
             Msg::NotifClose(id) => {
                 self.st.notifs.remove(id, false);
                 self.sync_notifs();
@@ -147,7 +145,6 @@ impl App {
                     self.dirty(&SKind::Bar);
                 }
             }
-            Msg::SnapText(qr, text) => self.on_snap_text(qr, text),
             Msg::LFiles(q, found) => {
                 self.st.launcher.files = (q, found);
                 if self.st.modal == Some(Modal::Launcher) {

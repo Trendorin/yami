@@ -10,7 +10,7 @@ impl App {
     // ── тик: часы, датчики, файл настроек ───────────────────────────────────
     pub(crate) fn tick_interval(&self) -> Duration {
         let fast = !self.st.notifs.popups.is_empty() || self.st.osd.is_some() || self.st.field_focus.is_some() || self.st.locked || self.st.modal == Some(Modal::Launcher);
-        let fast = fast || self.st.upd.busy.is_some() || self.st.snap.is_some() || self.st.snap_countdown.is_some() || self.st.dock_leave.is_some() || !self.st.dock_bounce.is_empty();
+        let fast = fast || self.st.upd.busy.is_some() || self.st.dock_leave.is_some() || !self.st.dock_bounce.is_empty();
         let ms = if fast { 100 } else { 1000 };
         // текст песни с метками: следующий тик — к смене строки, а не через секунду
         let next = self.lyrics_live().then(|| self.st.lyrics.next_in(self.st.media.now_pos())).flatten().map(|s| (s * 1000.0) as u64 + 20);
@@ -123,16 +123,8 @@ impl App {
         if self.notif_tick() {
             self.sync_notifs();
         }
-        self.snap_tick();
         self.dock_tick();
         self.disp_tick();
-        // отсчёт таймера скриншота держит табличку
-        if let Some((t0, d)) = self.st.snap_countdown {
-            if t0.elapsed().as_secs() < d as u64 {
-                self.st.osd = Some(("snap", Instant::now()));
-                self.dirty(&SKind::Osd);
-            }
-        }
         if let Some((_, t)) = self.st.osd {
             if t.elapsed() > Duration::from_millis(1500) {
                 self.st.osd = None;

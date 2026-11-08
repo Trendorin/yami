@@ -172,7 +172,7 @@ impl App {
             }
             Act::NotifAct(id, key) if key == "inline-reply" => self.reply_open(id),
             Act::NotifAct(id, key) => {
-                if !self.shot_note_action(id, &key) && !self.update_note_action(id) && !self.automount_note_action(id) {
+                if !self.update_note_action(id) && !self.automount_note_action(id) {
                     crate::dbus::notif_action(id, &key);
                 }
                 self.st.notifs.remove(id, false);
@@ -191,7 +191,6 @@ impl App {
                     }
                 }
             }
-            Act::SnapBtn(a) => self.snap_btn(a),
             Act::DockItem(i) => self.dock_click(i, button, sid, zone),
             Act::DockLauncher => self.toggle_modal(Modal::Launcher, button == RMB),
             Act::DockTrash => App::open_dir("trash:///".into()),

@@ -131,18 +131,23 @@ impl crate::app::App {
                 _ => {}
             },
             c if c.starts_with("settings ") => self.open_settings_tab(c[9..].trim()),
+            // снимает отдельная программа: второй запуск закрывает открытый оверлей (yami-shot)
             c if c == "screenshot" || c.starts_with("screenshot ") => {
-                let mode = match c.split_whitespace().nth(1) {
-                    Some("window") => crate::snap::Mode::Window,
-                    Some("screen") => crate::snap::Mode::Screen,
-                    _ => crate::snap::Mode::Area,
-                };
-                let delay = c.split_whitespace().nth(2).and_then(|d| d.parse().ok()).unwrap_or(0);
-                if self.st.snap.is_some() {
-                    self.snap_close();
-                } else {
-                    self.snap_start(mode, delay);
+                if self.st.locked {
+                    return;
                 }
+                if !crate::proc::have("yami-shot") {
+                    self.toast_note("скриншоты не установлены", "модуль yami-shot ставится из первой настройки: yami setup");
+                    return;
+                }
+                self.close_all();
+                let mut a = vec!["yami-shot".to_string()];
+                let mut w = c.split_whitespace().skip(1);
+                a.push(w.next().unwrap_or("area").to_string());
+                if let Some(d) = w.next() {
+                    a.extend(["--delay".to_string(), d.to_string()]);
+                }
+                crate::app::App::spawn(&a);
             }
             // следующий профиль питания (для хоткея)
             "profile" => self.prof_step(1),

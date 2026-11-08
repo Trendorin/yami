@@ -129,7 +129,6 @@ pub enum Act {
     WDrag(u32),
     WMenu(u32),
     EditDone,
-    SnapBtn(&'static str),
     DockItem(usize),
     DockLauncher,
     DockTrash,

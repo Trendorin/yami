@@ -55,8 +55,7 @@ impl App {
             return;
         }
         // HiDPI: буфер в физических пикселях, холст — логический, потом увеличение
-        // оверлей скриншота — застывший экран, не пиксель-арт: его растягивает композитор
-        let (pw, ph) = if scaled || s.viewport.is_none() || s.scale == 1.0 || s.kind == SKind::Snap { (bw, bh) } else { crate::gfx::phys(bw, bh, s.scale) };
+        let (pw, ph) = if scaled || s.viewport.is_none() || s.scale == 1.0 { (bw, bh) } else { crate::gfx::phys(bw, bh, s.scale) };
         let up = (pw, ph) != (bw, bh);
         let need = (pw * ph * 4) as usize;
         if s.pool.as_ref().map(|p| p.len() < need).unwrap_or(true) {
@@ -100,9 +99,8 @@ impl App {
             let st = &self.st;
             // появление: пиксельное проявление по Байеру + плавное всплытие
             let (k, finished) = match s.kind {
-                SKind::Modal | SKind::Popup | SKind::Menu | SKind::Dim | SKind::Catcher | SKind::Osd | SKind::EditBar | SKind::Widget(_) | SKind::Snap | SKind::Dock | SKind::CurtainBadge => {
+                SKind::Modal | SKind::Popup | SKind::Menu | SKind::Dim | SKind::Catcher | SKind::Osd | SKind::EditBar | SKind::Widget(_) | SKind::Dock | SKind::CurtainBadge => {
                     let dur = match s.kind {
-                        SKind::Snap => 200.0,
                         SKind::Dock => 200.0,
                         SKind::Widget(_) => 320.0,
                         SKind::Menu => 140.0,
@@ -159,14 +157,13 @@ impl App {
                 SKind::Title(win) => crate::titles::draw(&mut ui, st, *win, w, h),
                 SKind::Grip(win) => crate::titles::draw_grip(&mut ui, st, *win, w, h),
                 SKind::EditBar => crate::widgets::draw_editbar(&mut ui, st, w, h),
-                SKind::Snap => crate::snap::draw(&mut ui, st, &s.output, w, h),
                 SKind::Dock => crate::dock::draw(&mut ui, st, w, h),
                 SKind::DockEdge => {}
                 SKind::Curtain => crate::curtain::draw(&mut ui, st, &s.output, w, h),
                 SKind::CurtainBadge => crate::curtain::draw_badge(&mut ui, w, h),
             }
             // развёртка — только панели: не обои, не оверлей скриншота, не шторка
-            if st.set.scanlines && !matches!(s.kind, SKind::Dim | SKind::Catcher | SKind::Wall | SKind::Snap | SKind::Curtain | SKind::CurtainBadge | SKind::DockEdge | SKind::Title(_) | SKind::Grip(_)) {
+            if st.set.scanlines && !matches!(s.kind, SKind::Dim | SKind::Catcher | SKind::Wall | SKind::Curtain | SKind::CurtainBadge | SKind::DockEdge | SKind::Title(_) | SKind::Grip(_)) {
                 ui.cv.scanlines(if st.t.light { 0.06 } else { 0.22 });
             }
             if k < 1.0 && !matches!(s.kind, SKind::Dim | SKind::Catcher) {
@@ -187,7 +184,7 @@ impl App {
         }
         // тот же кадр, что уже у композитора (часы без секунд, датчики не сдвинулись): не отдавать —
         // композитору нечего пересобирать. Обои, скриншот и шторка рисуются один раз и так
-        let hash = if s.anim || done_closing || matches!(s.kind, SKind::Wall | SKind::Snap | SKind::Curtain) { 0 } else { frame_hash(buf, [s.w, s.h, pw, ph]) };
+        let hash = if s.anim || done_closing || matches!(s.kind, SKind::Wall | SKind::Curtain) { 0 } else { frame_hash(buf, [s.w, s.h, pw, ph]) };
         if hash != 0 && hash == s.drawn && s.input == s.input_set && blur == s.blur_set {
             drop(buffer);
             self.scratch = if scratch.capacity() > 1 << 20 { Vec::new() } else { scratch };

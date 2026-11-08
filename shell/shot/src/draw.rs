@@ -1,11 +1,26 @@
 // Отрисовка оверлея скриншотов: метки (общие для экрана и сохранённого файла), замороженный
 // экран с выделением, лупа, верхняя панель и панель инструментов с подсказками.
 
-use crate::app::State;
-use crate::font::PX;
-use crate::gfx::{BoxStyle, Canvas, Img, C, R};
 use crate::snap::*;
-use crate::ui::{Act, Cur, Tone, Ui};
+use std::time::Instant;
+use yami_px::font::{self, PX};
+use yami_px::gfx::{BoxStyle, Canvas, Img, C, R};
+use yami_px::ui::{Cur, Tone};
+
+/// щелчок по зоне: кнопка панели или фон, глушащий щелчки
+#[derive(Clone, PartialEq)]
+pub enum Act {
+    Block,
+    Btn(&'static str),
+}
+
+impl yami_px::ui::Action for Act {
+    fn block() -> Self {
+        Act::Block
+    }
+}
+
+pub type Ui<'a, 'b> = yami_px::ui::Ui<'a, 'b, Act>;
 
 // ── рисование меток (и на экране, и в файле) ───────────────────────────────
 /// квадратная кисть size по линии Брезенхэма
@@ -36,7 +51,7 @@ pub(crate) fn line(cv: &mut Canvas, a: (i32, i32), b: (i32, i32), size: i32, c: 
 
 /// метка m; координаты экрана → буфер: (p - o) · k. sb — пикселей снимка на точку экрана (масштаб
 /// монитора, бывает дробным: 1.25); на экране k = 1, в файле k = sb
-pub fn paint(cv: &mut Canvas, fonts: &mut crate::font::Fonts, m: &Mark, base: &Img, o: (i32, i32), k: f32, sb: f32, on_accent: C) {
+pub fn paint(cv: &mut Canvas, fonts: &mut font::Fonts, m: &Mark, base: &Img, o: (i32, i32), k: f32, sb: f32, on_accent: C) {
     let sc = |v: i32| (v as f32 * k).round() as i32;
     let tr = |p: (i32, i32)| (sc(p.0 - o.0), sc(p.1 - o.1));
     let size = sc(m.size).max(1);
@@ -109,9 +124,9 @@ pub fn paint(cv: &mut Canvas, fonts: &mut crate::font::Fonts, m: &Mark, base: &I
             let s = sc(26);
             let r = R::new(p.0 - s / 2, p.1 - s / 2, s, s);
             cv.pxbox(r, &BoxStyle::new(m.color, C::hex(0x0b0909)).shadow(sc(2)));
-            let face = crate::font::px((16.0 * k).round() as u16);
+            let face = font::px((16.0 * k).round() as u16);
             let txt = m.n.to_string();
-            let tc = if crate::theme::lightness(m.color) > 0.6 { C::hex(0x0b0909) } else { on_accent };
+            let tc = if yami_px::theme::lightness(m.color) > 0.6 { C::hex(0x0b0909) } else { on_accent };
             cv.text_center(fonts, face, r, &txt, tc);
         }
         Tool::Select | Tool::Pick => {}
@@ -119,9 +134,8 @@ pub fn paint(cv: &mut Canvas, fonts: &mut crate::font::Fonts, m: &Mark, base: &I
 }
 
 // ── отрисовка оверлея ──────────────────────────────────────────────────────
-pub fn draw(ui: &mut Ui, st: &State, out: &str, w: i32, h: i32) {
+pub fn draw(ui: &mut Ui, sn: &Snap, loupe_on: bool, started: Instant, out: &str, w: i32, h: i32) {
     let t = ui.t;
-    let Some(sn) = &st.snap else { return };
     let Some(img) = sn.imgs.get(out) else { return };
     // вспышка догорела, а курсор ещё в углу (snap_tick): оверлей прозрачен — виден живой экран
     if sn.flash.is_some_and(|f| f.elapsed().as_millis() >= crate::snap::FLASH) {
@@ -150,8 +164,9 @@ pub fn draw(ui: &mut Ui, st: &State, out: &str, w: i32, h: i32) {
         }
         None => ui.cv.fill(R::new(0, 0, w, h), veil),
     }
-    // строки развёртки по вуали
-    for y in (0..h).step_by(4) {
+    // строки развёртки по вуали: примета пиксельного вида
+    let lines = if ui.cv.style.cells { (0..h).step_by(4) } else { (0..0).step_by(4) };
+    for y in lines {
         match sel {
             Some(r) if y >= r.y && y < r.bottom() => {
                 ui.cv.fill(R::new(0, y, r.x, 1), C(0xff000000).alpha(0.16));
@@ -160,7 +175,7 @@ pub fn draw(ui: &mut Ui, st: &State, out: &str, w: i32, h: i32) {
             _ => ui.cv.fill(R::new(0, y, w, 1), C(0xff000000).alpha(0.16)),
         }
     }
-    let ph = (st.started.elapsed().as_millis() / 70) as i32;
+    let ph = (started.elapsed().as_millis() / 70) as i32;
     // режим «окно»: окно под курсором
     if sn.mode == Mode::Window && sn.drag.is_none() {
         if let Some((_, px, py)) = sn.ptr.as_ref().filter(|p| p.0 == out) {
@@ -205,7 +220,7 @@ pub fn draw(ui: &mut Ui, st: &State, out: &str, w: i32, h: i32) {
     // перекрестье и лупа
     if let Some((_, px, py)) = sn.ptr.as_ref().filter(|p| p.0 == out) {
         let (px, py) = (*px, *py);
-        let on_bar = ui.zones.iter().any(|z| matches!(z.act, Act::SnapBtn(_)) && z.r.contains(px as f64, py as f64));
+        let on_bar = ui.zones.iter().any(|z| matches!(z.act, Act::Btn(_)) && z.r.contains(px as f64, py as f64));
         if sel.is_none() && sn.mode == Mode::Area {
             for x in (0..w).step_by(6) {
                 ui.cv.fill(R::new(x, py, 3, 1), t.ember.alpha(0.55));
@@ -214,7 +229,7 @@ pub fn draw(ui: &mut Ui, st: &State, out: &str, w: i32, h: i32) {
                 ui.cv.fill(R::new(px, y, 1, 3), t.ember.alpha(0.55));
             }
         }
-        if st.set.shot_loupe && !on_bar && sn.drag.map(|d| !matches!(d, Drag::Move(..) | Drag::Draw)).unwrap_or(true) {
+        if loupe_on && !on_bar && sn.drag.map(|d| !matches!(d, Drag::Move(..) | Drag::Draw)).unwrap_or(true) {
             loupe(ui, img, px, py, w, h);
         }
     }
@@ -282,13 +297,13 @@ pub(crate) fn top_bar(ui: &mut Ui, sn: &Snap, w: i32) {
     let tw = bw * 3 + 8 * 2 + 16 + 44;
     let r = R::new((w - tw) / 2, 18, tw, 44);
     ui.cv.pxbox(r, &BoxStyle::new(t.panel.alpha(0.96), t.border.lerp(t.red, 0.5)).shadow(4));
-    ui.zone(r, Act::SnapBtn("none"), Cur::Default);
+    ui.zone(r, Act::Btn("none"), Cur::Default);
     for (i, (m, label, icon, act)) in modes.iter().enumerate() {
         let br = R::new(r.x + 8 + i as i32 * (bw + 8), r.y + 7, bw, 30);
         let icon = if *icon == "crop_" { "rect" } else { icon };
-        ui.button(br, label, icon, Tone::Ghost, sn.mode == *m, true, Act::SnapBtn(act));
+        ui.button(br, label, icon, Tone::Ghost, sn.mode == *m, true, Act::Btn(act));
     }
-    ui.button(R::new(r.right() - 40, r.y + 7, 32, 30), "", "timer", Tone::Ghost, false, true, Act::SnapBtn("delay"));
+    ui.button(R::new(r.right() - 40, r.y + 7, 32, 30), "", "timer", Tone::Ghost, false, true, Act::Btn("delay"));
     let hint = match sn.mode {
         Mode::Area => "тяни — выделить · enter — весь экран · esc — отмена",
         Mode::Window => "щёлкни по окну · enter — окно под курсором · esc — отмена",
@@ -319,11 +334,11 @@ pub(crate) fn toolbar(ui: &mut Ui, sn: &Snap, sel: R, w: i32, h: i32) {
     }
     let r = R::new(x, y, tw, th);
     ui.cv.pxbox(r, &BoxStyle::new(t.panel.alpha(0.97), t.border.lerp(t.red, 0.5)).shadow(4));
-    ui.zone(r, Act::SnapBtn("none"), Cur::Default);
+    ui.zone(r, Act::Btn("none"), Cur::Default);
     let by = r.y + 7;
     let mut bx = r.x + 8;
     for (tool, icon, act, _) in TOOLS {
-        ui.button(R::new(bx, by, bs, bs), "", icon, Tone::Ghost, sn.tool == *tool, true, Act::SnapBtn(act));
+        ui.button(R::new(bx, by, bs, bs), "", icon, Tone::Ghost, sn.tool == *tool, true, Act::Btn(act));
         bx += bs + 2;
     }
     bx += 4;
@@ -339,7 +354,7 @@ pub(crate) fn toolbar(ui: &mut Ui, sn: &Snap, sel: R, w: i32, h: i32) {
         }
         ui.cv.fill(cr, *c);
         ui.cv.outline(cr, C::hex(0x0b0909), 1);
-        ui.zone(R::new(cr.x - 2, cr.y - 4, 22, 26), Act::SnapBtn(COLOR_ACTS[i]), Cur::Pointer);
+        ui.zone(R::new(cr.x - 2, cr.y - 4, 22, 26), Act::Btn(COLOR_ACTS[i]), Cur::Pointer);
         bx += 22;
     }
     bx += 4;
@@ -349,7 +364,7 @@ pub(crate) fn toolbar(ui: &mut Ui, sn: &Snap, sel: R, w: i32, h: i32) {
     for (k, sz) in [(0, 2), (1, 4), (2, 8)] {
         let br = R::new(bx, by, bs, bs);
         let on = sn.size == [2, 4, 8][k];
-        ui.button(br, "", "", Tone::Ghost, on, true, Act::SnapBtn(["s:2", "s:4", "s:8"][k]));
+        ui.button(br, "", "", Tone::Ghost, on, true, Act::Btn(["s:2", "s:4", "s:8"][k]));
         let d = sz.max(2);
         ui.cv.fill(R::new(br.x + (bs - d) / 2, br.y + (bs - d) / 2, d, d), if on { C(0xffffffff) } else { t.text_dim });
         bx += bs + 2;
@@ -368,13 +383,13 @@ pub(crate) fn toolbar(ui: &mut Ui, sn: &Snap, sel: R, w: i32, h: i32) {
     acts.extend([("copy", "copy", true), ("down", "save", true), ("folder", "saveas", true), ("close", "close", true)]);
     for (icon, act, on) in acts {
         let tone = if act == "save" { Tone::Primary } else { Tone::Ghost };
-        ui.button(R::new(bx, by, bs, bs), "", icon, tone, false, on && !sn.busy, Act::SnapBtn(act));
+        ui.button(R::new(bx, by, bs, bs), "", icon, tone, false, on && !sn.busy, Act::Btn(act));
         bx += bs + 2;
     }
     // подсказка к кнопке под курсором
     if let Some((_, px, py)) = &sn.ptr {
         let tip = ui.zones.iter().rev().find(|z| z.r.contains(*px as f64, *py as f64)).and_then(|z| match &z.act {
-            Act::SnapBtn(a) => tip_of(a),
+            Act::Btn(a) => tip_of(a),
             _ => None,
         });
         if let Some(tip) = tip {

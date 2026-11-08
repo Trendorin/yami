@@ -79,7 +79,6 @@ pub enum SKind {
     /// ручка размера в правом нижнем углу плавающего окна (titles.rs)
     Grip(u64),
     EditBar,
-    Snap,
     /// шторка для трансляций и значок «скрыто» (curtain.rs)
     Curtain,
     CurtainBadge,
@@ -193,12 +192,8 @@ pub enum Msg {
     WallsAsked(bool, Option<String>, bool),
     /// мониторы, где обои рисует skwd-paper (skwd.rs, слои niri)
     SkwdLayers(Vec<String>),
-    Snap(HashMap<String, crate::gfx::Img>, Vec<(String, R, String)>, crate::snap::Mode),
-    /// распознанное со снимка: QR или текст, None — ничего не нашлось
-    SnapText(bool, Option<String>),
     /// проверка обновлений (update.rs)
     Update(crate::update::Info),
-    SnapDone { path: Option<std::path::PathBuf>, copied: bool, err: Option<String>, thumb: Option<crate::gfx::Img> },
     /// тома gio после события udev (automount.rs)
     Volumes(Vec<crate::automount::Vol>),
     /// том подключён сам: его локальная папка или ошибка
@@ -322,9 +317,8 @@ pub struct State {
     pub reply: crate::reply::Reply,
     /// координаты для ночного света
     pub geo_field: Field,
-    pub snap: Option<crate::snap::Snap>,
-    pub snap_countdown: Option<(Instant, u32)>,
-    pub shot_files: HashMap<u32, std::path::PathBuf>,
+    /// настройки yami-shot (вкладка «скриншоты»)
+    pub shot_cfg: crate::shotcfg::ShotCfg,
     pub shot_field: Field,
     pub float_field: Field,
     pub dock_hover: bool,
@@ -520,9 +514,7 @@ impl State {
             game_field: Field::default(),
             reply: Default::default(),
             geo_field: Field::default(),
-            snap: None,
-            snap_countdown: None,
-            shot_files: HashMap::new(),
+            shot_cfg: crate::shotcfg::ShotCfg::load(),
             shot_field: Field::default(),
             float_field: Field::default(),
             dock_hover: false,

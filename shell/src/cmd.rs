@@ -501,7 +501,14 @@ pub fn run(args: &[String], me: &str) -> i32 {
         Some("doctor") if a.get(1) == Some(&"games") => crate::gameboost::doctor(&y),
         Some("doctor") => crate::doctor::run(&y),
         Some("report") => crate::report::run(&y, &a[1..]),
-        Some("ocr") => crate::ocr::cli(&y, &a[1..]),
+        // распознавание живёт в модуле yami-shot
+        Some("ocr") => match std::process::Command::new("yami-shot").arg("ocr").args(&a[1..]).status() {
+            Ok(s) => s.code().unwrap_or(1),
+            Err(_) => {
+                eprintln!(" {} {}", y.bad("✕"), crate::tf!("нужен модуль yami-shot", "the yami-shot module is needed", "o módulo yami-shot é necessário"));
+                1
+            }
+        },
         Some("theme") => match a.get(1) {
             Some(&w @ ("export" | "import" | "save" | "list" | "apply" | "remove")) => crate::bundle::run(&y, &format!("theme-{w}"), &a[2..]),
             _ => crate::bundle::run(&y, "", &[]),

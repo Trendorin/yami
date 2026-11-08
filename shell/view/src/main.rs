@@ -88,7 +88,7 @@ fn shot(args: &[String]) -> i32 {
     let f = dir.join("pixel-art.png");
     let _ = img.save(&f);
     let _ = img.save(dir.join("second.png"));
-    let mut fonts = font::Fonts::new();
+    let mut fonts = font::Fonts::with(look.font("view"));
     let mut ic = icons::Icons::new("");
     let mut bad = 0;
     for target in ["view", "zoom", "crop", "info"] {

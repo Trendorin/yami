@@ -1111,6 +1111,46 @@ pub fn icon7(name: &str) -> Option<&'static [&'static str; 7]> {
     })
 }
 
+/// grim -t ppm: P6, ширина, высота, 255, RGB
+fn parse_ppm(b: &[u8]) -> Option<Img> {
+    let mut fields = vec![];
+    let mut i = 0;
+    while fields.len() < 4 && i < b.len() {
+        while i < b.len() && b[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if b.get(i) == Some(&b'#') {
+            while i < b.len() && b[i] != b'\n' {
+                i += 1;
+            }
+            continue;
+        }
+        let s = i;
+        while i < b.len() && !b[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        fields.push(String::from_utf8_lossy(&b[s..i]).to_string());
+    }
+    i += 1;
+    if fields.first().map(|f| f != "P6").unwrap_or(true) {
+        return None;
+    }
+    let w: i32 = fields.get(1)?.parse().ok()?;
+    let h: i32 = fields.get(2)?.parse().ok()?;
+    let data = b.get(i..i + (w * h * 3) as usize)?;
+    let px = data.chunks_exact(3).map(|p| 0xff000000 | (p[0] as u32) << 16 | (p[1] as u32) << 8 | p[2] as u32).collect();
+    Some(Img { w, h, px })
+}
+
+/// снимок монитора через grim (скриншотер, шторка трансляций)
+pub fn grab_output(out: &str) -> Option<Img> {
+    let o = std::process::Command::new("grim").args(["-o", out, "-t", "ppm", "-"]).output().ok()?;
+    if !o.status.success() {
+        return None;
+    }
+    parse_ppm(&o.stdout)
+}
+
 /// Размер буфера в физических пикселях для логического w×h при масштабе вывода `scale`
 /// (1.0, 1.25, 2.0 — из wp_fractional_scale, preferred_scale / 120).
 pub fn phys(w: i32, h: i32, scale: f64) -> (i32, i32) {
