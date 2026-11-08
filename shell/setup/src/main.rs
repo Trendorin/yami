@@ -53,11 +53,13 @@ fn shot(args: &[String]) -> i32 {
     let mut ic = icons::Icons::new("");
     let (sw, sh) = (1280, 720);
     let mut bad = 0;
-    for (name, p) in [("hello", Page::Hello), ("look", Page::Look), ("modules", Page::Modules), ("restyle", Page::Restyle), ("confirm", Page::Confirm), ("install", Page::Install), ("done", Page::Done)] {
+    for (name, p) in [("hello", Page::Hello), ("look", Page::Look), ("modules", Page::Modules), ("restyle", Page::Restyle), ("confirm", Page::Confirm), ("install", Page::Install), ("failed", Page::Install), ("done", Page::Done)] {
         w.page = p;
         if p == Page::Install {
-            w.step = Some((4, 11, "yami-files".into()));
+            w.step = Some((42, 100, "yami-files".into()));
             w.lines = vec!["Compiling yami-px v3.0.0".into(), "Compiling yami-files v3.0.0".into()];
+            w.running = name == "install";
+            w.failed = (name == "failed").then(|| "the disk is full: free a few gigabytes and run again · ~/.cache/yami/install.log".to_string());
         }
         let mut buf = vec![0u32; (sw * sh) as usize];
         let mut u = ui::Ui { cv: gfx::Canvas::new(&mut buf, sw, sh), f: &mut fonts, ic: &mut ic, t: w.look.theme, zones: vec![], ptr: None, down: false, anim: false, blink: true, tr: |s| s };

@@ -25,6 +25,7 @@ pub enum Act {
     Next,
     Skip,
     Finish,
+    Retry,
 }
 
 impl yami_px::ui::Action for Act {
@@ -76,15 +77,12 @@ const fn m(id: &'static str, name: &'static str, group: u8, on: bool, ru: &'stat
 
 pub fn modules() -> Vec<Module> {
     vec![
-        m("files", "yami-files", 0, true, "файлы и диалог выбора файлов во всех программах", "files and the file dialog of every app", "arquivos e o diálogo de arquivos de todos os aplicativos"),
+        m("files", "yami-files", 0, true, "файлы, диалог выбора во всех программах, флешки и телефоны", "files, the file dialog of every app, drives and phones", "arquivos, o diálogo de todos os apps, pendrives e telefones"),
         m("view", "yami-view", 0, true, "картинки: мгновенно, с быстрыми правками", "pictures: instant, with quick edits", "imagens: instantâneo, com edições rápidas"),
         m("play", "yami-play", 0, true, "видео и музыка на libmpv", "video and music on libmpv", "vídeo e música com libmpv"),
         m("shot", "yami-shot", 0, true, "скриншоты: разметка, текст и QR со снимка", "screenshots: markup, text and QR from a shot", "capturas: anotações, texto e QR"),
-        m("agents", "yami-agents", 1, true, "окна паролей, выбор экрана для трансляций, автоподключение", "password windows, the screen-share picker, automount", "janelas de senha, seleção de tela, montagem automática"),
+        m("agents", "yami-agents", 1, true, "окна паролей, показ экрана, автоподключение", "password windows, screen sharing, automount", "senhas, compartilhar a tela, montagem automática"),
         m("login", "yami-greet", 1, true, "свой экран входа вместо чужого", "our own login screen", "nossa própria tela de login"),
-        m("drives", "drives", 1, true, "udisks2 и gvfs: флешки, телефоны, сетевые папки", "udisks2 and gvfs: drives, phones, network shares", "udisks2 e gvfs: pendrives, telefones, rede"),
-        m("apps", "apps", 2, true, "kitty, fastfetch, pavucontrol, btop", "kitty, fastfetch, pavucontrol, btop", "kitty, fastfetch, pavucontrol, btop"),
-        m("tools", "tools", 2, true, "ночной свет, распознавание текста и QR", "night light, text and QR recognition", "luz noturna, reconhecimento de texto e QR"),
         m("games", "games", 2, false, "GameMode и MangoHud в палитре", "GameMode and MangoHud in the palette", "GameMode e MangoHud na paleta"),
         m("fork", "yami-niri", 2, false, "наш niri из исходников: 5–25 минут сборки", "our niri from source: a 5–25 minute build", "nosso niri do código-fonte: 5–25 minutos"),
     ]
@@ -104,8 +102,14 @@ pub struct W {
     pub mods: Vec<Module>,
     pub restyle: [bool; 11],
     pub field: Field,
-    /// sudo спрашивать не будет (NOPASSWD)
+    /// sudo спрашивать не будет (NOPASSWD), или его нет
     pub no_password: bool,
+    /// sudo нет (doas): окну пароль не передать, пакеты — одной командой потом
+    pub no_root: bool,
+    /// другой менеджер входа, который заменит наш экран входа
+    pub dm: String,
+    /// есть Steam: показать строку про игры
+    pub steam: bool,
     pub lines: Vec<String>,
     pub step: Option<(u32, u32, String)>,
     pub failed: Option<String>,
@@ -123,6 +127,18 @@ impl W {
     /// то, что уже стоит и выбрано, — из записи об установке и настроек шелла
     pub fn fill_from_system(&mut self) {
         let first = yami_px::paths::state_dir().join("yami/first-run").exists();
+        self.dm = other_dm();
+        self.steam = has_steam();
+        if first {
+            // чужой экран входа по умолчанию не заменяем; игры — только если есть Steam
+            for m in self.mods.iter_mut() {
+                match m.id {
+                    "login" => m.on = self.dm.is_empty(),
+                    "games" => m.on = self.steam,
+                    _ => {}
+                }
+            }
+        }
         if let Some(list) = read_json(&yami_px::paths::state_dir().join("yami/install.json")).and_then(|v| v["components"].as_str().map(str::to_string)) {
             if !first {
                 for m in self.mods.iter_mut() {
@@ -158,6 +174,9 @@ impl W {
             restyle: [true, true, true, true, true, true, true, false, false, false, false],
             field: Field::default(),
             no_password: false,
+            no_root: false,
+            dm: String::new(),
+            steam: false,
             lines: vec![],
             step: None,
             failed: None,
@@ -224,6 +243,19 @@ impl W {
             }
         }
     }
+}
+
+/// менеджер входа, который стоит вместо нашего (systemd); свой не считается
+fn other_dm() -> String {
+    let Some(l) = std::fs::read_link("/etc/systemd/system/display-manager.service").ok() else { return String::new() };
+    let name = l.file_stem().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let ours = (name == "greetd" && std::fs::read_to_string("/etc/greetd/config.toml").is_ok_and(|t| t.contains("yami/greet-session"))) || (name == "sddm" && std::path::Path::new("/usr/share/sddm/themes/yami").is_dir());
+    if ours { String::new() } else { name }
+}
+
+fn has_steam() -> bool {
+    let h = yami_px::paths::home();
+    [".local/share/Steam", ".steam", ".var/app/com.valvesoftware.Steam"].iter().any(|d| h.join(d).is_dir()) || std::path::Path::new("/usr/bin/steam").exists()
 }
 
 fn step_index(p: Page) -> usize {
@@ -392,8 +424,19 @@ fn modules_page(ui: &mut Ui, w: &W, b: R) {
         let mut ry = y + rows[c];
         ui.cv.text_in(ui.f, PX, R::new(x, ry, col, 20), titles[g as usize], t.text_faint);
         ry += 24;
-        for (i, m) in w.mods.iter().enumerate().filter(|(_, m)| m.group == g) {
-            ui.toggle(R::new(x, ry, col, 40), m.name, l(m.ru, m.en, m.pt), m.on, Act::Module(i));
+        for (i, m) in w.mods.iter().enumerate().filter(|(_, m)| m.group == g && (m.id != "games" || w.steam)) {
+            let replaces;
+            let desc = if m.id == "login" && !w.dm.is_empty() {
+                replaces = match () {
+                    _ if yami_px::i18n::pt_br() => format!("nossa tela de login, no lugar de {}", w.dm),
+                    _ if yami_px::i18n::translated() => format!("our own login screen, replaces {}", w.dm),
+                    _ => format!("свой экран входа, заменит {}", w.dm), // i18n-ok
+                };
+                replaces.as_str()
+            } else {
+                l(m.ru, m.en, m.pt)
+            };
+            ui.toggle(R::new(x, ry, col, 40), m.name, desc, m.on, Act::Module(i));
             ry += 42;
         }
         rows[c] = ry - y + 8;
@@ -415,13 +458,15 @@ fn restyle_page(ui: &mut Ui, w: &W, b: R) {
 
 fn confirm(ui: &mut Ui, w: &W, b: R) {
     let t = ui.t;
-    let mut y = head(ui, b, l("Всё готово к установке", "Ready to install", "Pronto para instalar"), l("Модули собираются из исходников: обычно это несколько минут. Можно не ждать и работать дальше.", "The modules are built from source, usually a few minutes. You can keep working meanwhile.", "Os módulos são compilados do código-fonte, em geral alguns minutos. Você pode continuar usando."));
+    let mut y = head(ui, b, l("Всё готово к установке", "Ready to install", "Pronto para instalar"), l("Модули собираются из исходников: обычно это несколько минут. Ничего не сломается, и всё можно вернуть.", "The modules are built from source, usually a few minutes. Nothing breaks, and everything can be undone.", "Os módulos são compilados do código-fonte, em geral alguns minutos. Nada quebra, e tudo pode ser desfeito."));
     let picked: Vec<&str> = w.mods.iter().filter(|m| m.on).map(|m| m.name).collect();
     let text = if picked.is_empty() { l("только шелл: ничего не добавлять", "only the shell: add nothing", "só o shell: não adicionar nada").to_string() } else { picked.join(" · ") };
     ui.cv.pxbox(R::new(b.x, y, b.w, 70), &BoxStyle::new(t.surface, t.border));
     ui.cv.text_wrap(ui.f, PX, R::new(b.x + 14, y + 10, b.w - 28, 50), &text, t.text, 2);
     y += 90;
-    if !w.no_password {
+    if w.no_root {
+        ui.cv.text_wrap(ui.f, PX, R::new(b.x, y, b.w, 40), l("sudo нет: нужные пакеты покажу одной командой в настройках → обновления", "there is no sudo: the packages you need are shown as one command in settings → updates", "não há sudo: os pacotes necessários aparecem como um comando em configurações → atualizações"), t.text_dim, 2);
+    } else if !w.no_password {
         ui.cv.text_in(ui.f, PX, R::new(b.x, y, b.w, 20), l("пароль администратора — для пакетов (пусто: только домашняя папка)", "administrator password, for the packages (empty: home folder only)", "senha de administrador, para os pacotes (vazio: só a pasta pessoal)"), t.text_dim);
         y += 26;
         ui.field(R::new(b.x, y, b.w, 34), &w.field, l("пароль", "password", "senha"), true, true, Act::Pass);
@@ -436,18 +481,18 @@ fn confirm(ui: &mut Ui, w: &W, b: R) {
 fn install(ui: &mut Ui, w: &W, b: R) {
     let t = ui.t;
     let title = if w.failed.is_some() { l("Не получилось", "It did not work", "Não deu certo") } else { l("Устанавливаю", "Installing", "Instalando") };
-    let mut y = head(ui, b, title, l("Окно можно не закрывать: рабочий стол продолжает работать.", "You can leave this open: the desktop keeps working.", "Pode deixar aberto: a área de trabalho continua funcionando."));
+    let sub = if w.failed.is_some() { l("Ничего не сломалось: прежние программы на месте.", "Nothing is broken: the old programs are still in place.", "Nada quebrou: os programas antigos continuam no lugar.") } else { l("Обычно это несколько минут. Прежние программы работают, пока всё не соберётся.", "Usually a few minutes. The old programs keep working until everything is built.", "Em geral alguns minutos. Os programas antigos continuam funcionando até tudo ser compilado.") };
+    let mut y = head(ui, b, title, sub);
     if let Some((k, n, s)) = &w.step {
         ui.cv.text_in(ui.f, PX, R::new(b.x, y, b.w - 80, 22), s, t.text);
-        ui.text_right(PX, R::new(b.x, y, b.w, 22), &format!("{k}/{n}"), t.text_faint);
+        let done = if *n == 100 { format!("{k}%") } else { format!("{k}/{n}") };
+        ui.text_right(PX, R::new(b.x, y, b.w, 22), &done, t.text_faint);
         y += 28;
         ui.cv.gauge(R::new(b.x, y, b.w, 12), 40, *k as f32 / (*n).max(1) as f32, t.red, t.surface_hi, 2);
         y += 26;
     }
-    if w.running {
-        ui.anim = true;
-    }
-    let log = R::new(b.x, y, b.w, b.bottom() - 44 - y);
+    // перерисовка — по строкам установщика: без постоянной анимации сборке достаётся весь процессор
+    let log = R::new(b.x, y, b.w, b.bottom() - if w.failed.is_some() { 84 } else { 44 } - y);
     ui.cv.pxbox(log, &BoxStyle::new(t.code_bg, t.border));
     ui.cv.push_clip(log.inset(8));
     for (i, line) in w.lines.iter().enumerate() {
@@ -455,19 +500,21 @@ fn install(ui: &mut Ui, w: &W, b: R) {
     }
     ui.cv.pop_clip();
     if let Some(why) = &w.failed {
-        ui.cv.text_in(ui.f, PX, R::new(b.x, b.bottom() - 34, b.w - 200, 34), why, t.ember);
-        ui.button(R::new(b.right() - 180, b.bottom() - 34, 180, 34), l("назад", "back", "voltar"), "left", Tone::Plain, false, true, Act::Back);
+        ui.cv.text_wrap(ui.f, PX, R::new(b.x, b.bottom() - 78, b.w, 40), why, t.ember, 2);
+        ui.button(R::new(b.x, b.bottom() - 34, 130, 34), l("назад", "back", "voltar"), "left", Tone::Plain, false, true, Act::Back);
+        ui.button(R::new(b.right() - 180, b.bottom() - 34, 180, 34), l("повторить", "try again", "tentar de novo"), "check", Tone::Primary, false, true, Act::Retry);
     }
 }
 
-fn done(ui: &mut Ui, _w: &W, b: R) {
+fn done(ui: &mut Ui, w: &W, b: R) {
     let t = ui.t;
     let face = font::px(48);
     ui.cv.text_in(ui.f, face, R::new(b.x, b.y + 8, b.w, 60), l("Готово", "All set", "Tudo pronto"), t.text);
     ui.cv.text_wrap(ui.f, PX, R::new(b.x, b.y + 80, b.w, 40), l("Вот что стоит запомнить. Поменять клавиши можно в настройках.", "Here is what is worth remembering. Keys can be changed in the settings.", "Isto vale lembrar. As teclas podem ser alteradas nas configurações."), t.text_dim, 2);
     let rows = [("Mod+Space", l("запуск программ", "launcher", "lançador")), ("Mod+S", l("настройки", "settings", "configurações")), ("Mod+V", l("буфер обмена", "clipboard", "área de transferência")), ("Mod+E", l("файлы", "files", "arquivos")), ("Print", l("скриншот", "screenshot", "captura de tela")), ("Mod+Shift+/", l("все клавиши", "all keys", "todas as teclas"))];
     let mut y = b.y + 136;
-    for (k, v) in rows {
+    let chosen = |id: &str| w.mods.iter().any(|m| m.id == id && m.on);
+    for (k, v) in rows.into_iter().filter(|(k, _)| (*k != "Mod+E" || chosen("files")) && (*k != "Print" || chosen("shot"))) {
         ui.cv.pxbox(R::new(b.x, y, 150, 30), &BoxStyle::new(t.surface_hi, t.border).bevel(true));
         ui.cv.text_center(ui.f, PX, R::new(b.x, y, 150, 30), k, t.text);
         ui.cv.text_in(ui.f, PX, R::new(b.x + 170, y, b.w - 170, 30), v, t.text_dim);

@@ -110,7 +110,8 @@ pub fn run(wiz: W) -> i32 {
         cursor_mgr: CursorShapeManager::bind(&globals, &qh).ok(), cursor_dev: None, cursor_now: None, enter_serial: 0, pointer: None, keyboard: None, mods: Modifiers::default(),
         w: 0, h: 0, scale: 1.0, pool: None, zones: vec![], configured: false, dirty: true, frame_pending: false, anim: false, ptr: None, press: None, scratch: vec![], fonts, icons: Icons::new(""), wiz, tx, quit: false,
     };
-    app.wiz.no_password = !run::needs_password();
+    app.wiz.no_root = !run::has_sudo();
+    app.wiz.no_password = app.wiz.no_root || !run::needs_password();
     app.wiz.fill_from_system();
     app.apply_look();
     let _ = queue.roundtrip(&mut app);
@@ -269,6 +270,15 @@ impl App {
             Act::Skip | Act::Finish => {
                 self.finish_marker();
                 self.quit = true;
+            }
+            Act::Retry => {
+                // пароль уже стёрт: если он нужен, спросим снова
+                self.wiz.failed = None;
+                if self.wiz.no_password {
+                    self.start_install();
+                } else {
+                    self.wiz.turn(Page::Confirm);
+                }
             }
             Act::Pass | Act::Block => {}
         }

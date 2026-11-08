@@ -1,5 +1,6 @@
 // Сама установка: мастер запускает install.sh --apply со своим выбором и читает его вывод. Пароль
 // отдаётся только sudo и только через askpass: сокет в личной папке 0700, живёт, пока идёт установка.
+// i18n: inline pairs
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
@@ -16,6 +17,7 @@ pub enum Ev {
 }
 
 pub const SOCK_ENV: &str = "YAMI_SETUP_ASKPASS";
+const REPO: &str = "https://github.com/Trendorin/yami.git";
 
 /// режим askpass: sudo запустил нас, чтобы узнать пароль. true — это он и был
 pub fn askpass() -> bool {
@@ -35,6 +37,11 @@ pub fn source_dir() -> PathBuf {
     }
     let state = yami_px::paths::state_dir().join("yami/source");
     std::fs::read_to_string(state).ok().map(|s| PathBuf::from(s.trim())).filter(|p| p.join("install.sh").exists()).unwrap_or_else(|| yami_px::paths::data_dir().join("yami/src"))
+}
+
+/// есть ли sudo: через doas окну пароль не передать, пакеты тогда — одной командой потом
+pub fn has_sudo() -> bool {
+    std::env::var_os("PATH").is_some_and(|p| std::env::split_paths(&p).any(|d| d.join("sudo").is_file()))
 }
 
 /// sudo спросит пароль? false — NOPASSWD или уже root
@@ -83,6 +90,14 @@ pub fn start(modules: Vec<String>, restyle: Vec<String>, lang: String, mut passw
     std::thread::spawn(move || {
         let src = source_dir();
         let script = src.join("install.sh");
+        // первая установка шла из папки, которой уже нет (/tmp после перезагрузки): своя копия заново
+        if !script.exists() {
+            send(Ev::Line("git clone yami".into()));
+            let ok = Command::new("git").args(["clone", "-q", "--filter=blob:none", REPO]).arg(&src).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().is_ok_and(|s| s.success());
+            if !ok {
+                return send(Ev::Done(Err(crate::wiz::l("нет исходников yami и не удалось их скачать: проверь интернет", "the yami sources are gone and could not be downloaded: check the internet", "os fontes do yami sumiram e não foi possível baixá-los: verifique a internet").to_string())));
+            }
+        }
         let mut c = Command::new("bash");
         c.arg(&script).args(["--apply", &modules.join(" "), "--restyle", &if restyle.is_empty() { "none".to_string() } else { restyle.join(" ") }]);
         if !lang.is_empty() {
@@ -90,6 +105,7 @@ pub fn start(modules: Vec<String>, restyle: Vec<String>, lang: String, mut passw
         }
         c.current_dir(&src).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut dir = None;
+        let mut secret: Option<Arc<Mutex<String>>> = None;
         if password.is_empty() {
             if needs_password() {
                 c.arg("--no-sudo");
@@ -98,9 +114,10 @@ pub fn start(modules: Vec<String>, restyle: Vec<String>, lang: String, mut passw
             let Ok(d) = yami_px::paths::private_tmp("yami-setup") else { return send(Ev::Done(Err("tmp".into()))) };
             let sock = d.join("askpass");
             let pass = Arc::new(Mutex::new(password.clone()));
-            if serve_password(sock.clone(), pass).is_none() {
+            if serve_password(sock.clone(), pass.clone()).is_none() {
                 return send(Ev::Done(Err("askpass".into())));
             }
+            secret = Some(pass);
             let me = yami_px::paths::self_exe();
             let check = Command::new("sudo").args(["-k", "-A", "true"]).env("SUDO_ASKPASS", &me).env(SOCK_ENV, &sock).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
             if !check.is_ok_and(|s| s.success()) {
@@ -119,10 +136,15 @@ pub fn start(modules: Vec<String>, restyle: Vec<String>, lang: String, mut passw
         if let Some(err) = err {
             std::thread::spawn(move || for _ in BufReader::new(err).lines() {});
         }
+        // строки «! …» установщика: почему не вышло, понятными словами
+        let mut why: Vec<String> = vec![];
         for line in BufReader::new(out).lines().map_while(Result::ok) {
             let l = plain_line(&line);
             if l.is_empty() {
                 continue;
+            }
+            if let Some(w) = l.strip_prefix('!') {
+                why.push(w.trim().to_string());
             }
             match step_of(&l) {
                 Some((k, n, t)) => send(Ev::Step(k, n, t)),
@@ -134,9 +156,16 @@ pub fn start(modules: Vec<String>, restyle: Vec<String>, lang: String, mut passw
             let _ = std::fs::remove_dir_all(d);
         }
         yami_px::ui::wipe(&mut password);
+        if let Some(mut p) = secret.as_ref().and_then(|s| s.lock().ok()) {
+            yami_px::ui::wipe(&mut p);
+        }
+        let log = yami_px::paths::cache_dir().join("yami/install.log");
         send(Ev::Done(match st {
             Ok(s) if s.success() => Ok(()),
-            Ok(s) => Err(format!("install.sh: exit {}", s.code().unwrap_or(-1))),
+            Ok(_) => {
+                let text: Vec<String> = why.into_iter().rev().take(2).rev().collect();
+                Err(if text.is_empty() { format!("{}: {}", crate::wiz::l("подробности", "details", "detalhes"), log.display()) } else { format!("{} · {}", text.join(" · "), log.display()) })
+            }
             Err(e) => Err(e.to_string()),
         }));
     });
