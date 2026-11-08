@@ -155,9 +155,23 @@ impl App {
         let x = (ax - w / 2).clamp(6, (ow - w - 6).max(6));
         self.mk_catcher(out);
         // видимый верх — на 6 px ниже бара (где бы он ни был); содержимое всплывашки внутри
-        // поверхности опущено на высоту подъёма (12), поэтому сама поверхность — выше
-        let top = (self.bar_bottom(out) + 6 - 12).max(0);
-        self.mk(SKind::Popup, out, Layer::Top, "yami-popup", Anchor::TOP | Anchor::LEFT, (w, h + 12), (top, 0, 0, x), -1, KeyboardInteractivity::OnDemand);
+        // поверхности опущено на высоту подъёма (12), поэтому сама поверхность — выше.
+        // Бар снизу — всплывашка над ним: низ содержимого и есть низ поверхности
+        let low = self.bar_reserve_bottom(out);
+        let (anchor, margin) = if low > 0 {
+            (Anchor::BOTTOM | Anchor::LEFT, (0, 0, low + 6, x))
+        } else {
+            (Anchor::TOP | Anchor::LEFT, ((self.bar_bottom(out) + 6 - 12).max(0), 0, 0, x))
+        };
+        let id = self.mk(SKind::Popup, out, Layer::Top, "yami-popup", anchor, (w, h + 12), margin, -1, KeyboardInteractivity::OnDemand);
+        if low > 0 {
+            // верх поверхности на мониторе: от него меню трея во всплывашке ищет свою строку
+            let (_, oh) = self.output_size(out);
+            if let Some(s) = self.surfs.get_mut(&id) {
+                s.margin = (x, oh - low - 6 - h - 12);
+                s.applied = s.margin;
+            }
+        }
     }
 
     pub fn resize_popup(&mut self) {
@@ -191,7 +205,8 @@ impl App {
             let (w, h) = self.output_size(out);
             let mut rs = vec![R::new(0, 0, w, h)];
             if !self.st.bar_hidden && self.bar_on(out) {
-                let (top, side, _) = crate::bar::geo(&self.st.set, w);
+                let (m, side, _) = crate::bar::geo(&self.st.set, w);
+                let top = if crate::bar::low(&self.st.set) { h - m - BAR_H } else { m };
                 let bot = top + BAR_H;
                 rs = vec![R::new(0, 0, w, top), R::new(0, top, side, BAR_H), R::new(w - side, top, side, BAR_H), R::new(0, bot, w, h - bot)];
                 rs.retain(|r| r.w > 0 && r.h > 0);
@@ -209,7 +224,8 @@ impl App {
         let (w, h) = menu::size(&m, &mut self.res.fonts);
         let (ow, oh) = self.output_size(&out);
         let x = m.x.clamp(4, (ow - w - 8).max(4));
-        let y = m.y.clamp(4, (oh - h - 8).max(4));
+        // нижний бар не закрываем: меню из него встаёт над ним
+        let y = m.y.clamp(4, (oh - h - 8 - self.bar_reserve_bottom(&out)).max(4));
         self.st.menu = Some(m);
         self.mk_catcher(&out);
         self.mk(SKind::Menu, &out, Layer::Overlay, "yami-menu", Anchor::TOP | Anchor::LEFT, (w, h + 4), (y, 0, 0, x), -1, KeyboardInteractivity::OnDemand);

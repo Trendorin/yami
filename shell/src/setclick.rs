@@ -262,6 +262,10 @@ impl App {
                     s.bar_center_align = if s.bar_center_align == "after-left" { "center" } else { "after-left" }.into();
                     self.settings_changed();
                 }
+                "bar_pos" => {
+                    s.bar_pos = if s.bar_pos == "bottom" { "top" } else { "bottom" }.into();
+                    self.settings_changed();
+                }
                 "bar_sep" => {
                     s.bar_sep = cycle(&[("dots", ""), ("line", ""), ("blocks", ""), ("gap", "")], &s.bar_sep).into();
                     self.settings_changed();

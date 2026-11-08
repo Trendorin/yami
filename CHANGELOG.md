@@ -16,6 +16,7 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 - yami-agents: the polkit window, passwords of encrypted drives, the screen-share picker and automount are one service, each part switched on its own (`yami-agents status`).
 - The installer's terminal side says what it is about to do in plain words and asks nothing else.
 - yami no longer touches drivers: the NVIDIA profile and every trace of the old name are gone.
+- The bar at the bottom of the screen: settings → bar → look → «screen edge» (`barPos` = `bottom`). Popups, tray and window menus and the OSD open above it, a bottom dock stands above it, the line is drawn on the side of the desktop.
 
 ## 2.7.0
 

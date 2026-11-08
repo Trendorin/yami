@@ -199,6 +199,7 @@ Settings → look → «pixel look» moves these keys, `iconPixel` and `cursor` 
 | `barMargin` | `6` | gap between a floating bar and the screen edges, px (0–32) |
 | `barOutputs` | `[]` | the screens with a bar, by niri name (`["eDP-1"]`; `niri msg outputs`); empty: every screen. When none of them is connected (a laptop away from its monitor) every screen gets one. Settings → screens → «bar on this screen» |
 | `barCenterAlign` | `"center"` | `barCenter` modules: `center` at the middle of the bar (a long left group only pushes them as far as needed), `after-left` right after the left group (the windows of `tasks` sat there before 2.7) |
+| `barPos` | `"top"` | screen edge with the bar: `top` or `bottom`; popups, tray menus and the OSD open above a bottom bar, a bottom dock stands above it |
 
 ### Windows, dock, screenshots, system
 
