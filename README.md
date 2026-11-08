@@ -72,7 +72,7 @@ Everything it does and its flags: [Installation](#installation).
   order, resume where you stopped, speed, frame step, saving a frame, a «pixel» scaling mode.
   libmpv is loaded at run time (the only dependency); the screen stays on while a video plays.
 - **Screens.** Settings → screens: drag monitors into place, pick resolution, refresh rate, scale,
-  rotation and VRR; applied through `~/.config/niri/yami-outputs.kdl`, reverted after 15 s unless kept.
+  rotation and VRR; applied through `~/.config/yami/niri/outputs.kdl`, reverted after 15 s unless kept.
 - **Login screen.** Our own: yami-greet draws the lock screen's face inside niri, greetd (a 650 KB
   daemon in Rust) checks the password and starts the session. No Qt, no SDDM. It follows the shell:
   palette, wallpaper, language, monitors, keyboard layouts; if it ever cannot start, greetd's text
@@ -94,7 +94,7 @@ Everything it does and its flags: [Installation](#installation).
   new keys right there (even ones niri itself uses), conflicts are freed and named, add your own
   commands. Keyboard layouts too: by default they follow the system languages (an English system
   gets `us`, a Russian one `us,ru`), any xkb codes and the switch combination are a choice. Written
-  to `~/.config/niri/yami-binds.kdl`.
+  to `~/.config/yami/niri/binds.kdl`.
 - **One palette everywhere.** Seven presets or any custom accent recolor the shell, wallpaper,
   niri borders, kitty, foot, cava, starship, btop, fastfetch (闇 logo), Qt/KDE and GTK apps, the browser's menus (its
   own theme stays yours), the pixel cursor and the login screen at once; your own templates
@@ -129,7 +129,7 @@ Everything it does and its flags: [Installation](#installation).
   rice light: the shell, GTK/Qt/KDE, kitty, the cursor, the lock and login screens.
 - **A launcher that does more.** Type `2+2*3` for an answer, an app or a window title, `vrr` to land
   on that setting, `>cmd` to run a command, `/name` to find a file at home.
-- **Your own bar modules.** Any script in `~/.config/yami/modules/` that prints text or JSON
+- **Your own bar modules.** Any script in `~/.config/yami/scripts/` that prints text or JSON
   becomes a module or a desktop widget (crypto, GitHub, anything); weather is built in (Open-Meteo,
   bar module and widget); see [docs/CONFIG.md](docs/CONFIG.md).
 - **Small comforts.** Reply to a message right from its notification, a night light (wlsunset),
@@ -237,8 +237,9 @@ What the base install does:
 2. Builds the shell and the setup window with `cargo build --release --locked` (Rust ≥ 1.89; rustup
    is used when the distribution's toolchain is older) into `~/.local/bin`.
 3. Installs the pixel fonts (Tiny5, DotGothic16, Terminess).
-4. Writes the niri configuration, the keybindings and the game rules; `output` blocks from a
-   previous niri config are carried over into `user.kdl`. A file it replaces is kept as `*.bak-DATE`.
+4. Connects yami to niri's config with one include line at its top (your config stays yours, what
+   you write below the line wins); without a config, or with niri's own starting one, it writes
+   yami's starting config and keeps the old file as `config.kdl.bak-yami-DATE`.
 
 yami stays out of your drivers and your boot: no session environment for a driver, no module
 options, no initramfs. Everything is logged to `~/.cache/yami/install.log`. On NixOS use the flake
@@ -388,7 +389,7 @@ Updates come from this repository over HTTPS; set `updateRepo` to follow a fork 
 
 ## Configuration
 
-Everything in settings (`Mod+S`) is also a key in `~/.config/yami-shell.json`, reloaded live when
+Everything in settings (`Mod+S`) is also a key in `~/.config/yami/shell.json`, reloaded live when
 edited by hand; one bad value falls back to its default instead of resetting the file. The full
 reference is [docs/CONFIG.md](docs/CONFIG.md). From the terminal:
 
@@ -404,15 +405,17 @@ yami-shell binds list                  # keybindings: id, keys, action
   edges, between modules and around the windows with arrows), widgets,
   dock, windows (gaps between windows and from the screen edges, floating rules, cursor), keys, games, screenshots, screens, system, services
   (notifications, tray, polkit, portals, covers: each can be handed to another program), updates.
-- **niri**: the shell owns `yami-binds.kdl`, `yami-fx.kdl` (window rules, blur, games),
-  `yami-colors.kdl`, `yami-cursor.kdl` and `yami-outputs.kdl`; `~/.config/niri/user.kdl` is
-  included after them and never overwritten, so your binds, rules and outputs there win.
+- **niri**: your `~/.config/niri/config.kdl` stays yours: yami adds one include line at its top
+  (`yami niri connect`, `yami niri disconnect` takes it out), and what you write below it wins. The
+  line brings `~/.config/yami/niri/yami.kdl`: the shell's keys (`binds.kdl`), window rules, blur and
+  games (`rules.kdl`), colours and cursor, screens (`outputs.kdl`) and yami's niri look (`base.kdl`),
+  each switched in settings → system → niri.
 - **IPC**: `yami-shell msg <command>`, where the command is one of `launcher`, `clipboard`,
   `power`, `settings`, `lock`, `bar`, `stacking`, `minimize`, `restore`, `edit`, `reload`,
   `restart`, `quit`, `settings TAB`, `profile` (next power profile), `popup cal|sound|media|net|bt|sys|profile|tray`, `screenshot [area|window|screen]`,
   `walls` (the wallpaper picker), `wallpaper [PATH]` (no path: the generated pixel wallpaper), `curtain [on|off]` (privacy curtain), `night` (night light on/off),
   `media play-pause|next|previous|player` (to the player the bar shows; `player` switches to the next one, as a click on its name in the music popup does).
-- **yami-files**: `~/.config/yami-files.json` (also from its ≡ menu → settings). `yami-files
+- **yami-files**: `~/.config/yami/files.json` (also from its ≡ menu → settings). `yami-files
   --pick open|save|dir …` is the dialog the portal runs; `yami-files --portal` is the portal and
   FileManager1 service, started by D-Bus; `yami-files --portal-reload` hands it over to a newly
   installed binary without cutting a recording (the installer runs it).

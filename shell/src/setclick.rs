@@ -1,7 +1,7 @@
 // Настройки: что делает щелчок (Act::S…) — меняет Settings и применяет (settings_changed);
 // вкладкам со своими файлами — их обработчики (обои, клавиши, обновления).
 
-use crate::app::{App, SKind};
+use crate::app::{App, Msg, SKind};
 use crate::config::Widget;
 use crate::settings::cycle;
 use crate::theme::{parse_hex, PRESETS};
@@ -141,6 +141,11 @@ impl App {
                     "game_ntsync" => s.game_ntsync = !s.game_ntsync,
                     "game_gamemode" => s.game_gamemode = !s.game_gamemode,
                     "night" => s.night = !s.night,
+                    "niri_look" => s.niri_look = !s.niri_look,
+                    "niri_keys" => s.niri_keys = !s.niri_keys,
+                    "niri_rules" => s.niri_rules = !s.niri_rules,
+                    "niri_colors" => s.niri_colors = !s.niri_colors,
+                    "niri_screens" => s.niri_screens = !s.niri_screens,
                     "session_restore" => s.session_restore = !s.session_restore,
                     "update_check" => s.update_check = !s.update_check,
                     "fetch_full" => {
@@ -450,6 +455,16 @@ impl App {
                 }
                 "reload" => self.ipc("reload"),
                 k if self.update_cycle(k) || self.agents_cycle(k) || self.login_cycle(k) => {}
+                "niri_connect" | "niri_disconnect" => {
+                    // niri validate — отдельный процесс: не на нити Wayland
+                    let on = *k == "niri_connect";
+                    self.save_now();
+                    let tx = self.tx.clone();
+                    std::thread::spawn(move || {
+                        let r = if on { crate::niricfg::connect(crate::niricfg::Mode::Auto) } else { crate::niricfg::disconnect() };
+                        let _ = tx.send(Msg::NiriLink(crate::niricfg::status(), r.unwrap_or_else(|e| e)));
+                    });
+                }
                 "open_config" => {
                     // на диске должно быть то, что сейчас в настройках
                     let j = self.st.set.to_json();

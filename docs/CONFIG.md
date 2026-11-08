@@ -8,15 +8,18 @@ of the file is kept), unknown keys are ignored: `yami-shell config check` lists 
 
 | File | Owner | Edit by hand |
 |---|---|---|
-| `~/.config/yami-shell.json` | the shell; yami-files, yami-view and `yami recolor` read the look from it | yes, live |
-| `~/.config/yami-files.json` | yami-files | yes (read at start) |
-| `~/.config/niri/config.kdl` | the installer | better not: it is replaced on reinstall |
-| `~/.config/niri/user.kdl` | **you** | yes: included last, wins over everything above |
-| `~/.config/niri/yami-binds.kdl` | the shell (settings → keys) | no, rewritten |
-| `~/.config/niri/yami-fx.kdl` | the shell (windows, look, games) | no, rewritten |
-| `~/.config/niri/yami-colors.kdl`, `yami-cursor.kdl` | `yami recolor` | no, rewritten |
-| `~/.config/niri/yami-outputs.kdl` | the shell (settings → screens) | no, rewritten |
-| `~/.config/niri/yami-local.kdl` | the installer (this machine's own niri settings; empty now) | no |
+| `~/.config/yami/shell.json` | the shell; yami-files, yami-view and `yami recolor` read the look from it | yes, live |
+| `~/.config/yami/files.json` | yami-files | yes (read at start) |
+| `~/.config/yami/style.json`, `style.<module>.json` | the look of every module (the shell writes it from settings → look) | yes |
+| `~/.config/yami/scripts/` | **you**: bar modules and widgets from scripts | yes |
+| `~/.config/yami/themes/`, `templates/` | **you**: saved themes, recolouring templates | yes |
+| `~/.config/niri/config.kdl` | **you**: yami only adds one include line at its top (`yami niri connect`), what you write below it wins | yes |
+| `~/.config/yami/niri/yami.kdl` | the shell: what that line brings, the parts below that are on in settings → system → niri | no, rewritten |
+| `~/.config/yami/niri/base.kdl` | the shell: yami's niri look (input, layout, animations, window rules, environment) | no, rewritten |
+| `~/.config/yami/niri/binds.kdl` | the shell (settings → keys) | no, rewritten |
+| `~/.config/yami/niri/rules.kdl` | the shell (windows, look, games) | no, rewritten |
+| `~/.config/yami/niri/colors.kdl`, `cursor.kdl` | `yami recolor` | no, rewritten |
+| `~/.config/yami/niri/outputs.kdl` | the shell (settings → screens) | no, rewritten |
 | `/var/lib/yami-greet/look/` | the shell: what the login screen is drawn from (`look.json`: palette, language, monitors, layouts; `wall.png`: the wallpaper), yours since the install | no, rewritten |
 | `/var/lib/yami-greet/log/` | the login screen: `greet.log` (its starts, niri's messages), `last` (how the last start went) | no, read with `yami login status` / `log` |
 | `~/.local/state/yami/palette.json` | the shell: the derived palette other apps are coloured from | no |
@@ -45,7 +48,7 @@ yami theme save [NAME] | list | apply NAME | remove NAME   # your themes in ~/.c
 yami templates [force NAME]                # render your templates and print what came out of each (force overwrites one changed by hand)
 yami icons [NAME | auto | add PATH]        # icon sets: list them, switch (auto: the system's), install your own from an archive or a folder into ~/.local/share/icons
 yami cursor [NAME | yami | system | size N | add PATH]   # cursors: the yami pixel one, any installed set, system (leave alone); the size; your own set
-yami export FILE | import FILE [--yes]    # every setting as one file; user.kdl, custom keys and bar scripts only with --yes; before an import the current state goes to ~/.local/state/yami/before-import-*.json (undo: yami import that file --yes)
+yami export FILE | import FILE [--yes]    # every setting as one file; niri/user.kdl, custom keys and bar scripts only with --yes; before an import the current state goes to ~/.local/state/yami/before-import-*.json (undo: yami import that file --yes)
 yami login sync                           # give the login screen the shell's look now (the shell does it on every change)
 yami login status | log | preview         # the login screen: installed, greetd enabled, its last start; its log; it over the desktop (password yami or Esc)
 yami clean [--dry-run]                    # remove the build cache (yami-niri sources, the shell's target: gigabytes); --force also drops a tree with your patch work
@@ -59,7 +62,7 @@ yami-shell config set animSpeed 0.7
 yami-shell config reset dockSide          # one key back to its default
 yami-shell config reset                   # the whole file (the old one is kept as .json.bak)
 yami-shell config check                   # bad values and unknown keys
-yami-shell config kdl                     # what the shell writes to yami-fx.kdl
+yami-shell config kdl                     # what the shell writes to ~/.config/yami/niri/rules.kdl
 yami-shell config lite-auto               # lite mode on if this machine is weak or virtual (the installer runs it)
 yami-shell binds list | print | write     # keybindings
 ```
@@ -88,7 +91,7 @@ file for one run. The files are reread when they change.
 | `lang` | `ru`, `en`, `pt-BR` | empty: as the system |
 | `colors` | an object of `#rrggbb` | any of `bg` `panel` `surface` `surfaceHi` `codeBg` `border` `dim` `accent` `deep` `glow` `bright` `selection` `text` `textDim` `textFaint` `onAccent` `textHi` `ok` `warn` |
 
-## yami-shell.json
+## shell.json
 
 ### Colour and look
 
@@ -122,7 +125,7 @@ file for one run. The files are reread when they change.
 | `wallDim` | `0.0` | darken the wallpaper towards the background colour, 0…0.8 |
 | `wallAccent` | `false` | take the accent from your image, again with every new one; the whole palette follows it (background, panels, borders, the 16 terminal colours, every recoloured program and template). Settings → color → «palette from the wallpaper» or `yami palette wallpaper`; picking a colour by hand turns it off |
 | `wallKanji` | `true` | the 闇 glyph in the wallpaper corner |
-| `wallSkwd` | `false` | the wallpaper comes from [skwd-wall](https://github.com/liixini/skwd-wall): the shell reads what it writes (`~/.cache/skwd-wall-v2/last-wallpaper.json`, `colors.json`; `SKWD_WALL_V2_CACHE` and `paths.cache` respected) and changes nothing in its config. On a monitor where skwd-wall draws (pictures by skwd-paper, videos and scenes by skwd-wall-vk, transitions; seen from its niri layer) the shell hides its own wallpaper; otherwise (skwd-wall's pick-only mode) the shell draws the picked image itself in its cells and tones, a video or scene by its preview frame. The lock and login screens show the same picture. `yami-fx.kdl` gets the layer rule that puts skwd-paper's overview backdrop behind the workspaces |
+| `wallSkwd` | `false` | the wallpaper comes from [skwd-wall](https://github.com/liixini/skwd-wall): the shell reads what it writes (`~/.cache/skwd-wall-v2/last-wallpaper.json`, `colors.json`; `SKWD_WALL_V2_CACHE` and `paths.cache` respected) and changes nothing in its config. On a monitor where skwd-wall draws (pictures by skwd-paper, videos and scenes by skwd-wall-vk, transitions; seen from its niri layer) the shell hides its own wallpaper; otherwise (skwd-wall's pick-only mode) the shell draws the picked image itself in its cells and tones, a video or scene by its preview frame. The lock and login screens show the same picture. `rules.kdl` gets the layer rule that puts skwd-paper's overview backdrop behind the workspaces |
 | `wallSkwdColors` | `true` | with `wallSkwd`: the accent is skwd-wall's `primary` and the theme follows its background (light or dark), so a palette made in its theme designer recolours the whole rice |
 | `iconTheme` | `""` | the icon set (settings → look → app icons, `yami icons`): the shell and yami's apps use it, and so do GTK and Qt when they are restyled; empty: the one the system already uses |
 | `iconPixel` | `true` | app icons as clean pixel art: the icon is drawn large, averaged down to a grid of 16–30 cells (2 px cells in the dock), in 5–10 of its own colours with a dark outline, no dithering |
@@ -210,8 +213,8 @@ Settings → look → «pixel look» moves these keys, `iconPixel` and `cursor` 
 | `floatMedia`, `floatPip` | `true` | photo/video viewers and picture-in-picture open floating |
 | `floatApps` | `""` | more app-ids to open floating, comma separated |
 | `floatW`, `floatH` | `0.62`, `0.78` | their size, share of the screen |
-| `winGap` | `8` | gap between tiled windows, px (0–64): niri `gaps` in `yami-fx.kdl` |
-| `winLeft`, `winRight`, `winTop`, `winBottom` | `8` each | from the screen edge to the windows, px (0–128; the top one from the bar): niri `struts` = edge − gap. Struts in `user.kdl` replace these whole |
+| `winGap` | `8` | gap between tiled windows, px (0–64): niri `gaps` in `rules.kdl` |
+| `winLeft`, `winRight`, `winTop`, `winBottom` | `8` each | from the screen edge to the windows, px (0–128; the top one from the bar): niri `struts` = edge − gap. Struts in your niri `config.kdl` replace these whole |
 | `winRadius` | `0` | window corner radius, px (0–24; 0 square, like pixels): niri `geometry-corner-radius` with `clip-to-geometry`, the border follows it. Games stay square; fullscreen and maximized windows are square anyway; in desk mode with title bars only the bottom corners of floating windows round, so the shell's title bar joins without a gap |
 | `winBorder` | `2` | window border width, px (0–8; 0: none); its colours come from the palette |
 | `cursor`, `cursorSize` | `"yami"`, `24` | `yami` (pixel, in the palette), the name of any installed cursor set (settings → look → cursor, `yami cursor`), or `system` (yami leaves the cursor alone) |
@@ -295,7 +298,7 @@ new tree: it rebuilds from source, keeps every setting and needs no sudo. Nothin
 built, and a module whose source did not change is not rebuilt. Before it starts, a rollback point goes to
 `~/.local/state/yami/snapshots` (the last three are kept, `yami update snapshots` lists them): the programs and every
 file the installer rewrites. A run that fails after it began changing things puts it all back by itself;
-`yami update rollback` goes back to the newest point (your settings, screens and `user.kdl` are left as they are now). `yami update list` shows the last
+`yami update rollback` goes back to the newest point (your settings, screens and niri config are left as they are now). `yami update list` shows the last
 eight releases with their signatures, `yami update to X.Y.Z` builds and installs one of them (only
 what passes `updateVerify`). Before switching to an older version the settings are copied to
 `~/.local/state/yami/settings-newer.json`; keys the older version dropped come back from it on the
@@ -326,11 +329,11 @@ installer writes them to `~/.local/state/yami/packages-needed`; `yami update nee
 
 Keys are written as niri does: `Mod` (Super), `Ctrl`, `Alt`, `Shift`, then a key name (`Q`,
 `Slash`, `Page_Up`, `Print`, `XF86AudioMute`, `WheelScrollDown`). Anything the table cannot
-express goes into `~/.config/niri/user.kdl` in plain niri syntax, which wins.
+express goes into your `~/.config/niri/config.kdl` below yami's line, in plain niri syntax, and wins.
 
 ### Bar modules from scripts
 
-An executable file in `~/.config/yami/modules/<name>` becomes the bar module `x:<name>` (settings
+An executable file in `~/.config/yami/scripts/<name>` becomes the bar module `x:<name>` (settings
 → bar lists it with the built-in ones). The script prints a line on every update, plain text or
 JSON; a script that keeps running streams lines, one that exits is run again after `interval`
 seconds (10 by default). The same script can also be a desktop widget (settings → widgets →
@@ -338,7 +341,7 @@ script), where `\n` in the JSON `text` starts a new line; the bar shows the firs
 
 ```sh
 #!/bin/sh
-# ~/.config/yami/modules/weather: a 7×7 icon, the text, a theme colour, a click, every 10 minutes
+# ~/.config/yami/scripts/weather: a 7×7 icon, the text, a theme colour, a click, every 10 minutes
 t=$(curl -fs 'https://wttr.in/?format=%t' || echo '?')
 printf '{"text":"%s","icon":"temp","color":"accent","click":"xdg-open https://wttr.in","interval":600}\n' "$t"
 ```
@@ -362,7 +365,7 @@ new wallpaper, a move, or a settings change.
 `source`. `x`/`y` of -1 means the default place. Easier to arrange with the
 mouse: settings → widgets, edit mode.
 
-## yami-files.json
+## files.json
 
 | Key | Default | Meaning |
 |---|---|---|

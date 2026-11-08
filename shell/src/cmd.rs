@@ -92,6 +92,7 @@ fn help(y: &Sty, me: &str) {
     y.row("export | import FILE", &crate::tf!("все настройки одним файлом: переезд на новую систему", "every setting as one file: move to a new system", "todas as configurações num arquivo: migrar para outro sistema"));
     y.row("config …", &crate::tf!("все настройки: list get set reset check path kdl", "every setting: list get set reset check path kdl", "todas as configurações: list get set reset check path kdl"));
     y.row("binds …", &crate::tf!("клавиши: list print write", "keybindings: list print write", "atalhos: list print write"));
+    y.row("niri [connect|disconnect]", &crate::tf!("часть yami в конфиге niri: подключить одной строкой, убрать, состояние", "yami in niri's config: connect with one line, take out, status", "o yami na configuração do niri: conectar com uma linha, remover, estado"));
     y.section(&crate::tf!("обслуживание", "maintenance", "manutenção"));
     y.row("update [check]", &crate::tf!("что нового в репозитории", "what is new upstream", "novidades no projeto original"));
     y.row("update apply", &crate::tf!("собрать и поставить новое (прежнее — в откат)", "build and install it (the old one is kept)", "compilar e instalar (a versão anterior é preservada)"));
@@ -557,6 +558,7 @@ pub fn run(args: &[String], me: &str) -> i32 {
         Some("shot") => crate::shot::run(&args[1..]),
         Some("config") => crate::cli::config(&args[1..]),
         Some("binds") => crate::cli::binds(&args[1..]),
+        Some("niri") => crate::niricfg::cli(&y, &a[1..]),
         Some(c) => {
             eprintln!(" {} {}", y.bad("✕"), crate::tf!("нет такой команды: {} (yami help)", "no such command: {} (yami help)", "comando inexistente: {} (yami help)", c));
             2

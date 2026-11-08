@@ -221,7 +221,7 @@ pub fn run(y: &Sty) -> i32 {
     y.section(&crate::tf!("настройки", "config", "configuração"));
     let (bad, unknown) = crate::config::Settings::problems(&crate::cli::file_json());
     if bad.is_empty() && unknown.is_empty() {
-        line(y, &y.ok("✓"), "yami-shell.json", &crate::config::settings_path().display().to_string());
+        line(y, &y.ok("✓"), "shell.json", &crate::config::settings_path().display().to_string());
     }
     for k in &bad {
         problems += 1;
@@ -231,13 +231,21 @@ pub fn run(y: &Sty) -> i32 {
         line(y, &y.warn("·"), k, &crate::tf!("неизвестный ключ, пропущен", "unknown key, ignored", "chave desconhecida, ignorada"));
     }
     if which("niri") {
-        let cfg = crate::config::config_dir().join("niri/config.kdl");
+        let cfg = crate::niricfg::config_path();
+        let name = yami_px::paths::pretty(&cfg);
         let ok = std::process::Command::new("niri").arg("validate").arg("-c").arg(&cfg).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().map(|s| s.success()).unwrap_or(false);
         if ok {
-            line(y, &y.ok("✓"), "niri/config.kdl", &crate::tf!("проходит проверку", "validates", "válido"));
+            line(y, &y.ok("✓"), &name, &crate::tf!("проходит проверку", "validates", "válido"));
         } else {
             problems += 1;
-            line(y, &y.bad("✕"), "niri/config.kdl", &crate::tf!("не проходит: niri validate", "fails: niri validate", "falhou: niri validate"));
+            line(y, &y.bad("✕"), &name, &crate::tf!("не проходит: niri validate", "fails: niri validate", "falhou: niri validate"));
+        }
+        // клавиши, правила и вид yami приходят в niri одной строкой include
+        if crate::niricfg::status().connected {
+            line(y, &y.ok("✓"), "yami ↔ niri", &crate::tf!("часть yami подключена", "yami's part is connected", "a parte do yami está conectada"));
+        } else {
+            problems += 1;
+            line(y, &y.warn("·"), "yami ↔ niri", &crate::tf!("не подключён: yami niri connect (клавиш шелла пока нет)", "not connected: yami niri connect (the shell's keys are missing)", "não conectado: yami niri connect (faltam os atalhos do shell)"));
         }
     }
     login(y);

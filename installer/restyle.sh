@@ -95,5 +95,5 @@ t_desc() {
   esac
 }
 
-# settings → yami-shell.json (do_dotfiles): themeApps and the cursor
+# settings → ~/.config/yami/shell.json (do_dotfiles): themeApps and the cursor
 restyle_json() { "$BIN/yami-shell" config restyle "$(t_list)" "$(t_on cursor && echo yami || echo system)"; }

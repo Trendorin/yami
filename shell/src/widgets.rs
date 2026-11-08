@@ -91,7 +91,7 @@ pub fn widget_menu(w: &Widget) -> Vec<MItem> {
             items.push(MItem::sub(&crate::tf!("эквалайзер: {}", "equalizer: {}", "equalizador: {}", crate::i18n::tr(name_of(STYLES, &w.style))), "music", pick("style", STYLES, &w.style)));
         }
         "script" => {
-            // скрипты — те же, что модули бара: ~/.config/yami/modules
+            // скрипты — те же, что модули бара: ~/.config/yami/scripts
             let names: Vec<MItem> = crate::plugins::scripts().into_iter().map(|n| MItem::new(&n, "", MAct::Widget(id, "source", n.clone())).check(n == w.source)).collect();
             if !names.is_empty() {
                 items.push(MItem::sub(&crate::tf!("скрипт: {}", "script: {}", "script: {}", if w.source.is_empty() { "—" } else { &w.source }), "term", names));
@@ -155,7 +155,7 @@ fn weather(ui: &mut Ui, st: &State, w: &Widget, r: R, c: C) {
     }
 }
 
-/// вывод скрипта из ~/.config/yami/modules на столе: значок и строки текста (как модуль бара,
+/// вывод скрипта из ~/.config/yami/scripts на столе: значок и строки текста (как модуль бара,
 /// «\n» в JSON-поле text — новая строка); click — по щелчку
 fn script(ui: &mut Ui, st: &State, w: &Widget, r: R, c: C) {
     let t = ui.t;

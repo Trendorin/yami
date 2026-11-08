@@ -64,7 +64,7 @@ fn small() -> Option<String> {
     (gb <= 4 && threads <= 4).then(|| crate::tf!("{} ГБ памяти, {} потока", "{} GB of memory, {} threads", "{} GB de memória, {} threads", gb, threads))
 }
 
-/// строки для yami-fx.kdl: что лёгкий режим выключает у niri (размытие пишет fx_kdl сам)
+/// строки для rules.kdl: что лёгкий режим выключает у niri (размытие пишет fx_kdl сам)
 pub fn kdl(l: &mut Vec<String>) {
     for s in ["// lite mode (settings → look): no animations, opaque inactive windows", "animations { off; }", "window-rule {", "    match is-active=false", "    opacity 1.0", "}", ""] {
         l.push(s.into());

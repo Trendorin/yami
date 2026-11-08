@@ -1,6 +1,6 @@
 // Клавиши: все сочетания niri и шелла. Шелл — их хозяин: таблица по умолчанию здесь,
 // переопределения — в настройках (`binds`: id → "Mod+X", "" — выключено) и свои команды
-// (`customBinds`), итог пишется в ~/.config/niri/yami-binds.kdl. Руками поверх — niri/user.kdl:
+// (`customBinds`), итог пишется в ~/.config/yami/niri/binds.kdl. Руками поверх — свой config.kdl niri:
 // он подключён позже, его сочетания перекрывают наши.
 //
 // i18n: inline pairs — у каждого бинда русское и английское название рядом.
@@ -298,11 +298,11 @@ pub fn kdl_str(s: &str) -> String {
     o
 }
 
-/// yami-binds.kdl целиком
+/// binds.kdl целиком
 pub fn kdl(set: &crate::config::Settings) -> String {
     let mut l = vec![
         "// yami: keybindings and keyboard layouts, written by the shell (settings → keys). Rewritten on every change:".to_string(),
-        "// add your own in niri/user.kdl (included later, its keys win).".to_string(),
+        "// add your own in your niri config.kdl, after yami's include line: its keys win.".to_string(),
         "binds {".to_string(),
     ];
     let mut used: Vec<String> = vec![];
@@ -362,7 +362,7 @@ pub fn kdl(set: &crate::config::Settings) -> String {
 }
 
 pub fn write(set: &crate::config::Settings) {
-    let path = crate::config::config_dir().join("niri/yami-binds.kdl");
+    let path = crate::dirs::niri_dir().join("binds.kdl");
     let text = kdl(set);
     if std::fs::read_to_string(&path).ok().as_deref() != Some(text.as_str()) {
         let _ = crate::config::write_atomic(&path, &text);
@@ -469,7 +469,7 @@ fn layout_rows(ui: &mut Ui, st: &State, list: R, mut ry: i32) -> i32 {
     let sw = SWITCHES.iter().find(|x| x.0 == s.kb_switch).map(|x| x.1).unwrap_or("свои");
     crate::settings::opt_btn(ui, R::new(list.x, ry, list.w, 26), "переключать раскладку", sw, Act::SCycle("kb_switch"));
     ry += 36;
-    ui.wrap(PX, R::new(list.x, ry, list.w, 60), "us, gb, de, fr, es, it, pl, ru, ua… Пустое поле — авто. Свой блок input в niri/user.kdl главнее.", t.text_faint, 3);
+    ui.wrap(PX, R::new(list.x, ry, list.w, 60), "us, gb, de, fr, es, it, pl, ru, ua… Пустое поле — авто. Свой блок input в конфиге niri главнее.", t.text_faint, 3);
     ry + 60
 }
 
@@ -713,7 +713,7 @@ impl App {
         self.st.keys.note = if freed.is_empty() { String::new() } else { crate::tf!("{key} снято с: {}", "{key} taken from: {}", "{key} removido de: {}", freed.join(", ")) };
     }
 
-    /// settings_changed перепишет yami-binds.kdl
+    /// settings_changed перепишет binds.kdl
     pub fn binds_changed(&mut self) {
         self.settings_changed();
     }

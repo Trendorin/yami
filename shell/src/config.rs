@@ -1,4 +1,5 @@
-// Настройки шелла: ~/.config/yami-shell.json. Меняются в панели настроек (Mod+S),
+// Настройки шелла: ~/.config/yami/shell.json (до 3.0 — ~/.config/yami-shell.json, его переносит
+// dirs.rs, а до переноса читается он). Меняются в панели настроек (Mod+S),
 // перетаскиванием виджетов и руками — файл перечитывается на лету.
 
 use serde::{Deserialize, Serialize};
@@ -7,7 +8,7 @@ use std::path::PathBuf;
 pub use yami_px::paths::{config_dir, data_dir, home, state_dir, write_atomic};
 
 pub fn settings_path() -> PathBuf {
-    config_dir().join("yami-shell.json")
+    yami_px::paths::shell_settings()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -116,6 +117,13 @@ pub struct Settings {
     /// лёгкий режим для слабых и виртуальных машин (lite.rs): без размытия, без анимаций шелла
     /// и niri, неактивные окна непрозрачные; свои настройки эффектов при этом не меняются
     pub lite: bool,
+    /// части yami в конфиге niri (niricfg.rs): вид niri от yami, клавиши, правила окон, цвета и
+    /// курсор, экраны. Выключенная часть просто не включается в yami.kdl: тогда решает твой config.kdl
+    pub niri_look: bool,
+    pub niri_keys: bool,
+    pub niri_rules: bool,
+    pub niri_colors: bool,
+    pub niri_screens: bool,
     /// режим «стол»: все окна плавают, у каждого заголовок как в DE
     pub stacking: bool,
     pub titlebars: bool,
@@ -235,7 +243,7 @@ pub struct Settings {
     pub float_apps: String,
     pub float_w: f32,
     pub float_h: f32,
-    /// отступы окон (niri gaps/struts, пишутся в yami-fx.kdl): между окнами и от краёв экрана
+    /// отступы окон (niri gaps/struts, пишутся в rules.kdl): между окнами и от краёв экрана
     /// (сверху — от бара), px
     pub win_gap: i32,
     pub win_left: i32,
@@ -483,6 +491,11 @@ impl Default for Settings {
             anim_close: true,
             scanlines: false,
             lite: false,
+            niri_look: true,
+            niri_keys: true,
+            niri_rules: true,
+            niri_colors: true,
+            niri_screens: true,
             stacking: false,
             titlebars: true,
             icon_theme: String::new(),
@@ -692,7 +705,7 @@ impl Settings {
         self.font_pt = self.font_pt.clamp(0, 48);
         self.binds.retain(|_, k| k.is_empty() || crate::keys::key_ok(k));
         self.custom_binds.retain(|c| c.key.is_empty() || crate::keys::key_ok(&c.key));
-        // модули-скрипты: только имя файла в ~/.config/yami/modules; «rec» (повтор) убран
+        // модули-скрипты: только имя файла в ~/.config/yami/scripts; «rec» (повтор) убран
         for l in [&mut self.bar_left, &mut self.bar_center, &mut self.bar_right] {
             l.retain(|m| m != "rec" && m.strip_prefix("x:").map_or(true, crate::plugins::name_ok));
         }
@@ -1078,7 +1091,7 @@ impl Settings {
         self.blur_term && !self.lite
     }
 
-    /// yami-fx.kdl для niri уровня `lvl` (0 — сток, иначе наш форк: allow-tearing; ≥ 4 —
+    /// rules.kdl для niri уровня `lvl` (0 — сток, иначе наш форк: allow-tearing; ≥ 4 —
     /// `show-only-in`; ≥ 5 — `hide-from`); curtain — шторка опущена (без `show-only-in` тогда
     /// прячутся окна). Матовость — размытие под терминалами (панели шелла — своим регионом)
     pub fn fx_kdl(&self, lvl: u32, curtain: bool) -> String {

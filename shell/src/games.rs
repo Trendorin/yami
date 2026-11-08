@@ -29,7 +29,7 @@ pub fn is_game(set: &crate::config::Settings, app_id: &str) -> bool {
         })
 }
 
-/// часть yami-fx.kdl: правило игровых окон и кеш шейдеров
+/// часть rules.kdl: правило игровых окон и кеш шейдеров
 pub fn kdl(set: &crate::config::Settings, yami: bool, l: &mut Vec<String>) {
     let tearing = set.game_tearing && yami;
     // скруглённые углы обрезали бы угол картинки и интерфейса игры

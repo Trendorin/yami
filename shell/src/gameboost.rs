@@ -1,5 +1,5 @@
 // Игровые ускорители, которые уже есть в системе: находятся и включаются сами, на любом дистрибутиве.
-// - ntsync (/dev/ntsync, ядро 6.14+): PROTON_USE_NTSYNC=1 для Proton через yami-fx.kdl;
+// - ntsync (/dev/ntsync, ядро 6.14+): PROTON_USE_NTSYNC=1 для Proton через rules.kdl;
 // - GameMode (gamemoded на сессионной шине): pid игры в фокусе регистрируется, пока она в
 //   фокусе, — без `gamemoderun %command%` в каждой игре.
 // Системное (планировщик, лимиты кадров) не трогаем: это дело игры, MangoHud и самой системы.
@@ -37,7 +37,7 @@ pub fn probe() -> Probe {
     }
 }
 
-/// строки для yami-fx.kdl (внутри `environment { }`)
+/// строки для rules.kdl (внутри `environment { }`)
 pub fn env_kdl(set: &crate::config::Settings, l: &mut Vec<String>) {
     if set.game_ntsync && Path::new("/dev/ntsync").exists() {
         l.push("    PROTON_USE_NTSYNC \"1\"".into());

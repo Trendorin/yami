@@ -11,17 +11,17 @@ const HELP: &str = "yami-shell config [list | get KEY | set KEY VALUE | reset [K
   reset [KEY]     back to the default: one key, or the whole file (a .bak copy is kept)
   check           keys with a bad value (ignored, default used) and unknown keys
   path            where the file is
-  kdl [yami]      what the shell writes to ~/.config/niri/yami-fx.kdl (yami: as for yami-niri)
+  kdl [yami]      what the shell writes to ~/.config/yami/niri/rules.kdl (yami: as for yami-niri)
   lite-auto       lite mode on when this machine is weak or virtual and the file has no `lite` yet
   seed K=V …      (the installer) set keys in the file as they are: true/false or a string; look=\"78 0 100 50\"
   restyle \"LIST\" C  (the installer) what to restyle: themeApps = LIST, cursor = yami or system
   portals         write niri-portals.conf for the modules that are installed
-Keys are camelCase, as in ~/.config/yami-shell.json. Reference: docs/CONFIG.md.
+Keys are camelCase, as in ~/.config/yami/shell.json. Reference: docs/CONFIG.md.
 
 yami-shell binds [list | print | write]
   list            every keybinding: id, keys, what it does
   print           the niri binds block the shell writes
-  write           write ~/.config/niri/yami-binds.kdl now (the shell does it on start)
+  write           write ~/.config/yami/niri/binds.kdl now (the shell does it on start)
 Change one: yami-shell config set binds '{\"terminal\": \"Mod+Return\"}' (\"\" turns it off).";
 
 pub fn file_json() -> serde_json::Map<String, Value> {
@@ -159,7 +159,7 @@ pub fn config(args: &[String]) -> i32 {
             }
         }
         ["kdl"] | ["kdl", _] => {
-            // что шелл пишет в niri/yami-fx.kdl; `kdl yami` — как для yami-niri
+            // что шелл пишет в ~/.config/yami/niri/rules.kdl; `kdl yami` — как для yami-niri
             let lvl = if a.get(1) == Some(&"yami") { u32::MAX } else { crate::niri::config_level(crate::niri::fork_level()) };
             print!("{}", Settings::load().fx_kdl(lvl, false));
         }

@@ -194,9 +194,16 @@ data() { printf '%s/.local/share/%s' "$H" "$1"; }
 cfg() { printf '%s/.config/%s' "$H" "$1"; }
 bin_sums() { (cd "$H/.local/bin" && sha256sum -- "${BINS[@]}" 2>/dev/null); }
 niri_ok() { sandbox /usr/bin/niri validate -c "$(cfg niri/config.kdl)"; }
-user_mark() { sandbox "$H/.local/bin/yami-shell" config set barMargin 13; printf '// my tweak\n' >>"$(cfg niri/user.kdl)"; }
+# settings: ~/.config/yami/shell.json, before 3.0 ~/.config/yami-shell.json; one's own niri lines: in
+# config.kdl since 3.0 (yami only adds its include), in user.kdl before (yami wrote config.kdl whole)
+settings_file() { if [[ -f $(cfg yami/shell.json) ]]; then cfg yami/shell.json; else cfg yami-shell.json; fi; }
+user_mark() {
+  sandbox "$H/.local/bin/yami-shell" config set barMargin 13
+  if grep -q 'yami/niri/yami.kdl' "$(cfg niri/config.kdl)" 2>/dev/null; then printf '// my tweak\n' >>"$(cfg niri/config.kdl)"; else printf '// my tweak\n' >>"$(cfg niri/user.kdl)"; fi
+}
 user_kept() {
-  grep -q '"barMargin": *13' "$(cfg yami-shell.json)" && contains "$(cfg niri/user.kdl)" '// my tweak'
+  # -q: a match in either file is enough, the other may be missing
+  grep -q '"barMargin": *13' "$(settings_file)" && grep -qsF '// my tweak' "$(cfg niri/config.kdl)" "$(cfg niri/user.kdl)"
 }
 publish() { # version: every module and the shell move to it
   local m
@@ -316,7 +323,7 @@ t_full() {
   for b in "${BINS[@]}"; do nocheck "  $b is gone" exists "$H/.local/bin/$b"; done
   nocheck "  the record is gone" exists "$(state install.json)"
   nocheck "  mimeapps forgot the apps" contains "$(cfg mimeapps.list)" "yami-view.desktop"
-  check "  settings stay" exists "$(cfg yami-shell.json)"
+  check "  settings stay" exists "$(settings_file)"
   check "  the counter mark stays" exists "$(state counted)"
 }
 t_failures() {
@@ -369,17 +376,17 @@ t_failures() {
   [[ "$before" == "$(bin_sums)" ]] && ok "  every binary is the old one" || no "  every binary is the old one"
   mv "$GH/gone.git" "$GH/yami-view.git"
 
-  # the new niri config is broken: the installer has already swapped the binaries and must put them back
+  # yami's new niri part is broken: the installer has already swapped the binaries and must put them back
   before="$(bin_sums)"
   local old_kdl
   old_kdl="$(cat "$(cfg niri/config.kdl)")"
-  printf 'this is not kdl {{{\n' >>"$SRC/yami/config/niri/config.kdl"
+  printf 'this is not kdl {{{\n' >>"$SRC/yami/config/niri/base.kdl"
   shell_tag 3.6.0
   nocheck "a config niri rejects fails the update" update
   [[ "$before" == "$(bin_sums)" ]] && ok "  the snapshot put every binary back" || no "  the snapshot put every binary back"
   [[ "$old_kdl" == "$(cat "$(cfg niri/config.kdl)")" ]] && ok "  the config is the old one" || no "  the config is the old one"
   check "  niri accepts it" niri_ok
-  git -C "$SRC/yami" checkout -q HEAD~1 -- config/niri/config.kdl
+  git -C "$SRC/yami" checkout -q HEAD~1 -- config/niri/base.kdl
   shell_tag 3.7.0
   check "a fixed release goes through" update
   check "  the shell is 3.7.0" is_ver yami-shell 3.7.0

@@ -180,7 +180,7 @@ pub(crate) fn tab_widgets(ui: &mut Ui, st: &State, b: R) {
             opt_btn(ui, R::new(px, y, pw, 26), "скрипт", if w.source.is_empty() { "—" } else { &w.source }, Act::SWidgetOpt(id, "source"));
             y += 30;
             if crate::plugins::scripts().is_empty() {
-                ui.wrap(crate::font::PX, R::new(px, y, pw, 40), "положи исполняемый скрипт в ~/.config/yami/modules (как модуль бара)", t.text_faint, 2);
+                ui.wrap(crate::font::PX, R::new(px, y, pw, 40), "положи исполняемый скрипт в ~/.config/yami/scripts (как модуль бара)", t.text_faint, 2);
                 y += 40;
             }
         }
@@ -342,6 +342,45 @@ pub(crate) fn tab_system(ui: &mut Ui, st: &State, b: R) {
     opt_btn(ui, R::new(lx, y, half, 26), "язык", lang, Act::SCycle("lang"));
     ui.toggle(R::new(rx, y, half, 26), "вернуть программы при входе", "", s.session_restore, Act::SBool("session_restore"));
     y += 40;
+    // конфиг niri — человека: yami только строка include в его начале, части включаются здесь
+    y = title(ui, b.x, y, b.w, "niri: что приносит yami");
+    let nl = &st.niri_link;
+    let (state, c) = if nl.connected {
+        (crate::tf!("подключён: {}", "connected: {}", "conectado: {}", yami_px::paths::pretty(&nl.path)), ui.t.ok)
+    } else if nl.exists {
+        (crate::tf!("не подключён к {}", "not in {}", "fora de {}", yami_px::paths::pretty(&nl.path)), ui.t.warn)
+    } else {
+        ("конфига niri пока нет".to_string(), ui.t.warn)
+    };
+    ui.text_in(PX, R::new(lx, y, half, 28), &state, c);
+    if nl.connected {
+        ui.button(R::new(rx, y, half, 28), "убрать строку yami", "close", Tone::Plain, false, true, Act::SCycle("niri_disconnect"));
+    } else {
+        ui.button(R::new(rx, y, half, 28), "подключить одной строкой", "plus", Tone::Primary, false, true, Act::SCycle("niri_connect"));
+    }
+    y += 34;
+    if !st.niri_note.is_empty() {
+        y += ui.wrap(PX, R::new(lx, y, b.w, 40), &st.niri_note, ui.t.text_dim, 3) + 6;
+    }
+    for (i, (k, name, hint, on)) in [
+        ("niri_look", "вид niri от yami", "ввод, окна, анимации", s.niri_look),
+        ("niri_keys", "клавиши yami", "настройки → клавиши", s.niri_keys),
+        ("niri_rules", "правила окон", "размытие, игры, плавающие окна", s.niri_rules),
+        ("niri_colors", "цвета и курсор", "рамки окон в палитре", s.niri_colors),
+        ("niri_screens", "экраны", "настройки → экраны", s.niri_screens),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let x = if i % 2 == 0 { lx } else { rx };
+        ui.toggle(R::new(x, y, half, 40), name, hint, on, Act::SBool(k));
+        if i % 2 == 1 {
+            y += 46;
+        }
+    }
+    y += 46;
+    ui.wrap(PX, R::new(lx, y, b.w, 28), "что написано в config.kdl ниже строки yami — главнее любой части", ui.t.text_faint, 2);
+    y += 30;
     y = title(ui, b.x, y, b.w, "быстро");
     let bw = (b.w - 18) / 4;
     for (i, (label, icon, act)) in [("заблокировать", "lock", Act::SCycle("do_lock")), ("микшер", "speaker", Act::Pavu), ("процессы", "cpu", Act::SysMon), ("перечитать", "reboot", Act::SCycle("reload"))].into_iter().enumerate() {
@@ -440,7 +479,7 @@ pub(crate) fn tab_dock(ui: &mut Ui, st: &State, b: R) {
 pub(crate) fn tab_windows(ui: &mut Ui, st: &State, b: R) {
     let s = &st.set;
     let half = (b.w - 20) / 2;
-    // отступы, углы и рамка окон: niri gaps/struts и правила в yami-fx.kdl (применяются сразу)
+    // отступы, углы и рамка окон: niri gaps/struts и правила в rules.kdl (применяются сразу)
     let mut y = title(ui, b.x, b.y, b.w, "окна: отступы от краёв и между, углы, рамка");
     let cw = (b.w - 24) / 3;
     let col = |i: i32| b.x + i * (cw + 12);
@@ -465,7 +504,7 @@ pub(crate) fn tab_windows(ui: &mut Ui, st: &State, b: R) {
     ui.field(R::new(b.x, y, b.w - 130, 30), &st.float_field, "app-id через запятую: org.telegram.desktop, imv", focused, false, Act::SField("float_apps"));
     ui.button(R::new(b.right() - 120, y + 2, 120, 26), "применить", "check", Tone::Primary, false, true, Act::SCycle("float_apply"));
     y += 40;
-    ui.text_in(PX, R::new(b.x, y, b.w, 20), "app-id окна: niri msg windows · правила пишутся в niri/yami-fx.kdl", t.text_faint);
+    ui.text_in(PX, R::new(b.x, y, b.w, 20), "app-id окна: niri msg windows · правила пишутся в ~/.config/yami/niri/rules.kdl", t.text_faint);
     y += 28;
     y = title(ui, b.x, y, b.w, "режим «стол»");
     ui.toggle(R::new(b.x, y, half, 40), "окна плавают, как в DE", "Mod+Shift+Space — назад к ленте", s.stacking, Act::SBool("stacking"));
@@ -529,7 +568,7 @@ pub(crate) fn tab_about(ui: &mut Ui, st: &State, b: R) {
         ("niri", if st.niri.yami { "yami-niri (форк)".to_string() } else { "стоковый".to_string() }),
         ("окон", st.niri.wins.len().to_string()),
         ("уведомлений в истории", st.notifs.history.len().to_string()),
-        ("настройки", "~/.config/yami-shell.json".to_string()),
+        ("настройки", "~/.config/yami/shell.json".to_string()),
         ("команды", "yami-shell msg launcher|power|settings|lock|…".to_string()),
     ];
     for (k, v) in rows {

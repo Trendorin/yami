@@ -110,15 +110,15 @@ fn bundle(theme: bool, with_wall: bool) -> Value {
     }
     if !theme {
         let mut files = Map::new();
-        for rel in ["yami-files.json", "niri/user.kdl"] {
-            if let Ok(t) = std::fs::read_to_string(config_dir().join(rel)) {
+        for (rel, p) in [("yami/files.json", yami_px::paths::module_settings("files")), ("niri/user.kdl", config_dir().join("niri/user.kdl"))] {
+            if let Ok(t) = std::fs::read_to_string(p) {
                 files.insert(rel.into(), Value::String(t));
             }
         }
         for m in crate::plugins::available() {
             let name = &m[2..];
             if let Ok(t) = std::fs::read(crate::plugins::dir().join(name)) {
-                files.insert(format!("yami/modules/{name}"), json!({ "exec": true, "data": b64(&t) }));
+                files.insert(format!("yami/scripts/{name}"), json!({ "exec": true, "data": b64(&t) }));
             }
         }
         b["files"] = Value::Object(files);
@@ -142,11 +142,22 @@ pub fn export(y: &Sty, file: &str, theme: bool) -> i32 {
 const RUNS: &[&str] = &["customBinds", "binds"];
 
 /// какие файлы бывают в полном файле (ровно то, что пишет export) и запускает ли файл команды
+/// имена файлов до 3.0 → нынешние (старый файл настроек тоже импортируется)
+fn modern_rel(rel: &str) -> String {
+    match rel {
+        "yami-files.json" => "yami/files.json".into(),
+        _ => match rel.strip_prefix("yami/modules/") {
+            Some(n) => format!("yami/scripts/{n}"),
+            None => rel.into(),
+        },
+    }
+}
+
 fn file_kind(rel: &str) -> Option<bool> {
     match rel {
-        "yami-files.json" => Some(false),
+        "yami/files.json" => Some(false),
         "niri/user.kdl" => Some(true),
-        _ => rel.strip_prefix("yami/modules/").filter(|n| crate::plugins::name_ok(n)).map(|_| true),
+        _ => rel.strip_prefix("yami/scripts/").filter(|n| crate::plugins::name_ok(n)).map(|_| true),
     }
 }
 
@@ -161,22 +172,22 @@ fn risky(b: &Value) -> Vec<String> {
     }
     if let Some(f) = b["files"].as_object() {
         for k in f.keys() {
-            if file_kind(k) == Some(true) {
+            if file_kind(&modern_rel(k)) == Some(true) {
                 v.push(k.clone());
             }
         }
-        if f.get("yami-files.json").and_then(|t| t.as_str()).is_some_and(|t| t.contains("\"terminal\"")) {
+        if f.get("yami/files.json").or_else(|| f.get("yami-files.json")).and_then(|t| t.as_str()).is_some_and(|t| t.contains("\"terminal\"")) {
             v.push(crate::tf!("терминал файлового менеджера", "the file manager's terminal", "terminal do gerenciador de arquivos"));
         }
     }
     v
 }
 
-/// yami-files.json из файла; без --yes терминал остаётся свой: это команда, которую файлы запускают
+/// files.json yami-files из файла; без --yes терминал остаётся свой: это команда, которую файлы запускают
 fn files_json(incoming: &str, yes: bool) -> Option<String> {
     let mut v: Map<String, Value> = serde_json::from_str::<Value>(incoming).ok()?.as_object()?.clone();
     if !yes {
-        let cur = std::fs::read_to_string(config_dir().join("yami-files.json")).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok());
+        let cur = std::fs::read_to_string(yami_px::paths::module_settings("files")).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok());
         match cur.as_ref().and_then(|c| c.get("terminal")) {
             Some(t) => v.insert("terminal".into(), t.clone()),
             None => v.remove("terminal"),
@@ -251,6 +262,7 @@ fn commit(b: &Value, p: Plan, yes: bool, y: Option<&Sty>) -> Result<PathBuf, Str
     if !theme {
         if let Some(files) = b["files"].as_object() {
             for (rel, v) in files {
+                let rel = &modern_rel(rel);
                 // только файлы, что пишет export: путь вроде autostart/… или fish/config.fish
                 // запустил бы что угодно при следующем входе
                 let Some(runs) = file_kind(rel) else {
@@ -267,7 +279,7 @@ fn commit(b: &Value, p: Plan, yes: bool, y: Option<&Sty>) -> Result<PathBuf, Str
                     let _ = std::fs::create_dir_all(d);
                 }
                 match v {
-                    Value::String(t) if rel == "yami-files.json" => {
+                    Value::String(t) if rel == "yami/files.json" => {
                         if let Some(t) = files_json(t, yes) {
                             let _ = write_atomic(&dst, &t);
                         }
@@ -670,10 +682,10 @@ mod tests {
         assert_eq!(super::theme_name(" ash/../dark: 2 "), "ashdark 2");
         assert!(super::is_policy("updateRepo"));
         assert!(super::safe_rel("niri/user.kdl") && !super::safe_rel("../x") && !super::safe_rel("/etc/x"));
-        assert_eq!(super::file_kind("yami-files.json"), Some(false));
-        assert_eq!(super::file_kind("yami/modules/w.sh"), Some(true));
+        assert_eq!(super::file_kind(&super::modern_rel("yami-files.json")), Some(false));
+        assert_eq!(super::file_kind(&super::modern_rel("yami/modules/w.sh")), Some(true));
         assert_eq!(super::file_kind("autostart/x.desktop"), None);
-        assert_eq!(super::file_kind("yami/modules/../../fish/config.fish"), None);
+        assert_eq!(super::file_kind("yami/scripts/../../fish/config.fish"), None);
         assert_eq!(super::backup_key(std::path::Path::new("/s/before-import-1793885973-12.json")), Some((1793885973, 12)));
         assert_eq!(super::backup_key(std::path::Path::new("/s/before-import-1793885973.json")), Some((1793885973, 0)));
         assert_eq!(super::backup_key(std::path::Path::new("/s/other.json")), None);

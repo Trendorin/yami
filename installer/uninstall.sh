@@ -8,26 +8,29 @@ uninstall() {
   say "$(t "удаляю YAMI" "removing YAMI" "removendo YAMI")"
   ((DRY)) && { note "--dry-run"; return; }
   if ((!YES)); then
-    printf '  %s%s%s %s[%s]%s ' "$T" "$(t "Удалить yami с этой машины? Прежний конфиг niri вернётся, настройки шелла останутся." "Remove yami from this machine? The previous niri config comes back, the shell settings stay." "Remover o yami desta máquina? A configuração anterior do niri volta, as configurações do shell ficam.")" "$R" "$F" "$(t "y — да, enter — нет" "y yes, enter no" "y sim, enter não")" "$R"
+    printf '  %s%s%s %s[%s]%s ' "$T" "$(t "Удалить yami с этой машины? Из конфига niri уйдёт только строка yami, настройки останутся в ~/.config/yami." "Remove yami from this machine? Only yami's line leaves the niri config, the settings stay in ~/.config/yami." "Remover o yami desta máquina? Só a linha do yami sai da configuração do niri; as configurações ficam em ~/.config/yami.")" "$R" "$F" "$(t "y — да, enter — нет" "y yes, enter no" "y sim, enter não")" "$R"
     local a
     read -r a || a=n
     [[ $a =~ ^[yYдД] ]] || bye
   fi
   # первым: скрипт экрана входа лежит в том, что удаляется ниже
   uninstall_login
+  # строки yami из конфига niri (всё остальное в нём — твоё и остаётся), пока бинарь ещё есть
+  [[ -x $BIN/yami-shell ]] && "$BIN/yami-shell" niri disconnect
   pgrep -x yami-shell >/dev/null && "$BIN/yami-shell" msg quit 2>/dev/null
   [[ -x $HOME/.local/lib/yami-niri/yami-niri.sh ]] && "$HOME/.local/lib/yami-niri/yami-niri.sh" off
   rm -rf "$HOME/.local/lib/yami-niri" "$HOME/.local/lib/yami"
   rm -f "$BIN/yami-shell" "$BIN/yami" "$STATE/install.json" "$STATE/no-monocraft" "$STATE/update.json" "$STATE/update-keys" "$CFG/environment.d/60-yami-path.conf" "$CFG/systemd/user/niri.service.d/60-yami-path.conf" "$CFG/fontconfig/conf.d/50-yami-pixel.conf" \
-    "$CFG/niri/yami-binds.kdl" "$CFG/niri/yami-fx.kdl"
+    "$CFG"/niri/yami-{local,binds,fx,colors,cursor}.kdl "$CFG/niri/.yami"
   local data="${XDG_DATA_HOME:-$HOME/.local/share}"
   pkill -f "$BIN/yami-files --portal" 2>/dev/null
   pkill -x yami-agents 2>/dev/null
   rm -f "$BIN/yami-setup" "$BIN/yami-shot" "$BIN/yami-agents" "$data/xdg-desktop-portal/portals/yami-agents.portal" "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service" "$STATE/first-run" "$STATE/source"
-  rm -rf "$HOME/.local/share/yami/modules" "$CFG/yami"
+  # ~/.config/yami: its niri part goes, the settings (*.json), themes, templates and scripts stay
+  rm -rf "$HOME/.local/share/yami/modules" "$CFG/yami/niri"
   rm -f "$BIN/yami-files" "$BIN/yami-view" "$BIN/yami-play" "$data/applications/yami-files.desktop" "$data/applications/yami-view.desktop" "$data/applications/yami-play.desktop" "$data/xdg-desktop-portal/portals/yami.portal" \
     "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yami.service" "$data/dbus-1/services/org.freedesktop.FileManager1.service" \
-    "$CFG/xdg-desktop-portal/niri-portals.conf" "$CFG/niri/yami-cursor.kdl" "$CFG/btop/themes/yami.theme"
+    "$CFG/xdg-desktop-portal/niri-portals.conf" "$CFG/btop/themes/yami.theme"
   # the apps' own icons theme.py drew in the palette
   rm -f "$data/icons/hicolor/scalable/apps/yami-files.svg" "$data/icons/hicolor/scalable/apps/yami-view.svg" "$data/icons/hicolor/scalable/apps/yami-play.svg"
   # pixel cursors: yami-<accent>, and yami-<accent>-l for the light theme
@@ -56,15 +59,15 @@ uninstall() {
     sed -i '/^# YAMI/d; /^include yami.conf$/d' "$CFG/kitty/kitty.conf"
     rm -f "$CFG/kitty/yami.conf"
   fi
+  # yami before 3.0 replaced the whole niri folder and kept the old one next to it
   local b
   b="$(ls -d "$CFG"/niri.bak-* 2>/dev/null | sort | tail -n1)"
-  if [[ -n $b ]]; then
+  # (only while config.kdl is still yami's, the old one or its starting one: not a config you made since)
+  if [[ -n $b ]] && grep -qE '"yami-binds.kdl"|^// niri.s config: yours. yami adds itself' "$CFG/niri/config.kdl" 2>/dev/null; then
     mv "$CFG/niri" "$CFG/niri.yami-$STAMP" && mv "$b" "$CFG/niri"
     say "$(t "niri: вернул" "niri: restored" "niri: restaurado") $b"
-  else
-    note "$(t "niri: прежнего конфига нет, оставил текущий" "niri: no previous config, kept the current one" "niri: sem configuração anterior; mantendo a atual")"
   fi
   while IFS= read -r b; do mv -f "$b" "${b%.bak-yami}"; done < <(find "$CFG" -maxdepth 3 -name '*.bak-yami' 2>/dev/null)
-  say "$(t "готово. настройки шелла остались в" "done. shell settings are kept in" "concluído. as configurações do shell ficam em") $CFG/yami-shell.json"
+  say "$(t "готово. настройки шелла остались в" "done. shell settings are kept in" "concluído. as configurações do shell ficam em") $CFG/yami"
   exit 0
 }

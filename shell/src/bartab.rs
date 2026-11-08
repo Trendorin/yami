@@ -164,7 +164,7 @@ pub(crate) fn tab_bar(ui: &mut Ui, st: &State, b: R) {
     ui.text_in(PX, R::new(b.x, y, b.w, 20), "добавить — тащи в бар или кликни:", t.text_dim);
     y += 22;
     let all: Vec<&String> = s.bar_left.iter().chain(&s.bar_center).chain(&s.bar_right).collect();
-    // и модули-скрипты из ~/.config/yami/modules
+    // и модули-скрипты из ~/.config/yami/scripts
     let plugs = crate::plugins::available();
     let free: Vec<&str> = ALL_MODULES.iter().map(|m| m.0).chain(plugs.iter().map(|p| p.as_str())).filter(|id| *id == "sep" || !all.iter().any(|m| m == id)).collect();
     let ws: Vec<i32> = free.iter().map(|m| chip_w(ui, m)).collect();

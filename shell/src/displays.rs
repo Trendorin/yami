@@ -1,5 +1,5 @@
 // Экраны (настройки → экраны): расположение мышкой, разрешение, частота, масштаб, поворот, VRR.
-// Состояние берём у niri (IPC Outputs), применяем записью ~/.config/niri/yami-outputs.kdl —
+// Состояние берём у niri (IPC Outputs), применяем записью ~/.config/yami/niri/outputs.kdl —
 // niri перечитывает конфиг сам. После применения 15 с на «оставить», иначе откат.
 
 use crate::app::{App, SKind, State};
@@ -61,7 +61,7 @@ pub struct Disp {
     pub edited: bool,
     /// откуда начали тащить экран
     pub drag: Option<(i32, i32)>,
-    /// прежний yami-outputs.kdl (None — его не было) и когда откатить
+    /// прежний outputs.kdl (None — его не было) и когда откатить
     pub revert: Option<(Option<String>, Instant)>,
     pub reload_at: Option<Instant>,
     /// масштаб схемы и её начало (замирают, пока тащим)
@@ -69,7 +69,7 @@ pub struct Disp {
 }
 
 fn path() -> std::path::PathBuf {
-    crate::config::config_dir().join("niri/yami-outputs.kdl")
+    crate::dirs::niri_dir().join("outputs.kdl")
 }
 
 fn transform_of(v: &str) -> String {

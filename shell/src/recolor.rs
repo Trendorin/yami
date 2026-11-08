@@ -221,7 +221,9 @@ impl Cx {
         let cfg = env_dir("XDG_CONFIG_HOME", home.join(".config"));
         let state = env_dir("XDG_STATE_HOME", home.join(".local/state")).join("yami");
         let data = env_dir("XDG_DATA_HOME", home.join(".local/share"));
-        let mut st = std::fs::read_to_string(cfg.join("yami-shell.json")).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()).and_then(|v| v.as_object().cloned()).unwrap_or_default();
+        // настройки шелла: ~/.config/yami/shell.json, до переноса — старый ~/.config/yami-shell.json
+        let sj = if cfg.join("yami/shell.json").exists() || !cfg.join("yami-shell.json").exists() { cfg.join("yami/shell.json") } else { cfg.join("yami-shell.json") };
+        let mut st = std::fs::read_to_string(&sj).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()).and_then(|v| v.as_object().cloned()).unwrap_or_default();
         for k in ["fontUi", "fontMono", "fontShell", "fontFiles", "fontView", "cursor", "iconTheme"] {
             let v = st.get(k).and_then(|x| x.as_str()).map(clean_name).unwrap_or_default();
             st.insert(k.into(), v.into());

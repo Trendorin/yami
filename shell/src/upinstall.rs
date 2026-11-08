@@ -334,6 +334,9 @@ pub fn rollback() -> Result<String, String> {
             snapshot_settings(&from);
         }
         snapshot_back(&d).map_err(|e| e.to_string())?;
+        if older(&ver, "3.0.0") {
+            crate::dirs::back_to_old();
+        }
         let _ = std::fs::remove_dir_all(&d);
         let _ = std::fs::remove_dir_all(prev_dir());
         if !older(&ver, &from) {
@@ -352,6 +355,9 @@ pub fn rollback() -> Result<String, String> {
         snapshot_settings(&from);
     }
     copy_bins(&p, &bin_dir()).map_err(|e| e.to_string())?;
+    if older(&to, "3.0.0") {
+        crate::dirs::back_to_old();
+    }
     if p.join("install.json").exists() {
         let _ = std::fs::copy(p.join("install.json"), stamp_path());
     }

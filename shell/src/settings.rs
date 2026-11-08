@@ -1,5 +1,5 @@
 // Настройки: группы вкладок слева, содержимое справа. Всё применяется сразу и пишется в
-// ~/.config/yami-shell.json (его можно править и руками — шелл подхватит).
+// ~/.config/yami/shell.json (его можно править и руками — шелл подхватит).
 //
 // Вкладка — строка в GROUPS: ключ, имя, значок, слова для поиска и функция рисования (каждая в
 // своём модуле). Содержимое листается колесом: сколько его, узнаём по зонам, которые вкладка
@@ -247,6 +247,7 @@ impl App {
     pub fn tab_probe(&mut self) {
         match self.st.stab {
             "games" => self.st.game_probe = crate::gameboost::probe(),
+            "system" => self.st.niri_link = crate::niricfg::status(),
             "wall" => self.st.skwd_here = crate::skwd::installed(),
             "login" => self.st.login_probe = crate::login::probe(),
             "look" if self.st.sets.is_none() => self.sets_load(),

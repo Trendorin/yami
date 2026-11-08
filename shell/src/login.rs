@@ -1,6 +1,6 @@
 // Экран входа (yami-greet) в виде шелла: шелл выкладывает в /var/lib/yami-greet/look то, из
 // чего тот рисуется, — look.json (палитра и тона, язык, проявление, 闇, шрифт, раскладки,
-// мониторы из yami-outputs.kdl, настройки экрана входа greet*) и wall.png (обои: как на столе,
+// мониторы из ~/.config/yami/niri/outputs.kdl, настройки экрана входа greet*) и wall.png (обои: как на столе,
 // пиксельные из палитры или никаких — greetWall). Папку отдаёт пользователю установщик; нет её или
 // она не наша — ничего не пишется. Экран входа проверяет всё сам: для него это чужие данные.
 // Здесь же вкладка «экран входа» и `yami login` (sync, status, log, preview). Как прошёл его
@@ -61,7 +61,7 @@ pub fn look(set: &Settings) -> String {
     }
     o.insert("kbLayout".into(), crate::keys::layouts(set).into());
     o.insert("kbSwitch".into(), set.kb_switch.clone().into());
-    let outs = std::fs::read_to_string(crate::config::config_dir().join("niri/yami-outputs.kdl")).unwrap_or_default();
+    let outs = std::fs::read_to_string(crate::dirs::niri_dir().join("outputs.kdl")).unwrap_or_default();
     o.insert("outputs".into(), outs.chars().take(64 * 1024).collect::<String>().into());
     serde_json::to_string_pretty(&serde_json::Value::Object(o)).unwrap_or_default() + "\n"
 }

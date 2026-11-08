@@ -144,7 +144,7 @@ const CARDS: [[&str; 7]; 10] = [
 
 /// акцент — тот же, что на скриншотах (палитра шелла), а без настроек — «кровь»
 fn accent(root: &std::path::Path) -> String {
-    let st: serde_json::Value = std::env::var_os("HOME").and_then(|h| std::fs::read_to_string(std::path::Path::new(&h).join(".config/yami-shell.json")).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    let st: serde_json::Value = std::env::var_os("HOME").and_then(|h| std::fs::read_to_string(std::path::Path::new(&h).join(".config/yami/shell.json")).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     let choices = std::fs::read_to_string(root.join("installer/choices.sh")).unwrap_or_default();
     let list = |name: &str| Regex::new(&format!(r"{name}=\(([^)]*)\)")).ok().and_then(|r| r.captures(&choices).map(|m| m[1].split_whitespace().map(String::from).collect::<Vec<_>>())).unwrap_or_default();
     let (ids, hexes) = (list("PAL_ID"), list("PAL_HEX"));

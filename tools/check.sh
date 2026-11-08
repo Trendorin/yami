@@ -83,7 +83,22 @@ fi
 
 step "niri config"
 if command -v niri >/dev/null; then
-  niri validate -c "$ROOT/config/niri/config.kdl" >/dev/null 2>&1 && ok "config.kdl valid" || bad "niri validate config.kdl"
+  # what a new home gets: the starting config.kdl with yami's part (base, binds, rules) through one
+  # include, and a config of one's own with the include line added at its top
+  h="$TMP/niri-home"
+  box=(env -u DBUS_SESSION_BUS_ADDRESS -u NIRI_CONFIG HOME="$h" XDG_CONFIG_HOME= XDG_STATE_HOME= XDG_CACHE_HOME= XDG_DATA_HOME= XDG_RUNTIME_DIR="$h" NIRI_SOCKET= WAYLAND_DISPLAY=)
+  mkdir -p "$h"
+  if "${box[@]}" "$BIN" niri connect >/dev/null && "${box[@]}" "$BIN" niri write && "${box[@]}" niri validate -c "$h/.config/niri/config.kdl" >/dev/null 2>&1; then
+    ok "the starting config with yami's part validates"
+  else
+    bad "niri validate: the starting config"
+  fi
+  printf '// mine\ninput {\n}\nbinds {\n    Mod+Space { spawn "true"; }\n}\n' >"$h/.config/niri/config.kdl"
+  if "${box[@]}" "$BIN" niri connect >/dev/null && grep -q "yami/niri/yami.kdl" "$h/.config/niri/config.kdl" && "${box[@]}" niri validate -c "$h/.config/niri/config.kdl" >/dev/null 2>&1; then
+    ok "a config of one's own with yami's line validates"
+  else
+    bad "niri validate: a config of one's own with yami's line"
+  fi
 else
   echo "niri not installed, skipped"
 fi

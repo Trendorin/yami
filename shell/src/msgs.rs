@@ -160,6 +160,11 @@ impl App {
                 self.st.restyle = crate::restyle::load();
                 self.dirty(&SKind::Modal);
             }
+            Msg::NiriLink(s, note) => {
+                self.st.niri_link = s;
+                self.st.niri_note = note;
+                self.dirty(&SKind::Modal);
+            }
             Msg::Restyled => {
                 self.st.restyle = crate::restyle::load();
                 self.dirty(&SKind::Modal);

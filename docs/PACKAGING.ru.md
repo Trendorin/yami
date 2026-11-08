@@ -36,7 +36,7 @@
 | `programs.yami.tools` | `true` | ночной свет, текст и QR-коды со скриншотов |
 | `programs.yami.appTheme` | `true` | qt6ct и adw-gtk3 для программ Qt и GTK в палитре |
 
-Параметры Home Manager: `settings` (ключи `yami-shell.json`, сливаются при каждой активации: эти главнее, остальное из панели настроек остаётся), `niriConfig` (`config.kdl` от yami, копируется, пока `~/.config/niri/.yami` помечает его как файл yami; свои правки — в `user.kdl`), `kitty`, `defaultApplications`, `extraPackages`.
+Параметры Home Manager: `settings` (ключи `~/.config/yami/shell.json`, сливаются при каждой активации: эти главнее, остальное из панели настроек остаётся), `niriConfig` (подключает yami к `config.kdl` niri одной строкой include, `yami niri connect`; конфиг-ссылку в Nix store не трогает, в него строку `include optional=true "~/.config/yami/niri/yami.kdl"` добавляешь сам), `kitty`, `defaultApplications`, `extraPackages`.
 
 Шелл сам пишет свои файлы во время работы (настройки, клавиши, экраны, порталы), поэтому модули кладут их один раз и оставляют доступными для записи. yami-niri, исправленный niri в своём репозитории, пакетом не собирается: пакетный niri — тот же стол без разрывов в играх, главного потока реального времени и правил слоёв для шторки трансляций. `nix flake check` собирает пакет и вычисляет модуль NixOS; CI запускает его при каждом пуше. Модули начинались с работы TheCodedKid в #1.
 

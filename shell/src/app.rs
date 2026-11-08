@@ -166,6 +166,8 @@ pub enum Msg {
     Weather(crate::weather::Weather),
     /// свои темы (themetab.rs): список, что сделано, применена ли тема (перечитать настройки)
     Themes(Vec<crate::bundle::Card>, String, bool),
+    /// yami подключён к конфигу niri или убран из него (нить кнопки во вкладке «система»)
+    NiriLink(crate::niricfg::Status, String),
     Theme,
     /// recolor --templates закончил: итог в restyle.json (restyle.rs)
     Restyled,
@@ -286,8 +288,11 @@ pub struct State {
     pub game: crate::games::GameMode,
     /// что есть для игр (проверяется при открытии вкладки «игры»)
     pub game_probe: crate::gameboost::Probe,
+    /// конфиг niri: подключён ли yami (вкладка «система» открылась — tab_probe) и что вышло из кнопки
+    pub niri_link: crate::niricfg::Status,
+    pub niri_note: String,
     pub night: crate::night::Night,
-    /// модули бара из скриптов (~/.config/yami/modules)
+    /// модули бара из скриптов (~/.config/yami/scripts)
     pub plugins: crate::plugins::Plugins,
     pub session: crate::session::Session,
     /// skwd-wall: что выбрано, его палитра, где рисует сам (skwd.rs)
@@ -486,6 +491,8 @@ impl State {
             keys: Default::default(),
             game: Default::default(),
             game_probe: Default::default(),
+            niri_link: Default::default(),
+            niri_note: String::new(),
             night: Default::default(),
             plugins: Default::default(),
             session: Default::default(),
@@ -522,6 +529,8 @@ pub fn icon_set(theme: &str) -> String {
 
 pub fn run() {
     crate::proc::note_inherited();
+    // файлы старых версий — в ~/.config/yami (dirs.rs); команды читают и старые, пока шелл их не перенёс
+    crate::dirs::migrate();
     // из TTY или по ssh: понятная строка вместо паники
     let Ok(conn) = Connection::connect_to_env() else {
         eprintln!("yami-shell: no Wayland display (start it inside niri, or set WAYLAND_DISPLAY)");

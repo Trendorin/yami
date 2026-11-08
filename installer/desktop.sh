@@ -69,33 +69,12 @@ do_fonts() {
 }
 
 # ── niri config ─────────────────────────────────────────────────────────────
-# the machine's own niri settings: nothing for now (the GPU needs no environment from us); config.kdl
-# includes the file, so it is always there
-write_local_kdl() {
-  echo "// YAMI: written by install.sh for this machine. Re-run the installer to regenerate."
-}
+# niri's config stays the person's: yami's part lives in ~/.config/yami/niri and comes in through one
+# include line at the top of config.kdl (everything below it wins). No config yet, or niri's own
+# starting one: yami's starting config instead, the old file kept next to it. niri validates the
+# result, and a config it rejects is put back as it was (niricfg.rs)
 do_niri_config() {
-  local n="$CFG/niri" old=""
-  if [[ -d $n && ! -f $n/.yami ]]; then
-    backup "$n"
-    old="$n.bak-$STAMP/config.kdl"
-  elif [[ -f $n/config.kdl ]]; then
-    cp "$n/config.kdl" "$CACHE/config.kdl.prev"
-    old="$CACHE/config.kdl.prev"
-  fi
-  mkdir -p "$n"
-  [[ -f $n/user.kdl ]] || printf '%s\n' "// your tweaks on top of yami: binds, window rules, outputs. Included after the shell's" \
-    "// files, so what you write here wins. Reference: https://github.com/YaLTeR/niri/wiki" >"$n/user.kdl"
-  # keybindings come from the shell (yami-binds.kdl); carry `output` blocks of the previous
-  # config into user.kdl
-  install -m644 "$ROOT/config/niri/config.kdl" "$n/config.kdl" || return 1
-  if [[ -n $old && -f $old ]] && ! grep -q 'output ' "$n/user.kdl"; then
-    local outs
-    outs="$(awk '/^output "[^"]*" \{/ { on = 1 } on { print } on && /^\}/ { on = 0 }' "$old")"
-    [[ -n $outs ]] && printf '\n// outputs kept from the previous config\n%s\n' "$outs" >>"$n/user.kdl"
-  fi
-  touch "$n/.yami"
-  write_local_kdl >"$n/yami-local.kdl"
+  "$BIN/yami-shell" niri connect || return 1
   # niri spawns `yami-shell` by name: make ~/.local/bin visible to the systemd session.
   # environment.d alone is not enough: niri-session imports the login shell's PATH over it (bash on
   # Arch has no ~/.local/bin, fish on CachyOS adds it), so niri.service puts it back right before niri
@@ -107,13 +86,6 @@ do_niri_config() {
       "ExecStartPre=/bin/sh -c 'case \":\$PATH:\" in *\":\$HOME/.local/bin:\"*) ;; *) systemctl --user set-environment PATH=\"\$HOME/.local/bin:\$PATH\";; esac'" \
       >"$CFG/systemd/user/niri.service.d/60-yami-path.conf"
     systemctl --user daemon-reload 2>/dev/null
-  fi
-  if command -v niri >/dev/null && ! niri validate -c "$n/config.kdl"; then
-    # this niri does not load the new config: the previous one goes back, so the next login keeps working
-    if [[ $old == "$CACHE/config.kdl.prev" && -f $old ]]; then
-      cp "$old" "$n/config.kdl" && echo "niri: the new config.kdl did not validate, the previous one is back"
-    fi
-    return 1
   fi
 }
 
@@ -144,9 +116,8 @@ do_dotfiles() {
   # a weak or virtual machine (old laptop, VM, no GPU acceleration) starts in lite mode: no blur,
   # no animations; settings → look turns it off. A file that already says `lite` is left alone
   "$BIN/yami-shell" config lite-auto
-  # keybindings and the shell's window rules, before the first login (the shell keeps them current)
-  "$BIN/yami-shell" binds write || return 1
-  "$BIN/yami-shell" config kdl >"$CFG/niri/yami-fx.kdl" || return 1
+  # yami's part of niri (keys, window rules, its look), before the first login; the shell keeps it current
+  "$BIN/yami-shell" niri write || return 1
 }
 
 # the first Qt/GTK setup, only for the ones chosen to restyle
@@ -157,8 +128,7 @@ do_refresh() {
   # an older settings file (appThemes) gets themeApps; a --restyle flag lands here too
   restyle_json || return 1
   "$BIN/yami-shell" recolor || return 1
-  "$BIN/yami-shell" binds write || return 1
-  "$BIN/yami-shell" config kdl >"$CFG/niri/yami-fx.kdl"
+  "$BIN/yami-shell" niri write || return 1
 }
 
 # the install counter: one GET of a one-line file at a fixed address, once per machine, only after a

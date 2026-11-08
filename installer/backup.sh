@@ -14,14 +14,20 @@ SNAP_NOW=""
 snapshot_list() {
   local data="${XDG_DATA_HOME:-$HOME/.local/share}" b n
   for b in yami-shell yami-setup yami-files yami-view yami-play yami-shot yami-agents; do printf 'G %s\n' "$BIN/$b"; done
-  for n in config.kdl yami-local.kdl yami-binds.kdl yami-fx.kdl yami-colors.kdl yami-cursor.kdl; do printf 'G %s\n' "$CFG/niri/$n"; done
+  # yami's part of niri; before 3.0 it lay next to config.kdl
+  for n in yami.kdl base.kdl binds.kdl rules.kdl colors.kdl cursor.kdl; do printf 'G %s\n' "$CFG/yami/niri/$n"; done
+  for n in yami-local.kdl yami-binds.kdl yami-fx.kdl yami-colors.kdl yami-cursor.kdl; do printf 'G %s\n' "$CFG/niri/$n"; done
   printf 'G %s\n' "$CFG/xdg-desktop-portal/niri-portals.conf" "$CFG/environment.d/60-yami-path.conf" "$CFG/systemd/user/niri.service.d/60-yami-path.conf" "$STATE/install.json" \
     "$data/applications/yami-files.desktop" "$data/applications/yami-view.desktop" "$data/applications/yami-play.desktop" \
     "$data/xdg-desktop-portal/portals/yami.portal" "$data/xdg-desktop-portal/portals/yami-agents.portal" \
     "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yami.service" \
     "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service" \
     "$data/dbus-1/services/org.freedesktop.FileManager1.service"
-  printf 'U %s\n' "$CFG/yami-shell.json" "$CFG/mimeapps.list" "$CFG/niri/yami-outputs.kdl" "$CFG/niri/user.kdl"
+  printf 'U %s\n' "$CFG/yami/shell.json" "$CFG/yami-shell.json" "$CFG/mimeapps.list" "$CFG/yami/niri/outputs.kdl" "$CFG/niri/yami-outputs.kdl" "$CFG/niri/user.kdl"
+  # niri's config.kdl is the person's (only the restore right after a failed run touches it), except the
+  # one yami before 3.0 wrote whole: a rollback to that version needs it back
+  if grep -q '"yami-binds.kdl"' "$CFG/niri/config.kdl" 2>/dev/null; then n=G; else n=U; fi
+  printf '%s %s\n' "$n" "$CFG/niri/config.kdl"
 }
 
 # on btrfs the copy costs nothing; busybox cp has no --reflink

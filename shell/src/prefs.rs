@@ -1,4 +1,4 @@
-// Применение настроек: любое изменение (панель, правка yami-shell.json руками, CLI) пересобирает
+// Применение настроек: любое изменение (панель, правка shell.json руками, CLI) пересобирает
 // тему и шрифты, переписывает то, что читают niri и другие программы, перезапускает процессы шелла.
 
 use crate::app::*;
@@ -226,9 +226,10 @@ impl App {
         self.st.plugins.sync(&on_bar, &self.tx);
     }
 
-    /// yami-fx.kdl — только если он другой: каждая запись — перечитывание конфига niri
+    /// rules.kdl и yami.kdl — только если другие: каждая запись — перечитывание конфига niri
     pub fn write_fx(&mut self) {
-        let p = config::config_dir().join("niri/yami-fx.kdl");
+        crate::niricfg::write_yami(&self.st.set);
+        let p = crate::dirs::niri_dir().join("rules.kdl");
         let text = self.st.set.fx_kdl(crate::niri::config_level(self.st.niri.level), self.st.curtain.is_some());
         if std::fs::read_to_string(&p).ok().as_deref() != Some(text.as_str()) {
             let _ = config::write_atomic(&p, &text);

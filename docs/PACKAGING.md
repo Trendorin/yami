@@ -36,7 +36,7 @@ NixOS options:
 | `programs.yami.tools` | `true` | night light, text and QR codes from screenshots |
 | `programs.yami.appTheme` | `true` | qt6ct and adw-gtk3 for Qt and GTK apps in the palette |
 
-Home Manager options: `settings` (keys of `yami-shell.json`, merged on every activation: these win, the rest set in the settings panel stays), `niriConfig` (yami's `config.kdl`, copied while `~/.config/niri/.yami` marks it as yami's; your own changes go into `user.kdl`), `kitty`, `defaultApplications`, `extraPackages`.
+Home Manager options: `settings` (keys of `~/.config/yami/shell.json`, merged on every activation: these win, the rest set in the settings panel stays), `niriConfig` (connects yami to niri's `config.kdl` with one include line, `yami niri connect`; a config that is a link into the Nix store is left alone, add `include optional=true "~/.config/yami/niri/yami.kdl"` to it yourself), `kitty`, `defaultApplications`, `extraPackages`.
 
 The shell writes its own files at run time (settings, keys, screens, portals), so the modules seed them once and leave them writable. yami-niri, the patched niri in its own repository, is not packaged: the packaged niri is the same desktop without tearing in games, the realtime main thread and the stream curtain's layer rules. `nix flake check` builds the package and evaluates the NixOS module; CI runs it on every push. The modules started from the work of TheCodedKid in #1.
 

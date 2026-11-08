@@ -133,9 +133,12 @@ pub fn run(y: &Sty, args: &[&str]) -> i32 {
     put("journal-shell.txt", &out("journalctl", &["--user", "-b", "--no-pager", "-o", "short-iso", "-n", "3000", "_COMM=yami-shell"]));
     put("journal-niri.txt", &out("journalctl", &["--user", "-b", "--no-pager", "-o", "short-iso", "-n", "3000", "-u", "niri"]));
     let cfg = crate::config::config_dir();
-    let mut files: Vec<PathBuf> = vec![cfg.join("yami-shell.json"), cfg.join("yami-files.json")];
-    if let Ok(rd) = std::fs::read_dir(cfg.join("niri")) {
-        files.extend(rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|e| e == "kdl")));
+    // свои настройки yami (~/.config/yami/*.json), конфиг niri и часть yami в нём
+    let mut files: Vec<PathBuf> = vec![];
+    for (dir, ext) in [(cfg.join("yami"), "json"), (cfg.join("niri"), "kdl"), (crate::dirs::niri_dir(), "kdl")] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            files.extend(rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|e| e == ext)));
+        }
     }
     for f in files {
         if let (Some(name), Ok(t)) = (f.file_name(), std::fs::read_to_string(&f)) {

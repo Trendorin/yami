@@ -77,8 +77,9 @@ CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/yami"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/yami"
 BIN="$HOME/.local/bin"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-# settings of this shell
-SET_JSON="$CFG/yami-shell.json"
+# settings of this shell: ~/.config/yami/shell.json; before 3.0 ~/.config/yami-shell.json (the shell moves it)
+SET_JSON="$CFG/yami/shell.json"
+[[ -f $SET_JSON || ! -f $CFG/yami-shell.json ]] || SET_JSON="$CFG/yami-shell.json"
 LOG="$CACHE/install.log"
 MISSING_F="$CACHE/missing-packages"
 RUST_MIN="1.89"

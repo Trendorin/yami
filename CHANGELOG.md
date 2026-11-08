@@ -9,6 +9,8 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+- Everything of yami lives in one folder, `~/.config/yami`, like other shells have it: `shell.json` (was `~/.config/yami-shell.json`), `files.json` (was `~/.config/yami-files.json`), `scripts/` (was `modules/`), themes, templates and `niri/`. The old files move there by themselves.
+- Your niri config stays yours: yami no longer replaces `~/.config/niri/config.kdl` but adds one include line at its top (`yami niri connect`, `yami niri disconnect`), and what you write below it wins. A missing config or niri's own starting one gets yami's starting config, the old file kept next to it. Settings → system → niri switches each part yami brings: its niri look, keys, window rules, colours, screens.
 - With bash as the login shell (Arch and others) the shell no longer stays away after login: niri-session dropped `~/.local/bin` from the PATH, so neither the bar nor the keys like `Mod+Space` started. On CachyOS fish hid it.
 - The setup window has a new full-screen layout, starts with every module unticked and now opens by itself at the first login.
 - A module is one file: `yami-files install` asks for the settings, lists what it will change and installs only after a yes.

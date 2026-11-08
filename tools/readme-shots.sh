@@ -87,11 +87,12 @@ dev demo "$demo"
 
 cfg="$TMP/cfg"
 mkdir -p "$cfg"
-for f in yami-shell.json yami-files.json user-dirs.dirs; do
-  [[ -f ${XDG_CONFIG_HOME:-$HOME/.config}/$f ]] && cp "${XDG_CONFIG_HOME:-$HOME/.config}/$f" "$cfg/"
+mkdir -p "$cfg/yami"
+for f in yami/shell.json yami/files.json yami/style.json user-dirs.dirs; do
+  [[ -f ${XDG_CONFIG_HOME:-$HOME/.config}/$f ]] && cp "${XDG_CONFIG_HOME:-$HOME/.config}/$f" "$cfg/$f"
 done
 # диски и флешки — не в кадр
-dev files-no-devices "$cfg/yami-files.json"
+dev files-no-devices "$cfg/yami/files.json"
 # звуковые устройства — простыми именами вместо моделей: микрофон и наушники
 names() { # lang
   pactl -f json list sinks 2>/dev/null | dev audio-names "$1"

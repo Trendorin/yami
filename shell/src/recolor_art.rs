@@ -231,7 +231,7 @@ pub fn cursor_theme(p: &P, d: &Path, name: &str) -> Res {
     write(&d.join("index.theme"), &format!("[Icon Theme]\nName={name}\nComment=yami pixel cursor ({})\nInherits=Adwaita\n", p.g("accent")))
 }
 
-/// тема yami-<акцент>, niri и программы переключаются на неё (~/.config/niri/yami-cursor.kdl). В
+/// тема yami-<акцент>, niri и программы переключаются на неё (~/.config/yami/niri/cursor.kdl). В
 /// настройках: пиксельный, любой установленный набор или «не трогать», размер
 pub fn cursor(cx: &Cx, p: &P) -> Res {
     let kind = match cx.s("cursor") {
@@ -240,7 +240,7 @@ pub fn cursor(cx: &Cx, p: &P) -> Res {
     };
     let size = cx.n("cursorSize");
     let icons = cx.data.join("icons");
-    let kdl = cx.cfg.join("niri/yami-cursor.kdl");
+    let kdl = cx.cfg.join("yami/niri/cursor.kdl");
     if kind == "system" {
         if kdl.exists() {
             std::fs::remove_file(&kdl)?;

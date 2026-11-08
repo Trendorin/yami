@@ -10,7 +10,7 @@ use crate::gfx::R;
 use crate::settings::{step_in, title};
 use crate::ui::{Act, Tone, Ui};
 
-const PORTALS_HEAD: &str = "# yami: written by yami-shell (settings → services); edit it there or in yami-shell.json";
+const PORTALS_HEAD: &str = "# yami: written by yami-shell (settings → services); edit it there or in ~/.config/yami/shell.json";
 
 /// niri-portals.conf: файлы и показ экрана — yami или GTK/GNOME, остальное — как в niri
 pub fn portals_conf(s: &Settings) -> String {

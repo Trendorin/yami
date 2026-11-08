@@ -849,7 +849,7 @@ pub fn fastfetch(cx: &Cx, p: &P) -> Res {
 
 // ── niri ────────────────────────────────────────────────────────────────────
 pub fn niri(cx: &Cx, p: &P) -> Res {
-    write(&cx.cfg.join("niri/yami-colors.kdl"), &pyf(NIRI_KDL, p, &|_| String::new()))
+    write(&cx.cfg.join("yami/niri/colors.kdl"), &pyf(NIRI_KDL, p, &|_| String::new()))
 }
 
 // ── MangoHud ────────────────────────────────────────────────────────────────

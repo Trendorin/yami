@@ -47,7 +47,7 @@ in
         }
       '';
       description = ''
-        Keys of {file}`~/.config/yami-shell.json` (camelCase, see docs/CONFIG.md). Merged into the
+        Keys of {file}`~/.config/yami/shell.json` (camelCase, see docs/CONFIG.md). Merged into the
         file on every activation: these keys win, everything else set in the settings panel stays.
       '';
     };
@@ -56,12 +56,12 @@ in
       type = lib.types.bool;
       default = true;
       description = ''
-        Install yami's {file}`~/.config/niri/config.kdl` (it starts the shell and includes the
-        files the shell writes). Like install.sh: it is copied, not linked, and replaced on
-        activation only while {file}`~/.config/niri/.yami` marks it as yami's; your own changes
-        go into {file}`user.kdl`. An existing config.kdl without the marker is left alone. Turn
-        this off when niri's config comes from elsewhere and add the
-        `include optional=true "yami-….kdl"` lines from yami's config.kdl yourself.
+        Connect yami to niri's {file}`~/.config/niri/config.kdl`, like install.sh: one include line
+        at its top brings yami's part ({file}`~/.config/yami/niri/yami.kdl`: the shell, its keys,
+        window rules, colours and niri look), and what you write below it wins. Without a config
+        yami's starting one is written. A config.kdl that is a link into the Nix store (niri's
+        config made by home-manager) is left alone: add
+        `include optional=true "~/.config/yami/niri/yami.kdl"` to it yourself.
       '';
     };
 
@@ -124,15 +124,19 @@ in
 
       # settings: declared keys over what the panel saved
       ${lib.optionalString (cfg.settings != { }) ''
-        yami_json="$yami_cfg/yami-shell.json"
-        run mkdir -p "$yami_cfg"
+        yami_json="$yami_cfg/yami/shell.json"
+        run mkdir -p "$yami_cfg/yami"
+        # before yami 3.0 the file lay in ~/.config; the shell moves it too, this only comes first
+        if [[ -f "$yami_cfg/yami-shell.json" && ! -e "$yami_json" ]]; then
+          run mv "$yami_cfg/yami-shell.json" "$yami_json"
+        fi
         if [[ ! -e "$yami_json" && ! -v DRY_RUN ]]; then
           echo '{}' >"$yami_json"
         fi
         if [[ -e "$yami_json" ]] && ! ${pkgs.jq}/bin/jq -e 'type == "object"' "$yami_json" >/dev/null 2>&1; then
           warnEcho "yami: $yami_json is not a JSON object, programs.yami.settings not applied"
         elif [[ ! -v DRY_RUN ]]; then
-          ${pkgs.jq}/bin/jq --indent 2 -s '.[0] * .[1]' "$yami_json" ${json.generate "yami-shell.json" cfg.settings} >"$yami_json.tmp" \
+          ${pkgs.jq}/bin/jq --indent 2 -s '.[0] * .[1]' "$yami_json" ${json.generate "yami-shell-settings.json" cfg.settings} >"$yami_json.tmp" \
             && mv -f "$yami_json.tmp" "$yami_json"
         fi
       ''}
@@ -143,23 +147,15 @@ in
       fi
 
       ${lib.optionalString cfg.niriConfig ''
-        yami_niri="$yami_cfg/niri"
-        if [[ ! -e "$yami_niri/config.kdl" || ( -f "$yami_niri/.yami" && ! -L "$yami_niri/config.kdl" ) ]]; then
-          run ${pkgs.coreutils}/bin/install -Dm644 ${share}/config.kdl "$yami_niri/config.kdl"
-          run touch "$yami_niri/.yami"
-          if [[ ! -e "$yami_niri/user.kdl" && ! -v DRY_RUN ]]; then
-            printf '%s\n' "// your tweaks on top of yami: binds, window rules, outputs. Included after the shell's" \
-              "// files, so what you write here wins. Reference: https://github.com/YaLTeR/niri/wiki" >"$yami_niri/user.kdl"
-          fi
-        else
-          warnEcho "yami: $yami_niri/config.kdl is not yami's (no .yami marker), left as it is"
-        fi
-        # keys and window rules before the first login; the shell keeps them current
-        [[ -e "$yami_niri/yami-binds.kdl" ]] || run ${cfg.package}/bin/yami-shell binds write
-        if [[ ! -e "$yami_niri/yami-fx.kdl" && ! -v DRY_RUN ]]; then
-          ${cfg.package}/bin/yami-shell config kdl >"$yami_niri/yami-fx.kdl"
+        if [[ ! -v DRY_RUN ]]; then
+          ${cfg.package}/bin/yami-shell niri connect || warnEcho "yami: niri's config.kdl was left as it is (yami niri status)"
         fi
       ''}
+
+      # yami's part of niri (keys, window rules, its look) before the first login; the shell keeps it current
+      if [[ ! -v DRY_RUN ]]; then
+        ${cfg.package}/bin/yami-shell niri write || true
+      fi
     '';
   };
 }

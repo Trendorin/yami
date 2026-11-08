@@ -140,7 +140,7 @@ pub fn drawn_on(layers: &Value) -> Vec<String> {
     v
 }
 
-/// часть yami-fx.kdl: фон skwd-paper в обзоре niri — под столами, как советует skwd-wall
+/// часть rules.kdl: фон skwd-paper в обзоре niri — под столами, как советует skwd-wall
 pub fn kdl(set: &crate::config::Settings, l: &mut Vec<String>) {
     if !set.wall_skwd {
         return;
