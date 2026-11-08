@@ -304,7 +304,8 @@ impl App {
         }
         let (out, x, y) = self.tray_anchor.clone().unwrap_or_else(|| {
             let out = self.focus_out();
-            let y = self.bar_bottom(&out) + 2;
+            // бар снизу — меню встанет над ним (open_menu прижимает к нему)
+            let y = if crate::bar::low(&self.st.set) { i32::MAX / 2 } else { self.bar_bottom(&out) + 2 };
             (out, 100, y)
         });
         let title = self.st.tray.iter().find(|t| t.service == svc).map(|t| t.title.clone()).unwrap_or_default();

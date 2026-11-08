@@ -269,7 +269,8 @@ impl App {
                     let top = self.surfs.get(&sid).map(|s| self.bar_bottom(&s.output)).unwrap_or(BAR_H);
                     let (ww, wh) = self.surfs.get(&sid).map(|s| (s.w, s.h)).unwrap_or((0, 0));
                     let nx = nx.clamp(0, (ow - ww).max(0));
-                    let ny = ny.clamp(top, (oh - wh).max(top));
+                    let low = self.surfs.get(&sid).map(|s| self.bar_reserve_bottom(&s.output)).unwrap_or(0);
+                    let ny = ny.clamp(top, (oh - wh - low).max(top));
                     if let Some(w) = self.st.set.widget_mut(id) {
                         w.x = nx;
                         w.y = ny;

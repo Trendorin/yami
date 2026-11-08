@@ -194,7 +194,9 @@ fn tab_bar_look(ui: &mut Ui, st: &State, b: R) {
     num_btn(ui, R::new(col(2), y + 6, cw, 26), "отступ", s.num("bar_margin"), "bar_margin");
     y += 46;
     let align = if s.bar_center_align == "after-left" { "за левыми" } else { "по центру" };
-    opt_btn(ui, R::new(col(0), y, cw * 2 + 12, 26), "модули середины", align, Act::SCycle("bar_center_align"));
+    opt_btn(ui, R::new(col(0), y, cw, 26), "модули середины", align, Act::SCycle("bar_center_align"));
+    let pos = if crate::bar::low(s) { "снизу" } else { "сверху" };
+    opt_btn(ui, R::new(col(1), y, cw, 26), "край экрана", pos, Act::SCycle("bar_pos"));
     let shape = if crate::bar::strip(s) {
         "полоса во всю ширину"
     } else if s.bar_float {
@@ -255,8 +257,8 @@ fn tab_bar_look(ui: &mut Ui, st: &State, b: R) {
     shape_preview(ui, st, R::new(b.x, y, b.w, (b.bottom() - y).clamp(40, 96)));
 }
 
-/// схема верха экрана 1920 px: бар (полоса, плашка или плавающий), его модули и окна под ним —
-/// всё в масштабе, тем же расчётом, что у настоящего бара (bar::geo)
+/// схема края экрана 1920 px с баром (верх или низ): бар (полоса, плашка или плавающий), его
+/// модули и окна рядом — всё в масштабе, тем же расчётом, что у настоящего бара (bar::geo)
 fn shape_preview(ui: &mut Ui, st: &State, r: R) {
     let t = ui.t;
     let s = &st.set;
@@ -269,19 +271,22 @@ fn shape_preview(ui: &mut Ui, st: &State, r: R) {
     let (top, side, _) = crate::bar::geo(s, 1920);
     let strip = crate::bar::strip(s);
     let bh = sc(crate::app::BAR_H).max(8);
-    let bar = R::new(inner.x + sc(side), inner.y + sc(top), sc(1920 - 2 * side - if strip { 0 } else { crate::bar::SHADE }), bh);
-    // окна под баром — с отступами из «окон»
-    let wy = bar.bottom() + sc(s.num("win_top")).max(2);
+    let low = crate::bar::low(s);
+    let by = if low { inner.bottom() - sc(top) - bh } else { inner.y + sc(top) };
+    let bar = R::new(inner.x + sc(side), by, sc(1920 - 2 * side - if strip { 0 } else { crate::bar::SHADE }), bh);
+    // окна под баром (над нижним) — с отступами из «окон»
+    let gap = sc(s.num("win_top")).max(2);
+    let (wy, wb) = if low { (inner.y - 4, bar.y - gap) } else { (bar.bottom() + gap, inner.bottom() + 4) };
     let (wl, wg) = (sc(s.num("win_left")).max(1), sc(s.num("win_gap")).max(1));
     let ww = (inner.w - 2 * wl - wg) / 2;
     for i in 0..2 {
-        let wr = R::new(inner.x + wl + i * (ww + wg), wy, ww, inner.bottom() - wy + 4);
+        let wr = R::new(inner.x + wl + i * (ww + wg), wy, ww, wb - wy);
         ui.cv.fill(wr, t.surface);
         ui.cv.fill(R::new(wr.x, wr.y, wr.w, 1), if i == 0 { t.red } else { t.border });
     }
     if strip {
         ui.cv.fill(bar, t.panel);
-        ui.cv.fill(R::new(bar.x, bar.bottom() - 1, bar.w, 1), t.border);
+        ui.cv.fill(R::new(bar.x, if low { bar.y } else { bar.bottom() - 1 }, bar.w, 1), t.border);
     } else {
         ui.cv.pxbox(bar, &BoxStyle::new(t.panel, t.border).shadow(1));
     }

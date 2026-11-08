@@ -375,7 +375,7 @@ impl App {
             let (anchor, margin) = match self.st.set.osd_pos.as_str() {
                 "top" => (Anchor::TOP, (self.bar_bottom(&out) + self.st.set.num("osd_offset"), 0, 0, 0)),
                 "center" => (Anchor::empty(), (0, 0, 0, 0)),
-                _ => (Anchor::BOTTOM, (0, 0, self.st.set.num("osd_offset"), 0)),
+                _ => (Anchor::BOTTOM, (0, 0, self.bar_reserve_bottom(&out) + self.st.set.num("osd_offset"), 0)),
             };
             let id = self.mk(SKind::Osd, &out, Layer::Overlay, "yami-osd", anchor, (308, 64 + 8), margin, -1, KeyboardInteractivity::None);
             if let Some(s) = self.surfs.get(&id) {

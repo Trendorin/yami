@@ -196,6 +196,8 @@ pub struct Settings {
     pub bar_outputs: Vec<String>,
     /// модули середины: "center" — по центру бара, "after-left" — сразу за левыми
     pub bar_center_align: String,
+    /// край экрана с баром: "top" или "bottom"
+    pub bar_pos: String,
 
     // экран входа (yami-greet: login.rs выкладывает их в look.json)
     /// "list" — пользователи списком, "name" — имя вводят сами (список не показывается)
@@ -538,6 +540,7 @@ impl Default for Settings {
             bar_outputs: vec![],
             bar_margin: 6,
             bar_center_align: "center".into(),
+            bar_pos: "top".into(),
             greet_users: "list".into(),
             greet_wall: "desktop".into(),
             greet_dim: 0.55,
@@ -722,6 +725,9 @@ impl Settings {
         }
         if self.bar_center_align != "after-left" {
             self.bar_center_align = "center".into();
+        }
+        if self.bar_pos != "bottom" {
+            self.bar_pos = "top".into();
         }
         if self.temp_style != "compact" {
             self.temp_style = "full".into();
