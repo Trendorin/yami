@@ -48,6 +48,13 @@ for m in "${list[@]}"; do
     done
   done
   ok "renders: plain and yami, en ru pt-BR"
+  if [[ $m != yami-greet ]]; then
+    h="$TMP/home-$m"
+    mkdir -p "$h"
+    box=(env -u XDG_DATA_HOME -u XDG_CONFIG_HOME -u XDG_STATE_HOME -u YAMI_STYLE -u PREFIX HOME="$h")
+    if "${box[@]}" "$exe" install </dev/null >/dev/null 2>&1 || [[ -e $h/.local/bin/$m ]]; then bad "install without a yes"; fi
+    if "${box[@]}" "$exe" install --yes --all >/dev/null 2>&1 && [[ -x $h/.local/bin/$m ]] && "${box[@]}" "$exe" uninstall --yes >/dev/null 2>&1 && [[ ! -e $h/.local/bin/$m ]]; then ok "install, uninstall"; else bad "install, uninstall"; fi
+  fi
 done
 echo
 if ((fail)); then

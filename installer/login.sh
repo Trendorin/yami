@@ -79,7 +79,7 @@ login_offer() {
   if [[ -t 0 && -t 1 && -n $SU ]]; then
     printf '\n  %s%s%s\n  %s %s[%s]%s ' "$T" "$msg" "$R" "$(t "поставить сейчас?" "install it now?" "instalar agora?")" "$F" "$(t "enter — да, n — потом" "enter yes, n later" "enter sim, n depois")" "$R"
     read -r a || a=n
-    if [[ ! $a =~ ^[nNнН] ]] && "$(greet_script)"; then
+    if [[ ! $a =~ ^[nNнН] ]] && "$(greet_script)" --yes; then
       sed -i '/^login /d' "$f"
       grep -q '^pkgs ' "$f" || rm -f "$f"
     else

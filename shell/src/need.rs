@@ -151,7 +151,7 @@ pub fn cli(y: &crate::cmd::Sty, args: &[&str]) -> i32 {
         let a = n.argv();
         let mut ok = a.is_empty() || std::process::Command::new(&a[0]).args(&a[1..]).status().map(|s| s.success()).unwrap_or(false);
         if let (true, Some(p)) = (ok, &n.login) {
-            ok = std::process::Command::new(p).status().map(|s| s.success()).unwrap_or(false);
+            ok = std::process::Command::new(p).arg("--yes").status().map(|s| s.success()).unwrap_or(false);
         }
         if ok {
             let _ = std::fs::remove_file(path());

@@ -440,9 +440,12 @@ t_standalone() { # a module taken on its own, from its repository, without the s
     machine
     rm -f "$SRC/$m/target"
     ln -s "$WORK/target" "$SRC/$m/target"
-    check "$m: its own install.sh" sandbox bash "$SRC/$m/install.sh"
+    check "$m: builds on its own" sandbox bash -c 'cd "$1" && cargo build --release --locked' _ "$SRC/$m"
+    nocheck "  without a terminal or --yes it installs nothing" sandbox "$SRC/$m/target/release/$m" install
+    nocheck "  nothing was put in" exists "$H/.local/bin/$m"
+    check "  install --yes" sandbox "$SRC/$m/target/release/$m" install --yes
     check "  it runs" is_ver "$m" 3.0.0
-    check "  --uninstall takes it away" sandbox bash "$SRC/$m/install.sh" --uninstall
+    check "  uninstall takes it away" sandbox "$SRC/$m/target/release/$m" uninstall --yes
     nocheck "  the binary is gone" exists "$H/.local/bin/$m"
     rm -f "$SRC/$m/target"
   done

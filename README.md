@@ -261,7 +261,7 @@ equalizer), `playerctl` (media), `nmcli` (Wi-Fi), BlueZ (Bluetooth), `cliphist` 
 
 Everything beyond the shell is a separate program in its own repository. The setup window adds and
 removes them, and any of them works without the yami shell: take one into your own setup with
-`git clone` and `./install.sh`, no root needed.
+one file and `./yami-files install`, no root needed.
 
 | Module | What | Needs |
 |---|---|---|

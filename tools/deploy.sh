@@ -36,8 +36,9 @@ fi
 put() { install -Dm755 "$ROOT/shell/target/release/$1" "$HOME/.local/bin/.$1.new" && mv -f "$HOME/.local/bin/.$1.new" "$HOME/.local/bin/$1"; }
 if ((WITH_MODULES)); then
   for m in yami-files yami-view yami-play yami-shot yami-agents; do
-    [[ -x $MODS/$m/install.sh ]] || { echo "deploy: no $MODS/$m" >&2; exit 1; }
-    "$MODS/$m/install.sh"
+    [[ -f $MODS/$m/Cargo.toml ]] || { echo "deploy: no $MODS/$m" >&2; exit 1; }
+    (cd "$MODS/$m" && cargo build --release --locked)
+    "$MODS/$m/target/release/$m" install --yes --all
   done
   # a running file dialog keeps its binary until it closes; D-Bus learns about new service files
   "$HOME/.local/bin/yami-files" --portal-reload || true

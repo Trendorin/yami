@@ -10,6 +10,8 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 ## Unreleased
 
 - With bash as the login shell (Arch and others) the shell no longer stays away after login: niri-session dropped `~/.local/bin` from the PATH, so neither the bar nor the keys like `Mod+Space` started. On CachyOS fish hid it.
+- The setup window has a new full-screen layout, starts with every module unticked and now opens by itself at the first login.
+- A module is one file: `yami-files install` asks for the settings, lists what it will change and installs only after a yes.
 - yami is now a shell and separate modules: yami-files, yami-view, yami-play, yami-shot, yami-agents, yami-greet and yami-niri each live in their own repository and work without the shell, so any of them can go into another setup.
 - A graphical first run: the install puts in only niri and the shell, and a full-screen window at the first login asks the language, the look and which modules to add. `yami setup` opens it again.
 - Every module can look your way: a neutral look next to the pixel one, corners, shadows, fonts and each colour in `~/.config/yami/style.json`, and per module in `style.<module>.json`. Settings → look has the style of everything.
