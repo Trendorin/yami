@@ -56,7 +56,7 @@ impl App {
                         true
                     }
                 };
-                // kitty включили руками: наш файл и строка include (выключение её уберёт theme.py)
+                // kitty включили руками: наш файл и строка include (выключение её уберёт recolor)
                 if on && *id == "kitty" {
                     crate::prefs::kitty_attach();
                 }
@@ -144,12 +144,12 @@ impl App {
                     "session_restore" => s.session_restore = !s.session_restore,
                     "update_check" => s.update_check = !s.update_check,
                     "fetch_full" => {
-                        // theme.py читает настройки с диска: сохранить, потом перерисовать fastfetch
+                        // recolor читает настройки с диска: сохранить, потом перерисовать fastfetch
                         s.fetch_full = !s.fetch_full;
                         self.settings_changed();
                         self.save_now();
                         std::thread::spawn(|| {
-                            let _ = crate::proc::theme_py().arg("--fetch").status();
+                            let _ = crate::proc::recolor().arg("--fetch").status();
                         });
                         self.dirty(&SKind::Modal);
                         return true;

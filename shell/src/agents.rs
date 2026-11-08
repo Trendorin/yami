@@ -26,10 +26,10 @@ pub fn write_portals(s: &Settings) {
     let p = crate::config::config_dir().join("xdg-desktop-portal/niri-portals.conf");
     // файл без нашей метки — свой у человека, не трогаем; тот же текст write_atomic не пишет (а зовут
     // сюда каждое изменение настроек, каждый шаг ползунка)
-    // без yami-files бэкенда yami нет: свой файл не заводим (порталы — как их отдаёт niri)
+    // без наших бэкендов свой файл не заводим (порталы — как их отдаёт niri)
     let mine = match std::fs::read_to_string(&p) {
         Ok(t) => t.starts_with("# yami:"),
-        Err(_) => crate::proc::have("yami-files"),
+        Err(_) => crate::proc::have("yami-files") || crate::proc::have("yami-agents"),
     };
     if mine {
         let _ = crate::config::write_atomic(&p, &portals_conf(s));

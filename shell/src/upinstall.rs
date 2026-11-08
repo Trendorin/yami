@@ -255,8 +255,51 @@ pub(crate) fn restore_settings(now_ver: &str) {
     let _ = std::fs::remove_file(snap_path());
 }
 
+/// точки отката установщика (installer/backup.sh), новые первыми: папка и версия
+pub fn snapshots() -> Vec<(PathBuf, String)> {
+    let root = crate::config::state_dir().join("snapshots");
+    let mut v: Vec<PathBuf> = std::fs::read_dir(root).map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.join("paths").is_file()).collect()).unwrap_or_default();
+    v.sort();
+    v.reverse();
+    v.into_iter().map(|d| {
+        let ver = std::fs::read_to_string(d.join("version")).map(|s| s.trim().to_string()).unwrap_or_default();
+        (d, if ver.is_empty() { "?".to_string() } else { ver })
+    }).collect()
+}
+
+/// вернуть из точки отката то, что сгенерировано (G): бинари и конфиги; своё (U) — настройки, раскладка
+/// экранов, user.kdl — человек мог поменять после обновления, их не трогаем. Файла, которого в точке
+/// не было (модуль поставлен обновлением), быть не должно
+fn snapshot_back(d: &Path) -> std::io::Result<()> {
+    let list = std::fs::read_to_string(d.join("paths"))?;
+    for line in list.lines() {
+        let Some(("G", p)) = line.split_once(' ') else { continue };
+        let target = Path::new(p);
+        let src = d.join(format!("files{p}"));
+        if src.exists() {
+            if let Some(dir) = target.parent() {
+                std::fs::create_dir_all(dir)?;
+            }
+            let tmp = PathBuf::from(format!("{p}.yami-new"));
+            std::fs::copy(&src, &tmp)?;
+            std::fs::rename(&tmp, target)?;
+        } else if target.exists() {
+            std::fs::remove_file(target)?;
+        }
+    }
+    Ok(())
+}
+
+/// откат возможен: есть точка отката или прошлые бинари
+pub fn can_rollback() -> bool {
+    !snapshots().is_empty() || prev_dir().join("yami-shell").exists()
+}
+
 /// версия прошлой сборки (для мгновенного отката), если она есть
 pub fn prev_version() -> Option<String> {
+    if let Some((_, v)) = snapshots().first() {
+        return Some(v.clone());
+    }
     if !prev_dir().join("yami-shell").exists() {
         return None;
     }
@@ -283,6 +326,22 @@ pub(crate) fn strip_ansi(s: &str) -> String {
 pub fn rollback() -> Result<String, String> {
     require_enabled()?;
     let Some(_l) = lock() else { return Err(crate::tf!("обновление уже идёт", "an update is already running", "uma atualização já está em andamento")) };
+    // бинари станут старыми: следующий запуск установщика не должен считать, что этот исходник уже стоит
+    let _ = std::fs::remove_dir_all(crate::config::state_dir().join("built"));
+    if let Some((d, ver)) = snapshots().into_iter().next() {
+        let from = installed().version;
+        if older(&ver, &from) {
+            snapshot_settings(&from);
+        }
+        snapshot_back(&d).map_err(|e| e.to_string())?;
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(prev_dir());
+        if !older(&ver, &from) {
+            restore_settings(&ver);
+        }
+        restart_shell();
+        return Ok(crate::tf!("вернул {}", "rolled back to {}", "revertido para {}", installed().version));
+    }
     let p = prev_dir();
     if !p.join("yami-shell").exists() {
         return Err(crate::tf!("откатывать не на что: прежней сборки нет", "nothing to roll back to: no previous build", "não há como reverter: sem compilação anterior"));

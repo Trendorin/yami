@@ -124,7 +124,7 @@ pub struct Upd {
 impl Upd {
     pub fn load() -> Upd {
         let (log, log_len) = log_tail();
-        Upd { stamp: installed(), info: last(), rollback: prev_dir().join("yami-shell").exists(), log, log_len, need: crate::need::load(), ..Default::default() }
+        Upd { stamp: installed(), info: last(), rollback: can_rollback(), log, log_len, need: crate::need::load(), ..Default::default() }
     }
     /// для `yami-shell shot settings:updates[-new|-busy]`
     pub fn mock(what: &str) -> Upd {

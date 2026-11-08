@@ -13,6 +13,9 @@ const HELP: &str = "yami-shell config [list | get KEY | set KEY VALUE | reset [K
   path            where the file is
   kdl [yami]      what the shell writes to ~/.config/niri/yami-fx.kdl (yami: as for yami-niri)
   lite-auto       lite mode on when this machine is weak or virtual and the file has no `lite` yet
+  seed K=V …      (the installer) set keys in the file as they are: true/false or a string; look=\"78 0 100 50\"
+  restyle \"LIST\" C  (the installer) what to restyle: themeApps = LIST, cursor = yami or system
+  portals         write niri-portals.conf for the modules that are installed
 Keys are camelCase, as in ~/.config/yami-shell.json. Reference: docs/CONFIG.md.
 
 yami-shell binds [list | print | write]
@@ -43,10 +46,58 @@ fn save(s: &Settings) -> bool {
     crate::config::write_atomic(&settings_path(), &s.to_json()).is_ok()
 }
 
+/// файл настроек как есть, без подстановки значений по умолчанию (установщик пишет только своё)
+fn write_raw(d: serde_json::Map<String, Value>) -> bool {
+    crate::config::write_atomic(&settings_path(), &(serde_json::to_string_pretty(&Value::Object(d)).unwrap_or_default() + "\n")).is_ok()
+}
+
+/// установщик: ключи разом. Значение — true, false или строка; look — четыре числа панелей в процентах
+fn seed(pairs: &[&str]) -> i32 {
+    let mut d = file_json();
+    for p in pairs {
+        let Some((k, v)) = p.split_once('=') else { continue };
+        if k == "look" {
+            for (name, n) in ["glass", "lift", "inner", "dim"].iter().zip(v.split_whitespace()) {
+                if let Ok(n) = n.parse::<f64>() {
+                    d.insert(name.to_string(), serde_json::json!(n / 100.0));
+                }
+            }
+            continue;
+        }
+        let val = match v {
+            "true" => Value::Bool(true),
+            "false" => Value::Bool(false),
+            _ => Value::String(v.to_string()),
+        };
+        d.insert(k.to_string(), val);
+    }
+    i32::from(!write_raw(d))
+}
+
+/// установщик: что перекрашивать. Пиксельный курсор включён — размер и вид, уже заданные, остаются
+fn restyle(list: &str, cursor: &str) -> i32 {
+    let mut d = file_json();
+    let before = d.clone();
+    d.insert("themeApps".into(), list.split_whitespace().map(Value::from).collect::<Vec<_>>().into());
+    d.remove("appThemes");
+    if cursor == "system" {
+        d.insert("cursor".into(), "system".into());
+    } else if matches!(d.get("cursor").and_then(|v| v.as_str()), None | Some("system")) {
+        d.insert("cursor".into(), "yami".into());
+    }
+    if d == before && settings_path().exists() {
+        return 0;
+    }
+    i32::from(!write_raw(d))
+}
+
 pub fn config(args: &[String]) -> i32 {
     let a: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     match a.as_slice() {
         ["path"] => println!("{}", settings_path().display()),
+        ["seed", rest @ ..] => return seed(rest),
+        ["restyle", list, cursor] => return restyle(list, cursor),
+        ["portals"] => crate::agents::write_portals(&Settings::load()),
         [] | ["list"] => {
             let cur = serde_json::to_value(Settings::load()).unwrap_or_default();
             let def = defaults();

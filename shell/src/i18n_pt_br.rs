@@ -679,7 +679,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("reassigned keys (binds)", "atalhos redefinidos (binds)"),
     ("reboot", "reiniciar"),
     ("recolour now", "recolorir agora"),
-    ("recolouring apps, wallpaper (theme.py)", "recolorir aplicativos e papel de parede (theme.py)"),
+    ("recolouring apps, wallpaper (recolor)", "recolorir aplicativos e papel de parede (recolor)"),
     ("redrawn when the colour changes", "redesenhado quando a cor muda"),
     ("refresh rate", "taxa de atualização"),
     ("release signature check", "verificação de assinatura da versão"),

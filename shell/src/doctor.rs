@@ -20,7 +20,6 @@ const DEPS: &[(&str, &str, &str, bool)] = &[
     ("playerctl", "музыка в баре", "music in the bar", false),
     ("nmcli", "Wi-Fi", "Wi-Fi", false),
     ("brightnessctl", "яркость с клавиш", "brightness keys", false),
-    ("python3", "перекраска программ, обои (theme.py)", "recolouring apps, wallpaper (theme.py)", false),
     ("fc-match", "шрифты", "fonts", false),
     ("curl", "обложки музыки из сети", "album covers from the web", false),
     ("xdg-open", "открыть файл настроек", "opening the settings file", false),
@@ -210,12 +209,6 @@ pub fn run(y: &Sty) -> i32 {
             line(y, &y.bad("✕"), c, &crate::tf!("нужен: {}", "required: {}", "necessário: {}", what));
         } else {
             line(y, &y.warn("·"), c, &crate::tf!("нет — не будет: {}", "missing, no {}", "ausente, sem {}", what));
-        }
-    }
-    if which("python3") {
-        let pil = std::process::Command::new("python3").args(["-I", "-c", "import PIL"]).stderr(std::process::Stdio::null()).status().map(|s| s.success()).unwrap_or(false);
-        if !pil {
-            line(y, &y.warn("·"), "python3-pillow", &crate::tf!("нет — обои из своей картинки не перекрасятся", "missing, own wallpapers are not recoloured", "ausente, papéis de parede personalizados não são recoloridos"));
         }
     }
     services(y, &mut problems);

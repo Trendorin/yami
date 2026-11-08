@@ -167,7 +167,7 @@ pub enum Msg {
     /// свои темы (themetab.rs): список, что сделано, применена ли тема (перечитать настройки)
     Themes(Vec<crate::bundle::Card>, String, bool),
     Theme,
-    /// theme.py --templates закончил: итог в restyle.json (restyle.rs)
+    /// recolor --templates закончил: итог в restyle.json (restyle.rs)
     Restyled,
     /// превью наборов значков и курсоров (iconsets.rs)
     Sets(Box<crate::iconsets::Sets>),
@@ -408,7 +408,7 @@ pub struct App {
     /// угол в начале текущего перетаскивания
     pub modal_at: Option<(u32, (i32, i32))>,
     pub mdrag: Option<(i32, i32)>,
-    /// ползунок пиксельности сменил шрифт программ / курсор, theme.py ещё не звали
+    /// ползунок пиксельности сменил шрифт программ / курсор, recolor ещё не звали
     pub look_pending: (bool, bool),
 }
 
@@ -643,8 +643,6 @@ pub fn run() {
     }
     crate::agents::write_portals(&app.st.set);
     crate::profile::refresh(None, tx.clone());
-    // копия theme.py рядом с состоянием — сразу свежая, а не после следующей смены палитры
-    let _ = crate::proc::theme_script();
     audio::spawn(tx.clone());
     media::spawn(tx.clone());
     net::spawn_bt(tx.clone());
@@ -652,7 +650,7 @@ pub fn run() {
     crate::prefs::write_style(&app.st.set);
     // кто отвечает за порталы, зависит от поставленных модулей
     crate::agents::write_portals(&app.st.set);
-    // обои: при старте палитра обычно та же, theme.py не запускается — готовим картинку сами
+    // обои: при старте палитра обычно та же, recolor не запускается — готовим картинку сами
     app.sync_wall();
     app.write_fx();
     crate::keys::write(&app.st.set);

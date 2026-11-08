@@ -79,7 +79,7 @@ pub struct Settings {
     pub palette: String,
     pub accent: String,
     pub tint: f32,
-    /// светлая тема (бумага вместо графита) для шелла и всего, что красит theme.py
+    /// светлая тема (бумага вместо графита) для шелла и всего, что красит recolor
     pub light: bool,
     /// общий вид всех модулей (style.json): yami — пиксельный, plain — нейтральный
     pub preset: String,
@@ -158,7 +158,7 @@ pub struct Settings {
     pub tray_pixel: bool,
     /// модуль bat прячется от сети без зарядки: полная или держит порог заряда (#21)
     pub bat_hide_full: bool,
-    /// чужие программы, которые theme.py красит по палитре (THEME_APPS; настройки → цвет → программы,
+    /// чужие программы, которые recolor красит по палитре (THEME_APPS; настройки → цвет → программы,
     /// установщик); выключенную yami не трогает. До 2.7 — appThemes: foot, cava, starship сверх остальных
     pub theme_apps: Vec<String>,
     pub clock_seconds: bool,

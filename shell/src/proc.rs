@@ -1,9 +1,8 @@
 // Внешние программы: запуск отвязанными (setsid), долгие дети нитей (PDEATHSIG), curl к чужим
-// сайтам, окно выбора yami-files, tools/theme.py с пониженным приоритетом, подбор детей,
+// сайтам, окно выбора yami-files, перекраска с пониженным приоритетом, подбор детей,
 // доставшихся от образа до перезапуска.
 
 use crate::app::App;
-use crate::config;
 
 /// curl к чужому сайту (погода, тексты песен, тема по ссылке): только https, и после
 /// переадресаций; потолок времени и размера; имя yami в User-Agent. Флаги -f, -G, -L, -o — у вызова
@@ -95,16 +94,16 @@ pub(crate) fn reap_inherited() {
     v.retain(|&p| unsafe { libc::waitpid(p, std::ptr::null_mut(), libc::WNOHANG) } == 0);
 }
 
-/// tools/theme.py, тихо и с пониженным приоритетом: на слабой машине перекраска (обои, курсор,
-/// темы программ) идёт секунды и не должна отнимать процессор у стола
-pub fn theme_py() -> std::process::Command {
-    let mut c = std::process::Command::new("python3");
-    c.arg("-I").arg(theme_script()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+/// `yami-shell recolor`, тихо и с пониженным приоритетом: на слабой машине перекраска (обои, курсор,
+/// темы программ) не должна отнимать процессор у стола
+pub fn recolor() -> std::process::Command {
+    let mut c = std::process::Command::new(yami_px::paths::self_exe());
+    c.arg("recolor").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
     gentle(&mut c);
     c
 }
 
-/// фоновая работа (theme.py, распознавание текста): nice 10 у процесса, шелл свой не меняет
+/// фоновая работа (перекраска, распознавание текста): nice 10 у процесса, шелл свой не меняет
 pub fn gentle(cmd: &mut std::process::Command) -> &mut std::process::Command {
     use std::os::unix::process::CommandExt;
     // SAFETY: между fork и exec только setpriority
@@ -114,16 +113,6 @@ pub fn gentle(cmd: &mut std::process::Command) -> &mut std::process::Command {
             Ok(())
         })
     }
-}
-
-pub fn theme_script() -> std::path::PathBuf {
-    // tools/theme.py вшит в шелл и пишется рядом с состоянием
-    let p = config::state_dir().join("theme.py");
-    let src = include_str!("../../tools/theme.py");
-    if std::fs::read_to_string(&p).map(|t| t != src).unwrap_or(true) {
-        let _ = std::fs::write(&p, src);
-    }
-    p
 }
 
 impl App {

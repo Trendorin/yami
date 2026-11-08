@@ -147,7 +147,8 @@ fn help_update(y: &Sty) {
     y.section(&crate::tf!("обновления", "updates", "atualizações"));
     y.row("update [check]", &crate::tf!("git fetch своего клона (~/.local/share/yami/src), что нового", "git fetch of its own clone (~/.local/share/yami/src), what is new", "git fetch da própria cópia (~/.local/share/yami/src), novidades"));
     y.row("update apply [-y]", &crate::tf!("проверить подпись, собрать из исходников, поставить", "check the signature, build from source, install", "verificar a assinatura, compilar e instalar"));
-    y.row("update rollback", &crate::tf!("бинари, что стояли до последнего обновления (сразу)", "the binaries from before the last update (instant)", "os binários anteriores à última atualização (instantâneo)"));
+    y.row("update rollback", &crate::tf!("вернуть программы и конфиги, что стояли до последнего обновления (сразу)", "bring back the programs and configs from before the last update (instant)", "traz de volta os programas e configurações anteriores à última atualização (instantâneo)"));
+    y.row("update snapshots", &crate::tf!("точки отката: хранятся три последние", "the rollback points: the last three are kept", "os pontos de restauração: os três últimos são mantidos"));
     y.row("update list", &crate::tf!("выпуски, на которые можно перейти, и их подписи", "releases you can switch to and their signatures", "versões disponíveis para troca e suas assinaturas"));
     y.row("update to X.Y.Z", &crate::tf!("собрать и поставить выбранный подписанный выпуск", "build and install the chosen signed release", "compilar e instalar a versão assinada escolhida"));
     y.row("update status", &crate::tf!("версия, коммит, канал, источник", "version, commit, channel, source", "versão, commit, canal e código-fonte"));
@@ -356,6 +357,19 @@ fn update(y: &Sty, args: &[&str]) -> i32 {
                 1
             }
         },
+        "snapshots" => {
+            y.section(&crate::tf!("точки отката", "rollback points", "pontos de restauração"));
+            let list = crate::update::snapshots();
+            for (i, (d, v)) in list.iter().enumerate() {
+                let name = d.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                println!("   {} {}", y.acc(&format!("{name:<18}")), y.dim(&if i == 0 { format!("{v} · yami update rollback") } else { v.clone() }));
+            }
+            if list.is_empty() {
+                println!("   {}", y.dim(&crate::tf!("пока нет: точка появляется перед обновлением", "none yet: one is made before an update", "ainda nenhum: um é criado antes de atualizar")));
+            }
+            println!();
+            0
+        }
         "list" => {
             let i = crate::update::check(&set);
             if !i.err.is_empty() {
@@ -445,6 +459,10 @@ fn update(y: &Sty, args: &[&str]) -> i32 {
 
 /// разбор команды; as_yami — вызвали как `yami` (без команды — справка, а не запуск шелла)
 pub fn run(args: &[String], me: &str) -> i32 {
+    // перекраска — отдельная работа: настройки разбирает сама, справка и цвета ей не нужны
+    if args.first().map(String::as_str) == Some("recolor") {
+        return crate::recolor::run(&args[1..]);
+    }
     let set = Settings::load();
     crate::i18n::set(&set.lang);
     let y = Sty::new(&set);

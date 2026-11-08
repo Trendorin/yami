@@ -1,8 +1,8 @@
-// Итог перекраски программ и своих шаблонов (#27). tools/theme.py пишет его в
+// Итог перекраски программ и своих шаблонов (#27). yami-shell recolor пишет его в
 // ~/.local/state/yami/restyle.json: шаблон записан, изменён руками (не перезаписан), с опечаткой в
 // {{цвете}}, без строки yami-output, с путём вне разрешённых папок; fastfetch со своим config.jsonc,
 // starship со своей палитрой. Шелл показывает это в настройках → цвет → программы, yami templates —
-// в терминале. Папку шаблонов шелл сверяет раз в 5 с: изменилась — theme.py --templates.
+// в терминале. Папку шаблонов шелл сверяет раз в 5 с: изменилась — recolor --templates.
 
 use crate::app::*;
 use crate::font::PX;
@@ -107,7 +107,7 @@ impl App {
     pub fn templates_run(&mut self, force: Option<String>) {
         let tx = self.tx.clone();
         std::thread::spawn(move || {
-            let mut c = crate::proc::theme_py();
+            let mut c = crate::proc::recolor();
             c.arg("--templates");
             if let Some(f) = force {
                 c.arg("--force").arg(f);
@@ -133,7 +133,7 @@ impl App {
 
 /// yami templates [force ИМЯ]: отрисовать свои шаблоны и сказать, что вышло
 pub fn cli(y: &crate::cmd::Sty, args: &[&str]) -> i32 {
-    let mut c = crate::proc::theme_py();
+    let mut c = crate::proc::recolor();
     c.arg("--templates");
     match args {
         [] => {}

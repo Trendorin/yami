@@ -2,7 +2,7 @@
 // для настроек → вид (значки — шесть программ набора в выбранном виде, курсор — его стрелка из
 // файла Xcursor), свой набор из архива или папки в ~/.local/share/icons; yami icons / yami cursor.
 // Превью строит нить (Msg::Sets), пока открыта вкладка «вид»; настройки закрылись — память
-// отдаётся (sets_free). Применяет выбор tools/theme.py: --icons (GTK, Qt), --cursor (niri, GTK, X11).
+// отдаётся (sets_free). Применяет выбор yami-shell recolor: --icons (GTK, Qt), --cursor (niri, GTK, X11).
 
 use crate::app::*;
 use crate::font::PX;
@@ -43,7 +43,7 @@ fn good_name(n: &str) -> bool {
         && !generated(n)
 }
 
-/// пиксельный курсор, который theme.py рисует в палитре: yami-<акцент>[-l]
+/// пиксельный курсор, который recolor рисует в палитре: yami-<акцент>[-l]
 fn generated(n: &str) -> bool {
     let Some(rest) = n.strip_prefix("yami-") else { return false };
     let hex = rest.strip_suffix("-l").unwrap_or(rest);
@@ -313,7 +313,7 @@ fn cards(ui: &mut Ui, cards: &[Card], sel: &str, b: R, y: i32, act: fn(usize) ->
     y + (cards.len() as i32 + cols - 1) / cols * (ch + gap)
 }
 
-/// пиксельная стрелка yami (та же, что рисует tools/theme.py) клетками по k px в r
+/// пиксельная стрелка yami (та же, что рисует yami-shell recolor) клетками по k px в r
 pub fn yami_arrow(ui: &mut Ui, r: R, k: i32) {
     const ARROW: [&str; 12] = ["o...........", "oo..........", "obo.........", "oaao........", "oaaao.......", "oaaaao......", "oaaaaao.....", "oaaaaaao....", "oaaaoooo....", "oaoao.......", "oo.oao......", "o...oo......"];
     let t = ui.t;
@@ -418,14 +418,14 @@ impl App {
         self.open_settings_tab("look");
     }
 
-    /// набор значков выбран: шелл сразу, GTK и Qt — theme.py --icons
+    /// набор значков выбран: шелл сразу, GTK и Qt — recolor --icons
     pub fn icons_apply(&mut self) {
         self.settings_changed();
         let j = self.st.set.to_json();
         let _ = crate::config::write_atomic(&crate::config::settings_path(), &j);
         self.set_saved = j;
         std::thread::spawn(|| {
-            let _ = crate::proc::theme_py().arg("--icons").status();
+            let _ = crate::proc::recolor().arg("--icons").status();
         });
     }
 }
@@ -440,7 +440,7 @@ pub fn cli(y: &crate::cmd::Sty, cursor: bool, args: &[&str]) -> i32 {
         if crate::config::write_atomic(&crate::config::settings_path(), &s.to_json()).is_err() {
             return 1;
         }
-        let _ = crate::proc::theme_py().arg(flag).status();
+        let _ = crate::proc::recolor().arg(flag).status();
         0
     };
     match args {

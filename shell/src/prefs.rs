@@ -89,14 +89,14 @@ impl App {
             let s = Settings::load();
             if s != self.st.set {
                 // правка извне (своя тема, yami config set, руками): шрифты и курсор программ
-                // theme.py перекрашивает сам только со сменой палитры — их входы сверяем отдельно
+                // recolor перекрашивает сам только со сменой палитры — их входы сверяем отдельно
                 let fonts = |s: &Settings| (s.font_ui.clone(), s.font_mono.clone(), s.font_pt, s.font_size, s.browser_font, s.browser_menus);
                 let cursor = |s: &Settings| (s.cursor.clone(), s.cursor_size);
                 let (f0, c0, pal0) = (fonts(&self.st.set), cursor(&self.st.set), self.palette_written.clone());
                 self.st.set = s;
                 self.set_saved = self.st.set.to_json();
                 self.settings_changed();
-                // новая палитра — theme.py уже идёт целиком (шрифты и курсор в нём)
+                // новая палитра — recolor уже идёт целиком (шрифты и курсор в нём)
                 if self.palette_written == pal0 {
                     if fonts(&self.st.set) != f0 {
                         self.apply_fonts();
@@ -109,7 +109,7 @@ impl App {
         }
     }
 
-    /// палитра для остальных программ; tools/theme.py перекрашивает их и рисует обои
+    /// палитра для остальных программ; yami-shell recolor перекрашивает их и рисует обои
     pub fn write_palette(&mut self) {
         let j = self.st.t.palette_json();
         if j == self.palette_written {
@@ -122,20 +122,20 @@ impl App {
         if changed || !config::state_dir().join("wallpaper.png").exists() {
             let tx = self.tx.clone();
             std::thread::spawn(move || {
-                let _ = crate::proc::theme_py().arg(&p).status();
+                let _ = crate::proc::recolor().arg(&p).status();
                 let _ = tx.send(Msg::Theme);
             });
         }
     }
 
-    /// перекрасить программы заново той же палитрой (включили foot или свой шаблон): theme.py
+    /// перекрасить программы заново той же палитрой (включили foot или свой шаблон): recolor
     /// читает настройки с диска — сначала сохранить
     pub fn theme_rerun(&mut self) {
         self.save_now();
         let p = config::state_dir().join("palette.json");
         let tx = self.tx.clone();
         std::thread::spawn(move || {
-            let _ = crate::proc::theme_py().arg(&p).status();
+            let _ = crate::proc::recolor().arg(&p).status();
             let _ = tx.send(Msg::Theme);
         });
     }
@@ -174,7 +174,7 @@ impl App {
         s.icon_pixel = icons;
         s.cursor = cursor;
         self.settings_changed();
-        // программы (GTK, Qt) и курсор перекрашивает theme.py — только если они правда сменились,
+        // программы (GTK, Qt) и курсор перекрашивает recolor — только если они правда сменились,
         // и не на каждое деление, пока ползунок тянут: один раз при отпускании (look_apply)
         self.look_pending.0 |= ui_new;
         self.look_pending.1 |= cur_new;
@@ -194,24 +194,24 @@ impl App {
         }
     }
 
-    /// курсор сменили в настройках: theme.py --cursor (niri перечитает свой конфиг сам)
+    /// курсор сменили в настройках: recolor --cursor (niri перечитает свой конфиг сам)
     pub fn apply_cursor(&mut self) {
         // настройки должны быть на диске до запуска скрипта
         let j = self.st.set.to_json();
         let _ = config::write_atomic(&config::settings_path(), &j);
         self.set_saved = j;
         std::thread::spawn(|| {
-            let _ = crate::proc::theme_py().arg("--cursor").status();
+            let _ = crate::proc::recolor().arg("--cursor").status();
         });
     }
 
-    /// размер шрифта программ сменили (или экраны): theme.py --fonts — GTK, Qt, kitty, браузер
+    /// размер шрифта программ сменили (или экраны): recolor --fonts — GTK, Qt, kitty, браузер
     pub fn apply_fonts(&mut self) {
         let j = self.st.set.to_json();
         let _ = config::write_atomic(&config::settings_path(), &j);
         self.set_saved = j;
         std::thread::spawn(|| {
-            let _ = crate::proc::theme_py().arg("--fonts").status();
+            let _ = crate::proc::recolor().arg("--fonts").status();
         });
     }
 
