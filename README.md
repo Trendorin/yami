@@ -207,8 +207,7 @@ Arch, Debian, Fedora, Gentoo and Nix: [docs/PACKAGING.md](docs/PACKAGING.md).
 It installs only the base: niri, the shell, a terminal and what the desktop cannot start without. Run it as
 yourself, not with sudo: it asks for the password once, where it is needed, and before anything else it says
 how long it will take and how much disk it needs. Then log out and pick the **Niri** session (no login screen
-on this system: type `niri-session` in the console). The first-run setup meets you there, in the settings window
-turned into steps: the language and style, colour, wallpaper, look, fonts, bar, dock, widgets, windows, keys, niri,
+on this system: type `niri-session` in the console). The first-run setup meets you there, one topic per screen with every setting of it a click away: the language and style, colour, wallpaper, look, fonts, bar, dock, widgets, windows, keys, niri,
 notifications and services, then which [modules](#modules) to add. Open it again at any time with `yami setup`. Running the
 same command again later updates and repairs what is there and keeps your choices.
 
@@ -217,8 +216,8 @@ No flag is needed for a normal install; these are for the rest:
 | Flag | Effect |
 |---|---|
 | `--yes` | no questions |
-| `--full` | everything now, no setup window at the first login |
-| `--apply "files view …"` | install exactly these modules (what the setup window runs) |
+| `--full` | everything now, no first-run setup at the first login |
+| `--apply "files view …"` | install exactly these modules (what the first-run setup runs) |
 | `--lang en\|ru\|pt-BR` | language of the installer, the shell and the key hints |
 | `--palette ID` | `blood` `ash` `sakura` `amber` `venom` `ice` `dusk` |
 | `--look ID` | panels: `matte` `glass` `light` `solid` |
@@ -269,7 +268,7 @@ equalizer), `playerctl` (media), `nmcli` (Wi-Fi), BlueZ (Bluetooth), `cliphist` 
 
 ## Modules
 
-Everything beyond the shell is a separate program in its own repository. The setup window adds and
+Everything beyond the shell is a separate program in its own repository. The first-run setup adds and
 removes them, and any of them works without the yami shell: take one into your own setup with
 one file and `./yami-files install`, no root needed.
 
@@ -284,7 +283,7 @@ one file and `./yami-files install`, no root needed.
 | [yami-niri](https://github.com/Trendorin/yami-niri) | niri with tearing for games and a realtime thread | a build from source |
 
 Their system packages come with them: drives and phones (udisks2, gvfs) with yami-files and yami-agents,
-text and QR recognition with yami-shot. With Steam on the machine the setup window also offers `games`
+text and QR recognition with yami-shot. With Steam on the machine the first-run setup also offers `games`
 (GameMode, MangoHud).
 
 Every module draws through [yami-px](https://github.com/Trendorin/yami-px) and reads one look: `~/.config/yami/style.json`
@@ -429,7 +428,7 @@ yami-shell binds list                  # keybindings: id, keys, action
   FileManager1 service, started by D-Bus; `yami-files --portal-reload` hands it over to a newly
   installed binary without cutting a recording (the installer runs it).
 - **Login screen**: `install-system.sh` of the yami-greet module builds it and installs it on a running
-  system (sudo once), greetd from the next boot; the setup window does the same.
+  system (sudo once), greetd from the next boot; the first-run setup does the same.
   `yami login sync` hands it the shell's look at once (the shell does that on every change).
 
 ## Repository layout
@@ -453,7 +452,7 @@ yami-shell binds list                  # keybindings: id, keys, action
 ## yami-niri
 
 Upstream niri v26.04 plus a short patch series, built on your machine. It lives in its own
-[repository](https://github.com/Trendorin/yami-niri); the setup window builds and enables it, by hand from a clone of it:
+[repository](https://github.com/Trendorin/yami-niri); the first-run setup builds and enables it, by hand from a clone of it:
 
 ```sh
 ./yami-niri.sh build     # fetch, patch, build (5–25 min), enable from the next login

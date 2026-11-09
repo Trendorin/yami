@@ -23,7 +23,7 @@ Inside the archive `stage.sh` puts the programs where a package wants them:
 | Fedora, openSUSE | `packaging/fedora/yami.spec` |
 | Gentoo | `packaging/gentoo/yami-bin-*.ebuild`, a USE flag per module |
 
-A package also installs `/etc/xdg/autostart/yami-shell.desktop`. It starts the shell (`yami-shell autostart`) at the first login, when niri's config does not start it yet; the first-run setup opens by itself and its niri step connects yami with one include line. After that the config starts the shell and the autostart entry does nothing. Without systemd niri runs no autostart entries: `yami niri connect` once from a terminal does the same.
+Ubuntu 26.04 has no niri package: `install.sh` builds niri there, a `.deb` needs niri from elsewhere. A package also installs `/etc/xdg/autostart/yami-shell.desktop`. It starts the shell (`yami-shell autostart`) at the first login, when niri's config does not start it yet; the first-run setup opens by itself and its niri step connects yami with one include line. After that the config starts the shell and the autostart entry does nothing. Without systemd niri runs no autostart entries: `yami niri connect` once from a terminal does the same.
 
 ## Nix
 

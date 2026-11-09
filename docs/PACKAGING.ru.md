@@ -23,7 +23,7 @@
 | Fedora, openSUSE | `packaging/fedora/yami.spec` |
 | Gentoo | `packaging/gentoo/yami-bin-*.ebuild`, флаг USE на модуль |
 
-Пакет ставит ещё `/etc/xdg/autostart/yami-shell.desktop`. Он запускает шелл (`yami-shell autostart`) при первом входе, когда конфиг niri его ещё не запускает; первая настройка открывается сама, и её шаг niri подключает yami одной строкой include. После этого шелл запускает конфиг, а запись автозапуска ничего не делает. Без systemd niri записи автозапуска не выполняет: то же сделает `yami niri connect`, один раз из терминала.
+В Ubuntu 26.04 нет пакета niri: `install.sh` соберёт его сам, а для `.deb` niri нужен откуда-то ещё. Пакет ставит ещё `/etc/xdg/autostart/yami-shell.desktop`. Он запускает шелл (`yami-shell autostart`) при первом входе, когда конфиг niri его ещё не запускает; первая настройка открывается сама, и её шаг niri подключает yami одной строкой include. После этого шелл запускает конфиг, а запись автозапуска ничего не делает. Без systemd niri записи автозапуска не выполняет: то же сделает `yami niri connect`, один раз из терминала.
 
 ## Nix
 
