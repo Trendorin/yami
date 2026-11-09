@@ -56,7 +56,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Trendorin/yami/v$v/install.s
 
 Already on yami: settings → updates → **update**, or \`yami update apply\`.
 
-Built from source on your machine (Arch, Fedora, Debian/Ubuntu, openSUSE, Void, Alpine, Gentoo, NixOS). The tag is signed; check it with
+Ready binaries for x86_64 with glibc 2.34 or newer, no compiler needed; otherwise it builds from source (Arch, Fedora, Debian/Ubuntu, openSUSE, Void, Alpine, Gentoo, NixOS). Packages are attached below. The tag and SHA256SUMS are signed; check the tag with
 \`git -c gpg.ssh.allowedSignersFile=keys/allowed_signers verify-tag v$v\`.
 
 Описание и установка по-русски: [README.ru.md](https://github.com/Trendorin/yami/blob/v$v/README.ru.md)."
@@ -69,8 +69,22 @@ Built from source on your machine (Arch, Fedora, Debian/Ubuntu, openSUSE, Void, 
   else
     gh release create "v$v" --verify-tag --title "yami $v" --notes "$body" --latest="$latest" >/dev/null
   fi
+  assets "$v"
   counter_release
   say "$(t "релиз на GitHub: yami $v" "GitHub release: yami $v")"
+}
+
+# the ready binaries (tools/dist.sh) with a signed SHA256SUMS: built from the release that was just tagged
+assets() { # ver
+  local v=$1 key
+  [[ "$(cat VERSION)" == "$v" ]] || { say "$(t "готовые бинари: дерево не на $v, пропускаю" "ready binaries: the tree is not at $v, skipped")"; return 0; }
+  key="$(git config user.signingkey || true)"
+  tools/dist.sh --deb --strict ${key:+--sign "$key"} || die "$(t "tools/dist.sh не прошёл" "tools/dist.sh failed")"
+  local up=(dist/"yami-$v-x86_64-linux.tar.gz" dist/*.deb dist/SHA256SUMS)
+  [[ -f dist/SHA256SUMS.sig ]] && up+=(dist/SHA256SUMS.sig)
+  gh release upload "v$v" --clobber "${up[@]}" >/dev/null
+  say "$(t "готовые бинари: приложены к выпуску" "ready binaries: attached to the release")"
+  sed -n "s/  yami-$v-x86_64-linux.tar.gz//p" dist/SHA256SUMS | head -n1 | xargs -r printf 'PKGBUILD sha256: %s\n'
 }
 
 # the install counter (docs/SECURITY.md, «Install count»): one small file on one release that is never
@@ -98,7 +112,7 @@ if [[ ${1:-} == --keygen ]]; then
   git config user.signingkey "$key.pub"
   who="$(git config user.email || git config user.name)"
   grep -qF "$(cut -d' ' -f2 "$key.pub")" "$KEYS" ||
-    printf '%s namespaces="git" %s\n' "$who" "$(cut -d' ' -f1,2 "$key.pub")" >>"$KEYS"
+    printf '%s namespaces="git,yami-release" %s\n' "$who" "$(cut -d' ' -f1,2 "$key.pub")" >>"$KEYS"
   say "$(t "ключ: $key (храни его; без него выпуски не подписать)" "key: $key (keep it safe; releases cannot be signed without it)")"
   say "$(t "закоммить $KEYS: с версии, где он есть, ставятся только подписанные выпуски" "commit $KEYS: from the version that has it, only signed releases are installed")"
   exit 0

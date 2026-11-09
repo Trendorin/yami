@@ -1,0 +1,65 @@
+# yami from the release's ready binaries (tools/dist.sh), one package per program.
+# Updates and modules are the package manager's: stage.sh --managed leaves the mark the shell looks for.
+pkgbase=yami-bin
+pkgname=(yami-shell-bin yami-files-bin yami-view-bin yami-play-bin yami-shot-bin yami-agents-bin yami-greet-bin)
+pkgver=2.7.0
+pkgrel=1
+pkgdesc='Lightweight pixel-art Wayland desktop for the niri compositor'
+arch=(x86_64)
+url='https://github.com/Trendorin/yami'
+license=(MIT)
+options=(!strip !debug)
+source=("https://github.com/Trendorin/yami/releases/download/v$pkgver/yami-$pkgver-x86_64-linux.tar.gz")
+sha256sums=('SKIP') # release: tools/release.sh prints the sum, `updpkgsums` writes it
+
+_put() { cd "yami-$pkgver-x86_64-linux" && ./stage.sh --prefix /usr --destdir "$pkgdir" --managed --only "$1"; }
+
+package_yami-shell-bin() {
+  pkgdesc='yami: bar, launcher, dock, lock screen, notifications and widgets for niri'
+  depends=(niri pam libxkbcommon gcc-libs glibc)
+  optdepends=('yami-files-bin: file manager and the file dialog' 'yami-view-bin: images' 'yami-play-bin: video and music'
+    'yami-shot-bin: screenshots' 'yami-agents-bin: password windows, screen sharing, automount' 'yami-greet-bin: login screen'
+    'grim: screenshots' 'wl-clipboard: clipboard' 'cliphist: clipboard history' 'playerctl: music' 'brightnessctl: brightness'
+    'wlsunset: night light' 'kitty: the terminal yami restyles')
+  provides=(yami-shell) conflicts=(yami-shell)
+  _put yami-shell
+}
+package_yami-files-bin() {
+  pkgdesc='yami-files: file manager, file dialog of every app, drives and phones'
+  depends=(libxkbcommon gcc-libs glibc)
+  optdepends=('ffmpegthumbnailer: video thumbnails' 'libarchive: archives' 'udisks2: drives' 'gvfs: phones and network places')
+  provides=(yami-files) conflicts=(yami-files)
+  _put yami-files
+}
+package_yami-view-bin() {
+  pkgdesc='yami-view: image viewer with quick edits'
+  depends=(libxkbcommon gcc-libs glibc)
+  provides=(yami-view) conflicts=(yami-view)
+  _put yami-view
+}
+package_yami-play-bin() {
+  pkgdesc='yami-play: video and music player'
+  depends=(mpv libxkbcommon gcc-libs glibc)
+  provides=(yami-play) conflicts=(yami-play)
+  _put yami-play
+}
+package_yami-shot-bin() {
+  pkgdesc='yami-shot: screenshots, marks, text and QR'
+  depends=(grim libxkbcommon gcc-libs glibc)
+  optdepends=('tesseract: text from screenshots' 'zbar: QR codes')
+  provides=(yami-shot) conflicts=(yami-shot)
+  _put yami-shot
+}
+package_yami-agents-bin() {
+  pkgdesc='yami-agents: password windows, screen sharing, automount'
+  depends=(polkit libxkbcommon gcc-libs glibc)
+  optdepends=('udisks2: automount' 'gvfs: phones')
+  provides=(yami-agents) conflicts=(yami-agents)
+  _put yami-agents
+}
+package_yami-greet-bin() {
+  pkgdesc='yami-greet: login screen for greetd'
+  depends=(greetd niri libxkbcommon gcc-libs glibc)
+  provides=(yami-greet) conflicts=(yami-greet)
+  _put yami-greet
+}

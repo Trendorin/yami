@@ -62,11 +62,11 @@ cargo test --release --locked --workspace --quiet --manifest-path "$ROOT/shell/C
 cargo test --release --locked -p yami-shell --features package-managed --quiet --manifest-path "$ROOT/shell/Cargo.toml" package_manager_owns_updates >"$TMP/managed.log" 2>&1 && ok "cargo test (package-managed)" || { tail -20 "$TMP/managed.log"; bad "cargo test --features package-managed"; }
 
 step "scripts"
-for f in "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh; do
+for f in "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh "$ROOT"/packaging/*.sh; do
   bash -n "$f" || bad "syntax: ${f#"$ROOT"/}"
 done
 if command -v shellcheck >/dev/null; then
-  shellcheck -S error -x "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh || bad "shellcheck"
+  shellcheck -S error -x "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh "$ROOT"/packaging/*.sh || bad "shellcheck"
 fi
 ok "scripts parsed"
 

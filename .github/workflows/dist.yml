@@ -1,0 +1,31 @@
+name: dist
+# the ready binaries on the system they are meant for: Debian 12 (glibc 2.36) needs no sysroot. The modules come
+# from their repositories at the versions of modules.lock; tools/release.sh signs and publishes the real ones
+on:
+  push:
+    tags: ["v[0-9]*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dist:
+    runs-on: ubuntu-24.04
+    container: debian:12
+    steps:
+      - name: build tools
+        run: |
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends git curl ca-certificates build-essential pkg-config libxkbcommon-dev libpam0g-dev binutils xz-utils
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - name: the modules of modules.lock
+        run: |
+          git config --global --add safe.directory '*'
+          while read -r repo tag; do
+            git clone -q --depth 1 --branch "$tag" "https://github.com/Trendorin/$repo.git" "../yami-modules/$repo"
+          done <modules.lock
+      - run: tools/dist.sh --deb --no-sysroot
