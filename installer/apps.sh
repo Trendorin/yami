@@ -91,7 +91,7 @@ do_agents() {
   sed "s|@BIN@|$BIN/yami-agents|" "$src/config/org.freedesktop.impl.portal.desktop.yamiagents.service" \
     >"$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service"
   # работающая служба переходит на новый бинарь, как только свободна, остановленная запускается
-  ((RUNNING_NIRI)) && "$BIN/yami-agents" --reload 2>/dev/null
+  ((RUNNING_NIRI)) && "$BIN/yami-agents" --reload </dev/null >/dev/null 2>&1
   portal_sync
 }
 drop_agents() {
@@ -128,7 +128,7 @@ do_files() {
   # browsers see nothing to capture. Only in a niri session or over a running backend: installed
   # from another desktop, it would take «show in folder» (FileManager1) there until logout
   if ((RUNNING_NIRI)) || pgrep -f '^[^ ]*yami-files --portal$' >/dev/null; then
-    "$BIN/yami-files" --portal-reload 2>/dev/null
+    "$BIN/yami-files" --portal-reload </dev/null >/dev/null 2>&1
   fi
   portal_sync
 }

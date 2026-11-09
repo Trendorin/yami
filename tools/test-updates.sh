@@ -474,6 +474,16 @@ t_prebuilt() { # a release with ready binaries: no compiler, signature first, ev
   check "  the record says 3.1.0" test "$(installed_version)" = 3.1.0
   check "  marked as from the archive" contains "$(state built/yami-shell)" "prebuilt-3.1.0"
   nocheck "  nothing was compiled" grep -q 'Compiling' "$(log_for "$SCEN")"
+  # a step that leaves a service running must not hold the run (yami-agents --reload in a real session)
+  rm -rf "$WORK/bins-keep"; cp -a "$WORK/bins" "$WORK/bins-keep"
+  printf '#!/bin/sh\n[ "$1" = --reload ] && { sleep 600 & }\nexit 0\n' >"$WORK/bins/yami-agents"
+  make_archive "$rel" 3.1.0 "$WORK/key"
+  SANDBOX_ENV=(YAMI_PREBUILT_URL="$rel" NIRI_SOCKET=/nonexistent)
+  check "a service left behind by a step does not hold the run" sandbox timeout -k 5 240 bash -c 'out=$(bash "$1" --lang en --apply "agents" 2>&1); printf "%s\n" "$out" >/dev/null' _ "$H/.local/share/yami/src/install.sh"
+  check "  and the step did start it" exists "$H/.local/bin/yami-agents"
+  command pkill -f '[s]leep 600' 2>/dev/null
+  rm -rf "$WORK/bins"; mv "$WORK/bins-keep" "$WORK/bins"
+  make_archive "$rel" 3.1.0 "$WORK/key"
   # what must not get through. A fresh machine each time: nothing may land
   local bad="$WORK/bad"
   rm -rf "$bad"; cp -a "$rel" "$bad"

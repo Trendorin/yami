@@ -307,8 +307,21 @@ step() { # index
     # no terminal, or root without the shared root shell (its prompts must be seen): run in the
     # foreground; [percent/100]: the setup window and the shell's updates tab draw their progress from it
     step_line "$(percent 0 "$i")" "$title"
-    eval "${STEPS_F[$i]}" 2>&1 | tee -a "$LOG" | step_pipe "$i" "$crates"
-    rc=${PIPESTATUS[0]}
+    # the step writes to the log and the reader follows the log until the step ends. Not a pipe: a
+    # service the step starts would inherit it and everyone downstream would wait for that service
+    local from reader pidf="$CACHE/step-tail.pid"
+    from=$(($(wc -c <"$LOG") + 1))
+    (eval "${STEPS_F[$i]}") >>"$LOG" 2>&1 <&0 &
+    local pid=$!
+    { tail -c +"$from" -f "$LOG" 2>/dev/null & echo $! >"$pidf"; wait; } | step_pipe "$i" "$crates" &
+    reader=$!
+    wait "$pid"
+    rc=$?
+    # the reader prints what is left, then it is told to stop
+    sleep 0.2
+    kill "$(cat "$pidf" 2>/dev/null)" 2>/dev/null
+    wait "$reader" 2>/dev/null
+    rm -f -- "$pidf"
   else
     # root commands go to the root shell authorised before the steps (root_start): nothing here
     # asks for a password, so every step can run behind the spinner
