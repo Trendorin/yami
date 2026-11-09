@@ -379,10 +379,25 @@ fn modules_page(ui: &mut Ui, st: &State, b: R) {
     let Some(w) = &st.welcome else { return };
     let half = (b.w - 20) / 2;
     let mut y = title(ui, b.x, b.y, b.w, "модули");
-    y += ui.wrap(PX, R::new(b.x, y, b.w, 40), "каждый — отдельная программа и работает без шелла. Отмеченные поставятся, снятые уйдут.", t.text_dim, 2) + 12;
+    // поставлен пакетом: выбирать здесь нечего, модули ставит менеджер пакетов
+    let packaged = !crate::update::enabled();
+    let hint = if packaged { "каждый — отдельная программа и работает без шелла. Стоит то, что поставлено пакетами." } else { "каждый — отдельная программа и работает без шелла. Отмеченные поставятся, снятые уйдут." };
+    y += ui.wrap(PX, R::new(b.x, y, b.w, 40), hint, t.text_dim, 2) + 12;
     for (i, m) in w.mods.iter().enumerate() {
         let x = if i % 2 == 0 { b.x } else { b.x + half + 20 };
         let r = R::new(x, y, half, 40);
+        if packaged {
+            ui.cv.text_in(ui.f, PX, R::new(r.x, r.y, r.w, 20), m.name, if m.have { t.text_hi } else { t.text_dim });
+            ui.text_in(PX, R::new(r.x, r.y + 18, r.w, 20), m.what, t.text_faint);
+            if m.have {
+                let nw = ui.w(PX, m.name);
+                ui.text_in(PX, R::new(r.x + nw + 10, r.y, r.w - nw - 10, 20), "стоит", t.ok);
+            }
+            if i % 2 == 1 {
+                y += 48;
+            }
+            continue;
+        }
         ui.toggle(r, m.name, m.what, m.want, Act::WMod(i));
         let nw = ui.w(PX, m.name);
         let (tag, c) = match (m.have, m.want) {
@@ -402,8 +417,8 @@ fn modules_page(ui: &mut Ui, st: &State, b: R) {
         y += 48;
     }
     y += 4;
-    if cfg!(feature = "package-managed") {
-        ui.wrap(PX, R::new(b.x, y, b.w, 60), "yami поставлен пакетом: модули ставит менеджер пакетов — пакеты yami-files, yami-view, yami-play, yami-shot, yami-agents", t.text_dim, 3);
+    if packaged {
+        ui.wrap(PX, R::new(b.x, y, b.w, 60), "yami поставлен пакетом: модули ставит менеджер пакетов — пакеты yami-files, yami-view, yami-play, yami-shot, yami-agents, yami-greet", t.text_dim, 3);
         return;
     }
     if !crate::wizinst::can_install() {
@@ -525,11 +540,11 @@ impl App {
                 }
             }
             "modules" => {
-                // пароль спросим, только если sudo его хочет (sudo -n — короткий процесс)
-                let pass = crate::wizinst::needs_password();
-                if let Some(wz) = self.st.welcome.as_mut() {
-                    wz.inst.pass = pass;
-                }
+                // пароль спросим, только если sudo его хочет: отдельный процесс, не на нити Wayland
+                let tx = self.tx.clone();
+                std::thread::spawn(move || {
+                    let _ = tx.send(crate::app::Msg::Install(Ev::NeedsPassword(crate::wizinst::needs_password())));
+                });
             }
             _ => self.tab_probe(),
         }
@@ -605,13 +620,12 @@ impl App {
             }
             Act::WOther(i) => {
                 let Some(o) = self.st.welcome.as_ref().and_then(|w| w.others.get(*i)).cloned() else { return true };
-                self.st.niri_note = match crate::niricfg::comment_out(&o) {
-                    Ok(s) | Err(s) => s,
-                };
-                let others = crate::niricfg::others();
-                if let Some(w) = self.st.welcome.as_mut() {
-                    w.others = others;
-                }
+                // niri validate — отдельный процесс: не на нити Wayland (список обновит NiriLink)
+                let tx = self.tx.clone();
+                std::thread::spawn(move || {
+                    let note = crate::niricfg::comment_out(&o).unwrap_or_else(|e| e);
+                    let _ = tx.send(crate::app::Msg::NiriLink(crate::niricfg::status(), note));
+                });
             }
             _ => return false,
         }
@@ -655,6 +669,7 @@ impl App {
                 w.inst.wrong = true;
                 self.st.field_focus = Some("w_pass");
             }
+            Ev::NeedsPassword(p) => w.inst.pass = p,
             Ev::Done(r) => {
                 w.inst.running = false;
                 w.inst.done = r.is_ok();

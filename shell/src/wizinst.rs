@@ -1,13 +1,16 @@
 // Модули из первой настройки: шелл запускает install.sh --apply со списком и читает его вывод
 // ([k/n] шаги, строки «! …» — почему не вышло). Пароль уходит только sudo и только через askpass:
-// sudo запускает нас же (`yami-shell` с YAMI_ASKPASS), мы читаем пароль из сокета в личной папке
-// 0700, который живёт, пока идёт установка. Своей копии исходников нет — клонируется заново.
+// на время установки есть личная папка 0700 с сокетом и ссылкой `yami-askpass` на наш бинарь, её
+// имя называется в SUDO_ASKPASS. Только запуск под этим именем отдаёт пароль: установщик зовёт
+// `yami-shell` десятки раз (recolor, stamp), и никакой из этих вызовов askpass'ом стать не может.
+// Своей копии исходников нет — клонируется заново.
 
 use crate::app::Msg;
 use std::io::{BufRead, BufReader, Write};
-use std::os::unix::net::UnixListener;
-use std::path::PathBuf;
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
@@ -17,20 +20,71 @@ pub enum Ev {
     Line(String),
     Done(Result<(), String>),
     WrongPassword,
+    /// sudo спросит пароль: на странице нужно поле
+    NeedsPassword(bool),
 }
 
-const SOCK_ENV: &str = "YAMI_ASKPASS";
+/// имя ссылки на наш бинарь: под ним sudo запускает нас как askpass
+const ASKPASS_NAME: &str = "yami-askpass";
 const REPO: &str = "https://github.com/Trendorin/yami.git";
 
-/// режим askpass: sudo запустил нас, чтобы узнать пароль. true — это он и был
+/// sudo запустил нас, чтобы узнать пароль: true — это он и был, больше ничего делать не надо
 pub fn askpass() -> bool {
-    let Some(p) = std::env::var_os(SOCK_ENV) else { return false };
-    if let Ok(s) = std::os::unix::net::UnixStream::connect(PathBuf::from(p)) {
+    let Some(arg0) = std::env::args_os().next() else { return false };
+    let me = Path::new(&arg0);
+    if me.file_name().is_none_or(|n| n != ASKPASS_NAME) {
+        return false;
+    }
+    if let Ok(s) = UnixStream::connect(me.with_file_name("askpass")) {
         let mut line = String::new();
         let _ = BufReader::new(s).read_line(&mut line);
         print!("{line}");
     }
     true
+}
+
+/// пароль на время установки: папка 0700 с сокетом и ссылкой; всё уходит вместе с этим значением
+struct Askpass {
+    dir: PathBuf,
+    pass: Arc<Mutex<String>>,
+    stop: Arc<AtomicBool>,
+}
+
+impl Askpass {
+    fn start(password: &str) -> Option<Askpass> {
+        let dir = yami_px::paths::private_tmp("yami-askpass").ok()?;
+        let a = Askpass { dir, pass: Arc::new(Mutex::new(password.to_string())), stop: Arc::new(AtomicBool::new(false)) };
+        std::os::unix::fs::symlink(yami_px::paths::self_exe(), a.program()).ok()?;
+        let l = UnixListener::bind(a.dir.join("askpass")).ok()?;
+        let (pass, stop) = (a.pass.clone(), a.stop.clone());
+        std::thread::spawn(move || {
+            for s in l.incoming().flatten() {
+                if stop.load(Ordering::SeqCst) {
+                    break;
+                }
+                let line = pass.lock().map(|p| p.clone()).unwrap_or_default();
+                let _ = (&s).write_all(format!("{line}\n").as_bytes());
+            }
+        });
+        Some(a)
+    }
+
+    /// что назвать в SUDO_ASKPASS
+    fn program(&self) -> PathBuf {
+        self.dir.join(ASKPASS_NAME)
+    }
+}
+
+impl Drop for Askpass {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        // нить ждёт в accept: подключение её будит, и она видит stop
+        let _ = UnixStream::connect(self.dir.join("askpass"));
+        if let Ok(mut p) = self.pass.lock() {
+            yami_px::ui::wipe(&mut p);
+        }
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
 }
 
 /// откуда ставить: папка первой установки (её записал установщик), иначе своя копия
@@ -44,7 +98,7 @@ pub fn source_dir() -> PathBuf {
 
 /// ставить есть чем: исходники на месте или git, чтобы их взять
 pub fn can_install() -> bool {
-    !cfg!(feature = "package-managed") && (source_dir().join("install.sh").exists() || crate::proc::have("git"))
+    crate::update::enabled() && (source_dir().join("install.sh").exists() || crate::proc::have("git"))
 }
 
 /// есть ли sudo: через doas окну пароль не передать, пакеты тогда — одной командой потом
@@ -55,17 +109,6 @@ pub fn has_sudo() -> bool {
 /// sudo спросит пароль? false — NOPASSWD или уже root
 pub fn needs_password() -> bool {
     has_sudo() && !Command::new("sudo").args(["-n", "true"]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().is_ok_and(|s| s.success())
-}
-
-fn serve_password(sock: PathBuf, pass: Arc<Mutex<String>>) -> Option<()> {
-    let l = UnixListener::bind(sock).ok()?;
-    std::thread::spawn(move || {
-        for s in l.incoming().flatten() {
-            let line = pass.lock().map(|p| p.clone()).unwrap_or_default();
-            let _ = (&s).write_all(format!("{line}\n").as_bytes());
-        }
-    });
-    Some(())
 }
 
 /// [3/8] шаг
@@ -116,29 +159,22 @@ pub fn start(modules: Vec<String>, lang: String, mut password: String, tx: callo
             c.args(["--lang", &lang]);
         }
         c.current_dir(&src).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        let mut dir = None;
-        let mut secret: Option<Arc<Mutex<String>>> = None;
+        // живёт до конца установки: нужен и шагам после сборки (экран входа)
+        let mut secret = None;
         if password.is_empty() {
             if needs_password() || !has_sudo() {
                 c.arg("--no-sudo");
             }
         } else {
-            let Ok(d) = yami_px::paths::private_tmp("yami-askpass") else { return send(Ev::Done(Err("tmp".into()))) };
-            let sock = d.join("askpass");
-            let pass = Arc::new(Mutex::new(password.clone()));
-            if serve_password(sock.clone(), pass.clone()).is_none() {
-                return send(Ev::Done(Err("askpass".into())));
-            }
-            secret = Some(pass);
-            let me = yami_px::paths::self_exe();
-            let check = Command::new("sudo").args(["-k", "-A", "true"]).env("SUDO_ASKPASS", &me).env(SOCK_ENV, &sock).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
+            let got = Askpass::start(&password);
+            yami_px::ui::wipe(&mut password);
+            let Some(a) = got else { return send(Ev::Done(Err("askpass".into()))) };
+            let check = Command::new("sudo").args(["-k", "-A", "true"]).env("SUDO_ASKPASS", a.program()).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
             if !check.is_ok_and(|s| s.success()) {
-                let _ = std::fs::remove_dir_all(&d);
-                yami_px::ui::wipe(&mut password);
                 return send(Ev::WrongPassword);
             }
-            c.env("SUDO_ASKPASS", &me).env(SOCK_ENV, &sock);
-            dir = Some(d);
+            c.env("SUDO_ASKPASS", a.program());
+            secret = Some(a);
         }
         let mut child = match crate::proc::owned(&mut c).spawn() {
             Ok(ch) => ch,
@@ -164,13 +200,7 @@ pub fn start(modules: Vec<String>, lang: String, mut password: String, tx: callo
             }
         }
         let st = child.wait();
-        if let Some(d) = dir {
-            let _ = std::fs::remove_dir_all(d);
-        }
-        yami_px::ui::wipe(&mut password);
-        if let Some(mut p) = secret.as_ref().and_then(|s| s.lock().ok()) {
-            yami_px::ui::wipe(&mut p);
-        }
+        drop(secret);
         let log = yami_px::paths::pretty(&yami_px::paths::cache_dir().join("yami/install.log"));
         send(Ev::Done(match st {
             Ok(s) if s.success() => Ok(()),
@@ -190,5 +220,22 @@ mod tests {
         assert_eq!(super::step_of("[3/8] yami-files"), Some((3, 8, "yami-files".into())));
         assert_eq!(super::step_of("Compiling yami-px"), None);
         assert_eq!(super::plain_line("\u{1b}[1mbold\u{1b}[0m text\r"), "bold text");
+    }
+
+    /// пароль отдаёт только запуск под именем ссылки, и всё исчезает вместе с установкой
+    #[test]
+    fn askpass_lives_in_its_folder() {
+        let dir;
+        {
+            let a = super::Askpass::start("secret").unwrap();
+            dir = a.dir.clone();
+            assert!(a.program().ends_with(super::ASKPASS_NAME));
+            assert!(std::os::unix::fs::MetadataExt::mode(&std::fs::metadata(&dir).unwrap()) & 0o077 == 0);
+            let s = super::UnixStream::connect(dir.join("askpass")).unwrap();
+            let mut line = String::new();
+            std::io::BufRead::read_line(&mut std::io::BufReader::new(s), &mut line).unwrap();
+            assert_eq!(line, "secret\n");
+        }
+        assert!(!dir.exists());
     }
 }

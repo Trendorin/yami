@@ -164,6 +164,13 @@ impl App {
             Msg::NiriLink(s, note) => {
                 self.st.niri_link = s;
                 self.st.niri_note = note;
+                // первая настройка показывает, что ещё запускает конфиг: он мог поменяться
+                if self.st.welcome.is_some() {
+                    let others = crate::niricfg::others();
+                    if let Some(w) = self.st.welcome.as_mut() {
+                        w.others = others;
+                    }
+                }
                 self.dirty(&SKind::Modal);
             }
             Msg::Restyled => {
