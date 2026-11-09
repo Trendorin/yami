@@ -1493,7 +1493,6 @@ dependencies = [
 name = "yami-shell"
 version = "2.7.0"
 dependencies = [
- "async-channel",
  "blocking",
  "calloop",
  "calloop-wayland-source",

@@ -4,7 +4,6 @@
 
 use crate::recolor::*;
 use crate::recolor_data::{FF_FONT, FF_MENUS, NIRI_KDL, QSS};
-use std::io;
 use std::path::{Path, PathBuf};
 
 const UI_FONT: &str = "Tiny5";
@@ -964,10 +963,6 @@ pub fn icons(cx: &Cx, _p: &P) -> Res {
     }
     Ok(())
 }
-
-// io нужен сигнатурам шагов в recolor.rs
-#[allow(dead_code)]
-fn _io(_: io::ErrorKind) {}
 
 #[cfg(test)]
 mod tests {

@@ -111,30 +111,11 @@ pub fn needs_password() -> bool {
     has_sudo() && !Command::new("sudo").args(["-n", "true"]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().is_ok_and(|s| s.success())
 }
 
-/// [3/8] шаг
+/// [3/8] шаг, где бы он ни стоял в строке (перед ним бывает значок)
 fn step_of(s: &str) -> Option<(u32, u32, String)> {
-    let i = s.find('[')?;
-    let (nums, text) = s[i + 1..].split_once(']')?;
-    let (k, n) = nums.split_once('/')?;
-    Some((k.trim().parse().ok()?, n.trim().parse().ok()?, text.trim().to_string()))
-}
-
-/// строка без управляющих последовательностей терминала
-fn plain_line(s: &str) -> String {
-    let mut out = String::new();
-    let mut it = s.chars().peekable();
-    while let Some(c) = it.next() {
-        if c == '\u{1b}' {
-            for d in it.by_ref() {
-                if d.is_ascii_alphabetic() {
-                    break;
-                }
-            }
-        } else if c != '\r' {
-            out.push(c);
-        }
-    }
-    out.trim().to_string()
+    let (nums, text) = crate::upinstall::step_of(&s[s.find('[')?..]);
+    let (k, n) = nums?;
+    Some((k, n, text.to_string()))
 }
 
 /// поставить ровно этот набор модулей (снятые уходят); ход — в Msg::Install
@@ -187,7 +168,7 @@ pub fn start(modules: Vec<String>, lang: String, mut password: String, tx: callo
         // строки «! …» установщика: почему не вышло, понятными словами
         let mut why: Vec<String> = vec![];
         for line in BufReader::new(out).lines().map_while(Result::ok) {
-            let l = plain_line(&line);
+            let l = crate::upinstall::strip_ansi(&line).replace('\r', "").trim().to_string();
             if l.is_empty() {
                 continue;
             }
@@ -219,7 +200,6 @@ mod tests {
     fn steps_and_lines() {
         assert_eq!(super::step_of("[3/8] yami-files"), Some((3, 8, "yami-files".into())));
         assert_eq!(super::step_of("Compiling yami-px"), None);
-        assert_eq!(super::plain_line("\u{1b}[1mbold\u{1b}[0m text\r"), "bold text");
     }
 
     /// пароль отдаёт только запуск под именем ссылки, и всё исчезает вместе с установкой
