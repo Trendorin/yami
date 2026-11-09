@@ -74,7 +74,8 @@ do_fonts() {
 # starting one: yami's starting config instead, the old file kept next to it. niri validates the
 # result, and a config it rejects is put back as it was (niricfg.rs)
 do_niri_config() {
-  "$BIN/yami-shell" niri connect || return 1
+  local how=(); ((UPDATE || REPAIR)) && how=(--unless-off)
+  "$BIN/yami-shell" niri connect "${how[@]}" || return 1
   # niri spawns `yami-shell` by name: make ~/.local/bin visible to the systemd session.
   # environment.d alone is not enough: niri-session imports the login shell's PATH over it (bash on
   # Arch has no ~/.local/bin, fish on CachyOS adds it), so niri.service puts it back right before niri

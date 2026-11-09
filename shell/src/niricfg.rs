@@ -117,9 +117,56 @@ pub fn connected(text: &str) -> bool {
     text.lines().any(is_our_include)
 }
 
-/// конфиг, который niri пишет сам при первом запуске (может быть уже поправлен руками)
+/// niri в PATH
+fn niri_exe() -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path).map(|d| d.join("niri")).find(|p| p.is_file())
+}
+
+/// `needle` — кусок файла `file`; файл отображается в память, а не читается (бинарь niri — десятки МБ)
+fn file_contains(file: &Path, needle: &[u8]) -> bool {
+    use std::os::unix::io::AsRawFd;
+    let Ok(f) = std::fs::File::open(file) else { return false };
+    let len = f.metadata().map(|m| m.len() as usize).unwrap_or(0);
+    if needle.is_empty() || len < needle.len() {
+        return false;
+    }
+    // SAFETY: отображение только для чтения своего открытого файла, снимается здесь же; memmem не
+    // выходит за переданные длины
+    unsafe {
+        let m = libc::mmap(std::ptr::null_mut(), len, libc::PROT_READ, libc::MAP_PRIVATE, f.as_raw_fd(), 0);
+        if m == libc::MAP_FAILED {
+            return false;
+        }
+        let hit = !libc::memmem(m, len, needle.as_ptr().cast(), needle.len()).is_null();
+        libc::munmap(m, len);
+        hit
+    }
+}
+
+/// конфиг — тот самый, что niri пишет при первом запуске, без единой правки: его текст вшит в бинарь
+/// niri. Поправленный руками (первая строка та же) — уже твой конфиг, его заменять нельзя
 fn niri_default(text: &str) -> bool {
-    text.trim_start().starts_with("// This config is in the KDL format: https://kdl.dev")
+    text.trim_start().starts_with("// This config is in the KDL format: https://kdl.dev") && niri_exe().is_some_and(|n| file_contains(&n, text.as_bytes()))
+}
+
+/// файл, который на самом деле правится: ссылка (stow, свой репозиторий настроек) — то, куда она
+/// ведёт; запись поверх ссылки превратила бы её в обычный файл. Ссылка в /nix/store (конфиг собрал
+/// home-manager) только для чтения: строку человек добавит сам
+fn real_config(cfg: &Path) -> Result<PathBuf, String> {
+    if !std::fs::symlink_metadata(cfg).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Ok(cfg.to_path_buf());
+    }
+    let real = std::fs::canonicalize(cfg).unwrap_or_else(|_| cfg.to_path_buf());
+    if real.starts_with("/nix/store") {
+        return Err(crate::tf!("{} собран Nix: добавь в него сам строку\n  {}", "{} is built by Nix: add this line to it yourself\n  {}", "{} é gerado pelo Nix: adicione esta linha você mesmo\n  {}", yami_px::paths::pretty(cfg), our_include(cfg)));
+    }
+    Ok(real)
+}
+
+/// метка «yami убрали из конфига niri нарочно»: обновление не подключит его обратно
+fn off_mark() -> PathBuf {
+    crate::config::state_dir().join("niri-off")
 }
 
 /// программы, которые спорят с yami, если конфиг niri их запускает: вид спора — для подписи
@@ -180,7 +227,7 @@ pub fn others() -> Vec<Other> {
 
 /// закомментировать запуск чужой программы (копия файла — рядом); вернуть — убрать «// yami: »
 pub fn comment_out(o: &Other) -> Result<String, String> {
-    let cfg = std::fs::canonicalize(config_path()).unwrap_or_else(|_| config_path());
+    let cfg = real_config(&config_path())?;
     let text = std::fs::read_to_string(&cfg).map_err(|e| e.to_string())?;
     if !text.lines().any(|l| l == o.line) {
         return Err(crate::tf!("строки с {} в конфиге уже нет", "the {} line is no longer in the config", "a linha do {} já não está na configuração", o.prog));
@@ -323,26 +370,18 @@ pub fn connect(mode: Mode) -> Result<String, String> {
     }
     crate::dirs::migrate();
     write_yami(&Settings::load());
-    let mut cfg = config_path();
-    // ссылка (stow, свой репозиторий настроек) — правим файл, на который она ведёт; ссылка в /nix/store
-    // (конфиг собрал home-manager) только для чтения: строку человек добавит сам
-    if std::fs::symlink_metadata(&cfg).is_ok_and(|m| m.file_type().is_symlink()) {
-        let real = std::fs::canonicalize(&cfg).unwrap_or_else(|_| cfg.clone());
-        if real.starts_with("/nix/store") {
-            return Err(crate::tf!("{} собран Nix: добавь в него сам строку\n  {}", "{} is built by Nix: add this line to it yourself\n  {}", "{} é gerado pelo Nix: adicione esta linha você mesmo\n  {}", yami_px::paths::pretty(&cfg), our_include(&cfg)));
-        }
-        cfg = real;
-    }
+    let cfg = real_config(&config_path())?;
     let old = std::fs::read_to_string(&cfg).ok();
+    // заменить просили явно — заменяем; иначе подключённый конфиг трогать незачем
+    if mode != Mode::Replace && old.as_deref().is_some_and(connected) {
+        let _ = std::fs::remove_file(off_mark());
+        return Ok(crate::tf!("yami уже подключён к {}", "yami is already in {}", "o yami já está em {}", yami_px::paths::pretty(&cfg)));
+    }
     let fresh = match (&old, mode) {
         (None, _) | (Some(_), Mode::Replace) => true,
         (Some(t), Mode::Auto) => niri_default(t) || old_yami(t),
         (Some(_), Mode::Insert) => false,
     };
-    if let Some(t) = old.as_deref().filter(|t| !fresh && connected(t)) {
-        let _ = t;
-        return Ok(crate::tf!("yami уже подключён к {}", "yami is already in {}", "o yami já está em {}", yami_px::paths::pretty(&cfg)));
-    }
     let text = if fresh { start_config(&cfg, old.as_deref()) } else { insert_block(old.as_deref().unwrap_or(""), &cfg) };
     let saved = match old.as_deref() {
         Some(t) if !old_yami(t) => Some(backup(&cfg, t)?),
@@ -363,6 +402,7 @@ pub fn connect(mode: Mode) -> Result<String, String> {
         }
         return Err(crate::tf!("niri не принял конфиг, всё как было:\n{}", "niri rejected the config, nothing changed:\n{}", "o niri recusou a configuração, nada mudou:\n{}", e));
     }
+    let _ = std::fs::remove_file(off_mark());
     let what = if fresh { crate::tf!("стартовый конфиг yami: {}", "yami's starting config: {}", "configuração inicial do yami: {}", yami_px::paths::pretty(&cfg)) } else { crate::tf!("одна строка yami в начале {}", "one yami line at the top of {}", "uma linha do yami no início de {}", yami_px::paths::pretty(&cfg)) };
     Ok(match saved {
         Some(b) => format!("{what} ({} {})", crate::tf!("прежний —", "the previous one is", "o anterior está em"), yami_px::paths::pretty(&b)),
@@ -372,7 +412,7 @@ pub fn connect(mode: Mode) -> Result<String, String> {
 
 /// убрать строки yami из конфига niri (его вид, клавиши и правила уходят со следующим перечитыванием)
 pub fn disconnect() -> Result<String, String> {
-    let cfg = config_path();
+    let cfg = real_config(&config_path())?;
     let Ok(text) = std::fs::read_to_string(&cfg) else { return Ok(crate::tf!("конфига niri нет", "no niri config", "sem configuração do niri")) };
     if !connected(&text) {
         return Ok(crate::tf!("yami и так не подключён", "yami is not connected", "o yami não está conectado"));
@@ -398,17 +438,18 @@ pub fn disconnect() -> Result<String, String> {
     }
     let out: Vec<&str> = lines.iter().zip(&drop).filter(|(_, d)| !**d).map(|(l, _)| *l).collect();
     crate::config::write_atomic(&cfg, &(out.join("\n") + "\n")).map_err(|e| e.to_string())?;
-    validate(&cfg).map_err(|e| {
+    validate(&cfg).inspect_err(|_| {
         let _ = crate::config::write_atomic(&cfg, &text);
-        e
     })?;
+    let _ = std::fs::create_dir_all(crate::config::state_dir());
+    let _ = std::fs::write(off_mark(), "");
     Ok(crate::tf!("строки yami убраны из {}", "yami's lines are out of {}", "as linhas do yami saíram de {}", yami_px::paths::pretty(&cfg)))
 }
 
 /// конфиг до 3.0, который yami писал целиком: теперь стартовый, со строкой include; свой config.kdl,
 /// где кто-то включал наши старые файлы, — эти include заменяет одна строка
 pub fn migrate_old_config(niri: &Path) {
-    let cfg = niri.join("config.kdl");
+    let Ok(cfg) = real_config(&niri.join("config.kdl")) else { return };
     let Ok(text) = std::fs::read_to_string(&cfg) else { return };
     let new = if old_yami(&text) {
         start_config(&cfg, Some(&text))
@@ -464,6 +505,11 @@ pub fn cli(y: &crate::cmd::Sty, args: &[&str]) -> i32 {
             0
         }
         "connect" => {
+            // обновление и починка (`--update`): если yami убрали из конфига нарочно, так и остаётся
+            if args.contains(&"--unless-off") && off_mark().exists() {
+                println!("{}", crate::tf!("yami убран из конфига niri, оставляю так (yami niri connect вернёт)", "yami was taken out of niri's config, leaving it so (yami niri connect brings it back)", "o yami foi removido da configuração do niri, deixando assim (yami niri connect o traz de volta)"));
+                return 0;
+            }
             let mode = if args.contains(&"--replace") {
                 Mode::Replace
             } else if args.contains(&"--insert") {
@@ -488,7 +534,7 @@ pub fn cli(y: &crate::cmd::Sty, args: &[&str]) -> i32 {
             0
         }
         _ => {
-            eprintln!("yami niri status | connect [--replace|--insert] | disconnect | write");
+            eprintln!("yami niri status | connect [--replace|--insert|--unless-off] | disconnect | write");
             2
         }
     }
@@ -519,6 +565,17 @@ mod tests {
     }
 
     #[test]
+    fn a_text_inside_a_binary_is_found_whole() {
+        let d = yami_px::paths::private_tmp("yami-test-niri").unwrap();
+        let f = d.join("niri");
+        std::fs::write(&f, b"\x7fELF\0\0// config\nbinds {}\n\0\0tail").unwrap();
+        assert!(file_contains(&f, b"// config\nbinds {}\n"));
+        assert!(!file_contains(&f, b"// config\nbinds {}\n// my tweak\n"));
+        assert!(!file_contains(&f, b""));
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
     fn spawned_programs() {
         assert_eq!(super::spawned(r#"spawn-at-startup "waybar""#), Some("waybar"));
         assert_eq!(super::spawned(r#"  spawn-at-startup "/usr/bin/mako" "--x""#), Some("mako"));
@@ -535,6 +592,6 @@ mod tests {
         assert!(connected(&t));
         let at = t.find("include").unwrap();
         assert!(at > t.find("// header").unwrap() && at < t.find("input {").unwrap());
-        assert!(!connected(mine) && niri_default("// This config is in the KDL format: https://kdl.dev\n"));
+        assert!(!connected(mine));
     }
 }
