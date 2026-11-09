@@ -68,7 +68,6 @@ yami-greet.
 ./stage.sh --prefix %{_prefix} --destdir %{buildroot} --managed
 
 %files shell
-%license LICENSE
 %{_bindir}/yami
 %{_bindir}/yami-shell
 %{_sysconfdir}/xdg/autostart/yami-shell.desktop
