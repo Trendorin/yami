@@ -21,14 +21,23 @@ pub const KEYS: &str = "keys/allowed_signers";
 pub const REPO: &str = "https://github.com/Trendorin/yami.git";
 const NOTE_ID: u32 = 9_400_001;
 
-pub const ENABLED: bool = !cfg!(feature = "package-managed");
+/// обновлять и ставить модули может сам yami: нет, если его поставил пакетный менеджер. Сборка из
+/// исходников узнаёт об этом по feature `package-managed`, готовые бинари в пакете (одни и те же для
+/// всех дистрибутивов) — по файлу-метке, который кладёт пакет: <префикс>/share/yami/package-managed
+pub fn enabled() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        let exe = yami_px::paths::self_exe();
+        !cfg!(feature = "package-managed") && !exe.parent().and_then(|d| d.parent()).is_some_and(|p| p.join("share/yami/package-managed").exists())
+    })
+}
 
 pub fn managed_message() -> String {
     crate::tf!("Обновлениями управляет пакетный менеджер.", "Updates are managed by your package manager.", "As atualizações são gerenciadas pelo seu gerenciador de pacotes.")
 }
 
 pub(crate) fn require_enabled() -> Result<(), String> {
-    if ENABLED { Ok(()) } else { Err(managed_message()) }
+    if enabled() { Ok(()) } else { Err(managed_message()) }
 }
 
 /// что установлено: пишет `yami-shell update stamp` (установщик, tools/deploy.sh)
@@ -270,7 +279,7 @@ pub(crate) fn ver(s: &str) -> Vec<u64> {
 
 /// проверить, что нового (сеть, git): из нити или из терминала
 pub fn check(set: &Settings) -> Info {
-    if !ENABLED {
+    if !enabled() {
         return Info { err: managed_message(), ..Default::default() };
     }
     let mut i = Info { at: now(), ..Default::default() };
@@ -451,7 +460,7 @@ pub fn sig_text(sig: &str) -> String {
 // ── шелл: проверка по расписанию, вкладка, команды от `yami update` ─────────
 impl App {
     pub fn update_check(&mut self) {
-        if !ENABLED || self.st.upd.checking {
+        if !enabled() || self.st.upd.checking {
             return;
         }
         self.st.upd.checking = true;
@@ -470,7 +479,7 @@ impl App {
     /// раз в минуту: пора ли проверить (не раньше минуты после старта; ошибка — снова через час)
     pub fn update_tick(&mut self) {
         let s = &self.st.set;
-        if !ENABLED || !s.update_check || s.update_every == 0 || self.st.upd.checking || self.st.upd.busy.is_some() || self.st.started.elapsed().as_secs() < 60 {
+        if !enabled() || !s.update_check || s.update_every == 0 || self.st.upd.checking || self.st.upd.busy.is_some() || self.st.started.elapsed().as_secs() < 60 {
             return;
         }
         let every = match &self.st.upd.info {
@@ -558,7 +567,7 @@ impl App {
 
     /// кнопки вкладки
     pub fn update_cycle(&mut self, k: &str) -> bool {
-        if !ENABLED {
+        if !enabled() {
             return false;
         }
         let s = &mut self.st.set;
@@ -643,7 +652,7 @@ mod tests {
     #[test]
     fn package_manager_owns_updates() {
         let set = crate::config::Settings::default();
-        assert!(!super::ENABLED);
+        assert!(!super::enabled());
         assert!(!super::check(&set).err.is_empty());
         assert!(super::apply(&set).is_err());
         assert!(super::install_tag(&set, "2.5.0").is_err());

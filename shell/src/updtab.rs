@@ -166,7 +166,7 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     }
     y += 10;
     y = title(ui, b.x, y, b.w, "обновления");
-    if !ENABLED {
+    if !enabled() {
         ui.text_in(px, R::new(b.x, y, b.w, 22), &managed_message(), t.text_dim);
         return;
     }

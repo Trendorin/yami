@@ -43,7 +43,7 @@ pub fn greet_bin() -> Option<PathBuf> {
         return Some(GREET.into());
     }
     let near = yami_px::paths::self_exe().with_file_name("yami-greet");
-    (!crate::update::ENABLED && near.is_file()).then_some(near)
+    (!crate::update::enabled() && near.is_file()).then_some(near)
 }
 
 pub fn installed() -> bool {

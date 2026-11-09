@@ -169,7 +169,7 @@ pub fn msg_ok(cmd: &str) -> bool {
     match head {
         "launcher" | "clipboard" | "power" | "lock" | "bar" | "stacking" | "minimize" | "restore" | "edit" | "reload" | "quit" | "ping" | "restart" | "profile" | "night" | "walls" => one(&mut w),
         "settings" => w.next().is_none_or(|t| crate::settings::find(t).is_some()) && one(&mut w),
-        "welcome" => w.next().is_none_or(|t| crate::welcome::has_step(t)) && one(&mut w),
+        "welcome" => w.next().is_none_or(crate::welcome::has_step) && one(&mut w),
         "popup" => w.next().is_some_and(|k| crate::popups::KINDS.contains(&k)) && one(&mut w),
         "screenshot" => w.next().is_none_or(|m| matches!(m, "area" | "window" | "screen")) && w.next().is_none_or(|d| d.parse::<u32>().is_ok()) && one(&mut w),
         "curtain" => w.next().is_none_or(|a| matches!(a, "on" | "off" | "toggle")) && one(&mut w),
@@ -308,7 +308,7 @@ fn restart(y: &Sty, force: bool) -> i32 {
 }
 
 fn update(y: &Sty, args: &[&str]) -> i32 {
-    if !crate::update::ENABLED {
+    if !crate::update::enabled() {
         eprintln!("{}", crate::update::managed_message());
         return 1;
     }
@@ -505,6 +505,14 @@ pub fn run(args: &[String], me: &str) -> i32 {
         }
         Some("run") => {
             crate::app::run();
+            0
+        }
+        // запись автозапуска из пакета (/etc/xdg/autostart): первый вход, когда конфиг niri шелл ещё
+        // не запускает. Подключённый конфиг запускает его сам — в цикле, который переживёт падение
+        Some("autostart") => {
+            if !crate::niricfg::status().connected {
+                crate::app::run();
+            }
             0
         }
         Some("--version") | Some("-V") => {

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=yami
+Comment=The yami shell, for a session whose niri config does not start it yet
+Exec=yami-shell autostart
+OnlyShowIn=niri;
+NoDisplay=true
