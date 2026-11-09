@@ -37,13 +37,23 @@ fetch_list() {
 }
 do_fetch_modules() {
   local repo
+  ((PREBUILT)) && { prebuilt_fetch || return 1; }
   for repo in $(fetch_list); do
     echo "$repo"
-    do_fetch_module "$repo" || return 1
+    # готовые бинари: файлы модуля — из того же архива; yami-niri собирается из исходников
+    if ((PREBUILT)) && [[ -d $PREBUILT_DIR/modules/$repo ]]; then
+      prebuilt_module "$repo" || return 1
+    else
+      do_fetch_module "$repo" || return 1
+    fi
   done
 }
 plan_fetch() {
-  [[ -n "$(fetch_list)" ]] && add "$(t "исходники модулей" "module sources" "código-fonte dos módulos")" do_fetch_modules
+  if ((PREBUILT)); then
+    add "$(t "готовые бинари: скачать и проверить подпись" "ready binaries: download and check the signature" "binários prontos: baixar e verificar a assinatura")" do_fetch_modules
+  elif [[ -n "$(fetch_list)" ]]; then
+    add "$(t "исходники модулей" "module sources" "código-fonte dos módulos")" do_fetch_modules
+  fi
   return 0
 }
 

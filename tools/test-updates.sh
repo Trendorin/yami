@@ -125,7 +125,7 @@ world() {
   # yami-px comes through cargo with its real history: Cargo.lock names its commit
   git clone -q --bare "$MODS/yami-px" "$GH/yami-px.git"
   new_repo yami "$ROOT"
-  printf 'test namespaces="git" %s\n' "$(cut -d' ' -f1,2 "$WORK/key.pub")" >"$SRC/yami/keys/allowed_signers"
+  printf 'test namespaces="git,yami-release" %s\n' "$(cut -d' ' -f1,2 "$WORK/key.pub")" >"$SRC/yami/keys/allowed_signers"
   rm -f "$SRC/yami/CLAUDE.md" "$SRC/yami/AGENTS.md" "$SRC/yami/GEMINI.md"
   local m
   for m in "${MODULES[@]}"; do
@@ -426,6 +426,74 @@ t_privacy() {
   SANDBOX_ENV=()
   [[ "$(count_hits)" == 0 ]] && ok "YAMI_NO_COUNT: no request" || no "YAMI_NO_COUNT: no request"
 }
+# the release's archive as tools/dist.sh makes it, from what this run built; signed by the given key
+make_archive() { # folder version key
+  local out=$1 v=$2 key=$3 n="yami-$2-x86_64-linux" a="$WORK/arch" m
+  rm -rf "$a" "$out"
+  mkdir -p "$a/$n/bin" "$a/$n/modules" "$out"
+  for m in "${BINS[@]}" yami-greet; do install -m755 "$WORK/bins/$m" "$a/$n/bin/$m"; done
+  for m in yami-files yami-view yami-play yami-agents; do mkdir -p "$a/$n/modules/$m"; cp -a "$SRC/$m/config" "$a/$n/modules/$m/"; done
+  mkdir -p "$a/$n/modules/yami-shot" "$a/$n/modules/yami-greet"
+  cp -a "$SRC/yami-greet/fonts" "$SRC/yami-greet/greet-session" "$SRC/yami-greet/install-system.sh" "$a/$n/modules/yami-greet/"
+  tar -C "$a" -czf "$out/$n.tar.gz" "$n"
+  (cd "$out" && sha256sum "$n.tar.gz" >SHA256SUMS)
+  ssh-keygen -q -Y sign -f "$key" -n yami-release "$out/SHA256SUMS" </dev/null
+}
+t_prebuilt() { # a release with ready binaries: no compiler, signature first, every failure stops before a change
+  reset_world
+  machine
+  # the full install leaves every binary in the shared target, the archive takes them from there
+  first_install --yes --full --from-source
+  rm -rf "$WORK/bins"; mkdir -p "$WORK/bins"
+  cp -- "$H"/.local/bin/yami-* "$WORK/target/release/yami-greet" "$WORK/bins/"
+  local rel="$WORK/release"
+  make_archive "$rel" 3.0.0 "$WORK/key"
+  machine
+  : >"$(log_for "$SCEN")"
+  : >"$H/root.log"
+  SANDBOX_ENV=(YAMI_PREBUILT_URL="$rel")
+  check "the first install from the ready binaries" first_install --yes
+  check "  the shell is in place" is_ver yami-shell 3.0.0
+  nocheck "  nothing was compiled" grep -q 'Compiling' "$(log_for "$SCEN")"
+  nocheck "  no compiler was asked for" sh -c "grep 'root: .*pacman -S' '$H/root.log' | grep -qE ' (rust|gcc|pkgconf)( |$)'"
+  check "  the record of what it came from" contains "$(state built/yami-shell)" "prebuilt-3.0.0"
+  check "  niri accepts the config" niri_ok
+  check "modules from the same archive" apply "files view shot"
+  check "  yami-files" is_ver yami-files 3.0.0
+  check "  its .desktop" exists "$(data applications/yami-files.desktop)"
+  nocheck "  still nothing compiled" grep -q 'Compiling' "$(log_for "$SCEN")"
+  : >"$H/root.log"
+  check "the login screen too" apply "files login"
+  check "  its root half from the archive" contains "$H/root.log" "/.local/share/yami/modules/yami-greet/install-system.sh --system"
+  check "  and the binary, next to its script for later" exists "$H/.local/share/yami/modules/yami-greet/yami-greet"
+  # an update to a release that has an archive: the same way, no compiler
+  publish 3.1.0
+  make_archive "$rel" 3.1.0 "$WORK/key"
+  : >"$(log_for "$SCEN")"
+  check "an update takes the ready binaries" update
+  check "  the record says 3.1.0" test "$(installed_version)" = 3.1.0
+  check "  marked as from the archive" contains "$(state built/yami-shell)" "prebuilt-3.1.0"
+  nocheck "  nothing was compiled" grep -q 'Compiling' "$(log_for "$SCEN")"
+  # what must not get through. A fresh machine each time: nothing may land
+  local bad="$WORK/bad"
+  rm -rf "$bad"; cp -a "$rel" "$bad"
+  printf 'x' >>"$bad/yami-3.1.0-x86_64-linux.tar.gz"
+  SANDBOX_ENV=(YAMI_PREBUILT_URL="$bad")
+  machine
+  nocheck "a changed archive is refused" first_install --yes
+  nocheck "  no shell landed" exists "$H/.local/bin/yami-shell"
+  rm -rf "$bad"; cp -a "$rel" "$bad"; rm -f "$bad/SHA256SUMS.sig"
+  machine
+  nocheck "an unsigned release is refused" first_install --yes
+  nocheck "  no shell landed" exists "$H/.local/bin/yami-shell"
+  rm -rf "$bad"; cp -a "$rel" "$bad"
+  rm -f "$bad/SHA256SUMS.sig"
+  ssh-keygen -q -Y sign -f "$WORK/rogue" -n yami-release "$bad/SHA256SUMS" </dev/null
+  machine
+  nocheck "a stranger's signature is refused" first_install --yes
+  nocheck "  no shell landed" exists "$H/.local/bin/yami-shell"
+  SANDBOX_ENV=()
+}
 t_askpass() { # the first-run setup's way in: no terminal, the password through SUDO_ASKPASS
   reset_world
   machine
@@ -510,13 +578,14 @@ t_migrate() { # the real previous release (2.7.0, one repository) updates to thi
   check "  yami doctor runs" sh -c "'$H/.local/bin/yami-shell' doctor >/dev/null 2>&1; [ \$? -le 1 ]"
 }
 
-SCENARIOS=(base pieces standalone module-files module-view module-play module-shot module-agents module-login module-games module-fork full failures repair privacy askpass tty migrate)
+SCENARIOS=(base prebuilt pieces standalone module-files module-view module-play module-shot module-agents module-login module-games module-fork full failures repair privacy askpass tty migrate)
 run_scenario() {
   SCEN=$1
   : >"$(log_for "$SCEN")"
   say "$SCEN"
   case $1 in
     base) t_base ;;
+    prebuilt) t_prebuilt ;;
     pieces) t_pieces ;;
     standalone) t_standalone ;;
     module-*) t_module "${1#module-}" ;;

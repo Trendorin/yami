@@ -121,12 +121,14 @@ welcome_rows() { printf '  %s%s%s  %s%s%s\n' "$F" "$(pad "$1" 12)" "$R" "$T" "$2
 disk_free() { df -Pk "$HOME" 2>/dev/null | awk 'NR == 2 { printf "%d", $4 / 1048576 }'; }
 disk_need() {
   local gb=3
+  ((PREBUILT)) && gb=1
   ((FULL)) && gb=6
   on fork && gb=$((gb + 4))
   echo "$gb"
 }
 # minutes on this machine, roughly: compiling is most of it
 time_guess() {
+  ((PREBUILT)) && ! on fork && { printf '2–5'; return; }
   local m=$((4 + 40 / (THREADS > 0 ? THREADS : 2)))
   ((FULL)) && m=$((m * 2))
   printf '%d–%d' "$m" $((m * 2))
@@ -205,6 +207,7 @@ STEPS_T=() STEPS_F=() STEPS_W=()
 step_weight() {
   case $1 in
     do_build_shell) echo 40 ;;
+    do_prebuilt_bins) echo 2 ;;
     do_build_module) echo 10 ;;
     do_build_greet) echo 8 ;;
     do_niri_source) echo 60 ;;
@@ -254,6 +257,8 @@ explain() {
   local tl
   tl="$(tail -n 60 "$LOG" 2>/dev/null)"
   case "$tl" in
+    *"signature of the ready binaries"* | *"carry no signature"* | *"match their checksum"*) t "готовые бинари не прошли проверку подписи: ничего не поставлено; собрать из исходников — ./install.sh --from-source" "the ready binaries failed the signature check: nothing was installed; to build from source: ./install.sh --from-source" "os binários prontos falharam na verificação da assinatura: nada foi instalado; para compilar: ./install.sh --from-source" ;;
+    *"could not download"*) t "готовые бинари не скачались: проверь интернет или собери из исходников (./install.sh --from-source)" "the ready binaries could not be downloaded: check the internet or build from source (./install.sh --from-source)" "os binários prontos não puderam ser baixados: verifique a internet ou compile (./install.sh --from-source)" ;;
     *"No space left on device"*) t "кончилось место на диске: освободи несколько гигабайт и запусти снова" "the disk is full: free a few gigabytes and run again" "o disco está cheio: libere alguns gigabytes e rode novamente" ;;
     *"no such version in its repository"*) t "у модуля нет нужной версии: похоже, выпуск ещё публикуется; подожди и запусти снова" "a module does not have the needed version: the release may still be going out; wait and run again" "falta a versão necessária de um módulo: a publicação pode estar em andamento; aguarde e rode novamente" ;;
     *"signature does not check out"*) t "подпись модуля не сошлась, ничего не поставлено: запусти установку заново; если повторится — напиши автору" "a module's signature did not match, nothing was installed: run again; if it repeats, tell the author" "a assinatura de um módulo não confere, nada foi instalado: rode novamente; se repetir, avise o autor" ;;
@@ -356,7 +361,7 @@ step() { # index
   printf '\e[?25h'
 }
 # a failure of one of these stops the run; steps before the swap changed nothing
-step_fatal() { case $1 in do_fetch_modules | do_build_* | do_install_bins) return 0 ;; *) return 1 ;; esac; }
+step_fatal() { case $1 in do_fetch_modules | do_build_* | do_prebuilt_bins | do_install_bins) return 0 ;; *) return 1 ;; esac; }
 # these change what the session starts from: a failure here puts the snapshot back
 step_critical() { case $1 in do_install_bins | do_niri_config | do_refresh) return 0 ;; *) return 1 ;; esac; }
 run_steps() {
@@ -371,7 +376,7 @@ run_steps() {
     # every root step comes before the build: the root shell is closed here, so no build script of
     # a crate (minutes of code from crates.io) runs while its pipes are open (see root_start). A step
     # after this point that still asked for root would fail (asroot: «the root shell is gone»)
-    [[ $cmd == do_build_* ]] && root_stop
+    [[ $cmd == do_build_* || $cmd == do_prebuilt_bins ]] && root_stop
     step "$i"
     W_DONE=$((W_DONE + ${STEPS_W[$i]}))
     ((${#FAILED[@]} > nf)) || continue

@@ -6,6 +6,11 @@
 # shellcheck shell=bash
 
 plan_build() {
+  if ((PREBUILT)); then
+    add "$(t "ставлю готовое" "installing the ready binaries" "instalando os binários prontos")" do_prebuilt_bins
+    add "$(t "ставлю собранное" "installing what was built" "instalando o que foi compilado")" do_install_bins
+    return 0
+  fi
   ((APPLY)) || add "$(t "шелл: сборка из исходников" "shell: build from source" "shell: compilar do código-fonte")" do_build_shell
   # каждый модуль — своя строка: видно, что сейчас собирается
   local id
@@ -93,6 +98,8 @@ do_install_bins() {
     any=1
   done
   ((any)) || return 99
+  # ready binaries: nothing worth keeping in the cache (yami-greet is taken after this step, login.sh)
+  ((PREBUILT)) && for b in yami-shell yami-files yami-view yami-play yami-shot yami-agents; do rm -f "$CACHE/target/release/$b"; done
   # a separate setup window of the development tree is part of the shell now (`yami setup`)
   rm -f "$BIN/yami-setup" "$STATE/built/yami-setup"
   # `yami <command>`: the same binary, help instead of the shell when started without a command

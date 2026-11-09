@@ -141,11 +141,14 @@ print_packages() {
 wanted_packages() {
   local p
   if ((!APPLY)) && on core; then printf '%s\n' "${P_niri[@]}" "${P_base[@]}" "${P_apps[@]}"; fi
-  # a working toolchain (rustup included) is kept: only the libraries and pkg-config are added
-  for p in "${P_build[@]}"; do
-    case "$p" in rust | rustc | cargo | virtual/rust) rust_ok && continue ;; esac
-    printf '%s\n' "$p"
-  done
+  # a working toolchain (rustup included) is kept: only the libraries and pkg-config are added.
+  # Ready binaries: nothing is compiled, no compiler needed
+  if needs_compiler; then
+    for p in "${P_build[@]}"; do
+      case "$p" in rust | rustc | cargo | virtual/rust) rust_ok && continue ;; esac
+      printf '%s\n' "$p"
+    done
+  fi
   { on files || on agents; } && printf '%s\n' "${P_drives[@]}"
   on files && printf '%s\n' "${P_files[@]}"
   on play && printf '%s\n' "${P_play[@]}"

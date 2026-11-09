@@ -6,6 +6,9 @@
 # It puts in niri, the yami shell and what the desktop cannot start without. Everything else (files,
 # player, screenshots, login screen, themes) is chosen in the graphical setup at the first login.
 #
+# A release installs ready binaries (x86_64, glibc 2.34 or newer) and asks for no compiler; otherwise it
+# builds from source. --from-source builds anyway, --main takes the development branch.
+#
 #   ./install.sh --full           the old way: everything now, no setup window
 #   ./install.sh --yes            no questions
 #   ./install.sh --dry-run        show the plan, change nothing
@@ -18,7 +21,8 @@
 #   --restyle LIST (all, none, or: gtk qt cursor kitty fastfetch btop firefox mangohud foot cava starship)
 # Modules (with --full or --apply): files view play shot agents login games fork
 #   --no-ID leaves one out, --ID takes it. --no-sudo: the home folder only, no packages.
-# Rarely needed: --no-monocraft, --no-count, --keep-build, --no-anim, --print-packages.
+# Rarely needed: --no-monocraft, --no-count, --keep-build, --no-anim, --print-packages,
+#   --prebuilt DIR|URL  (a folder or address with the release's archive and SHA256SUMS).
 # Run again over an installed yami: it updates and repairs, your choices and settings stay.
 #
 # Families: Arch, Fedora (incl. atomic), Debian/Ubuntu, openSUSE, Void, Alpine, Gentoo. NixOS: the
@@ -37,7 +41,7 @@ if [[ ! -f $ROOT/shell/Cargo.toml || ! -f $ROOT/installer/ui.sh ]]; then
   if ! command -v git >/dev/null; then
     # a bare system: git is the one thing needed before the installer proper
     pm="" su=""
-    for c in "pacman -S --needed --noconfirm git" "dnf install -y git" "apt-get install -y git" "zypper --non-interactive install git" "xbps-install -y git" "apk add git"; do
+    for c in "pacman -S --needed --noconfirm git" "dnf install -y git" "apt-get install -y git" "zypper --non-interactive install git" "xbps-install -y git" "apk add git" "emerge --noreplace dev-vcs/git"; do
       command -v "${c%% *}" >/dev/null && { pm=$c; break; }
     done
     if ((EUID != 0)); then
@@ -55,17 +59,17 @@ if [[ ! -f $ROOT/shell/Cargo.toml || ! -f $ROOT/installer/ui.sh ]]; then
   if [[ -d $SRC_DIR/.git ]]; then
     # a clone of an older address follows the current one; it may stand on a release tag
     [[ "$(git -C "$SRC_DIR" remote get-url origin 2>/dev/null)" == "$YAMI_REPO" ]] || git -C "$SRC_DIR" remote set-url origin "$YAMI_REPO"
-    if git -C "$SRC_DIR" fetch --quiet origin main; then
-      git -C "$SRC_DIR" checkout --quiet --detach FETCH_HEAD || echo "yami: could not update $SRC_DIR, using it as is" >&2
-    else
-      echo "yami: could not update $SRC_DIR, using it as is" >&2
-    fi
+    git -C "$SRC_DIR" fetch --quiet --tags origin main || echo "yami: could not update $SRC_DIR, using it as is" >&2
   else
     echo "yami: downloading the installer…" >&2
     mkdir -p "${SRC_DIR%/*}"
     # history without file contents: small like --depth 1, but updates can compare versions
     git clone --filter=blob:none "$YAMI_REPO" "$SRC_DIR" || { echo "yami: git clone $YAMI_REPO failed" >&2; exit 1; }
   fi
+  # the newest release (its ready binaries need no compiler); --main: the head of the development branch
+  at=""
+  [[ " $* " == *" --main "* ]] || at="$(git -C "$SRC_DIR" tag -l 'v[0-9]*' --sort=-v:refname | head -n1)"
+  git -C "$SRC_DIR" checkout --quiet --detach "${at:-origin/main}" || echo "yami: could not switch $SRC_DIR, using it as is" >&2
   # curl … | bash: give the interactive installer the terminal back
   if [[ ! -t 0 ]] && { : </dev/tty; } 2>/dev/null; then exec bash "$SRC_DIR/install.sh" "$@" </dev/tty; fi
   exec bash "$SRC_DIR/install.sh" "$@"
@@ -93,7 +97,7 @@ MONOCRAFT_SHA256="67f88ff9e7c6560f6cf60fb062fd353a72f62dc2654462950c65b63ed53d97
 [[ -d $HOME/.cargo/bin ]] && export PATH="$HOME/.cargo/bin:$PATH"
 
 # ── flags ───────────────────────────────────────────────────────────────────
-YES=0 SUDO=1 SHELL_ONLY=0 FULL=0 APPLY=0 REPAIR=0 APPLY_LIST="" RESTYLE="" COMP_FLAGS=() PALETTE="" LOOK_OPT="" THEME_OPT="" LANG_OPT="" FONT_OPT="" FETCH_OPT="" ANIM=1 DRY=0 UNINSTALL=0 UPDATE=0 COUNT=1 KEEP_BUILD=0 MONO="" PRINT_PKGS=0
+FROM_SOURCE=0 PREBUILT_FROM="" YES=0 SUDO=1 SHELL_ONLY=0 FULL=0 APPLY=0 REPAIR=0 APPLY_LIST="" RESTYLE="" COMP_FLAGS=() PALETTE="" LOOK_OPT="" THEME_OPT="" LANG_OPT="" FONT_OPT="" FETCH_OPT="" ANIM=1 DRY=0 UNINSTALL=0 UPDATE=0 COUNT=1 KEEP_BUILD=0 MONO="" PRINT_PKGS=0
 while (($#)); do
   case "$1" in
     -y | --yes) YES=1 ;;
@@ -112,6 +116,8 @@ while (($#)); do
     --no-anim) ANIM=0 ;;
     --dry-run) DRY=1 ;;
     --print-packages) PRINT_PKGS=1 ;;
+    --from-source | --main) FROM_SOURCE=1 ;;
+    --prebuilt) PREBUILT_FROM="${2:-}"; shift ;;
     --no-count) COUNT=0 ;;
     --keep-build) KEEP_BUILD=1 ;;
     --no-monocraft) MONO=0 ;;
@@ -137,7 +143,7 @@ fi
 export GIT_TERMINAL_PROMPT=0
 
 # ── the modules: each only defines (installer/*.sh) ─────────────────────────
-for m in ui json detect root packages components restyle choices modules build apps desktop niri login backup uninstall summary; do
+for m in ui json detect root packages components restyle choices modules prebuilt build apps desktop niri login backup uninstall summary; do
   # shellcheck source=/dev/null
   . "$ROOT/installer/$m.sh" || { echo "yami: $ROOT/installer/$m.sh is missing" >&2; exit 1; }
 done
@@ -187,6 +193,7 @@ ui_traps
 components_init
 restyle_init
 components_limit
+prebuilt_init
 
 # ── go: each module adds its own steps (plan_*), run_steps runs them in this order ──
 ((UNINSTALL)) && uninstall
@@ -247,5 +254,7 @@ root_end        # root.sh
 login_after     # login.sh: yami-greet itself
 fork_after      # niri.sh: yami-niri (minutes)
 summary_install # summary.sh
+# a run that stopped half way is a failure for whoever started it
+((BUILD_FAILED)) && exit 1
 exit 0
 }
