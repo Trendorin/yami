@@ -1,10 +1,37 @@
 {
   description = "yami: a lightweight pixel-art Wayland desktop for the niri compositor";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # the modules live in their own repositories; the versions are those of modules.lock
+    yami-files = {
+      url = "github:Trendorin/yami-files/v3.0.0";
+      flake = false;
+    };
+    yami-view = {
+      url = "github:Trendorin/yami-view/v3.0.0";
+      flake = false;
+    };
+    yami-play = {
+      url = "github:Trendorin/yami-play/v3.0.0";
+      flake = false;
+    };
+    yami-shot = {
+      url = "github:Trendorin/yami-shot/v3.0.0";
+      flake = false;
+    };
+    yami-agents = {
+      url = "github:Trendorin/yami-agents/v3.0.0";
+      flake = false;
+    };
+    yami-greet = {
+      url = "github:Trendorin/yami-greet/v3.0.0";
+      flake = false;
+    };
+  };
 
   outputs =
-    { self, nixpkgs }:
+    { self, nixpkgs, ... }@inputs:
     let
       inherit (nixpkgs) lib;
       systems = [
@@ -21,12 +48,19 @@
           ./VERSION
           ./config
           ./fonts
-          ./system/greet
           (lib.fileset.difference ./shell (lib.fileset.maybeMissing ./shell/target))
         ];
       };
+      modules = lib.getAttrs [
+        "yami-files"
+        "yami-view"
+        "yami-play"
+        "yami-shot"
+        "yami-agents"
+        "yami-greet"
+      ] inputs;
       packagesFor = pkgs: {
-        yami = pkgs.callPackage ./nix/package.nix { inherit version src; };
+        yami = pkgs.callPackage ./nix/package.nix { inherit version src modules; };
       };
     in
     {

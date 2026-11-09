@@ -19,7 +19,7 @@ let
     app:
     let
       line = lib.findFirst (lib.hasPrefix "MimeType=") "MimeType=" (
-        lib.splitString "\n" (builtins.readFile "${self}/config/applications/${app}.desktop")
+        lib.splitString "\n" (builtins.readFile "${self.inputs.${app}}/config/${app}.desktop")
       );
     in
     lib.filter (m: m != "") (lib.splitString ";" (lib.removePrefix "MimeType=" line));
@@ -106,6 +106,10 @@ in
         "${cfg.package}/share/dbus-1/services/org.freedesktop.impl.portal.desktop.yami.service";
       "dbus-1/services/org.freedesktop.FileManager1.service".source =
         "${cfg.package}/share/dbus-1/services/org.freedesktop.FileManager1.service";
+      "xdg-desktop-portal/portals/yami-agents.portal".source =
+        "${cfg.package}/share/xdg-desktop-portal/portals/yami-agents.portal";
+      "dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service".source =
+        "${cfg.package}/share/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service";
     };
 
     xdg.configFile."kitty/yami.conf" = lib.mkIf cfg.kitty { source = "${share}/yami.conf"; };

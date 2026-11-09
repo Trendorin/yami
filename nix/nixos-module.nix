@@ -103,7 +103,7 @@ in
         networking.networkmanager.enable = lib.mkDefault true;
         hardware.bluetooth.enable = lib.mkDefault true;
 
-        # FileChooser and ScreenCast from yami-files, the rest from GNOME's and GTK's portals; the
+        # FileChooser from yami-files, ScreenCast from yami-agents, the rest from GNOME's and GTK's portals; the
         # shell rewrites ~/.config/xdg-desktop-portal/niri-portals.conf (settings → services)
         xdg.portal = {
           enable = true;
@@ -125,7 +125,7 @@ in
               "gtk"
             ];
             "org.freedesktop.impl.portal.ScreenCast" = lib.mkDefault [
-              "yami"
+              "yami-agents"
               "gnome"
             ];
           };
