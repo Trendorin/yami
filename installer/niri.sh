@@ -31,6 +31,27 @@ niri_ok() {
   v="$(niri --version 2>/dev/null | awk '{print $2}')"
   [[ -n $v ]] && ver_ge "$v" "$NIRI_MIN"
 }
+# the version of niri this distribution would install; nothing when it has none
+niri_candidate() {
+  case $PM in
+    pacman) pacman -Si niri 2>/dev/null | awk '/^Version/ { print $3; exit }' ;;
+    dnf | rpm-ostree) dnf -q repoquery --qf '%{version}\n' niri 2>/dev/null | sort -V | tail -n1 ;;
+    apt) apt-cache policy niri 2>/dev/null | awk '/Candidate:/ { print $2; exit }' | grep -v '(none)' ;;
+    zypper) zypper --no-refresh -q info niri 2>/dev/null | awk -F': *' '/^Version/ { print $2; exit }' ;;
+    xbps) xbps-query -R -p pkgver niri 2>/dev/null | sed 's/^niri-//' ;;
+    apk) apk info niri 2>/dev/null | head -n1 | sed -e 's/^niri-//' -e 's/ .*//' ;;
+    emerge) portageq best_visible / gui-wm/niri 2>/dev/null | sed 's/.*niri-//' ;;
+    *) ;;
+  esac | sed -e 's/^[0-9]*://' -e 's/[-_~+].*//'
+}
+# a good enough niri is here or the distribution will install one: nothing to compile for it.
+# Packages are chosen before they are installed, so «not installed yet» must not mean «too old»
+niri_will_do() {
+  niri_ok && return 0
+  local v
+  v="$(niri_candidate)"
+  [[ -n $v ]] && ver_ge "$v" "$NIRI_MIN"
+}
 do_niri_source() {
   niri_ok && return 99
   [[ -n $SU || $EUID == 0 ]] || return 1

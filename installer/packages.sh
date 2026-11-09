@@ -45,7 +45,7 @@ case "$FAM" in
       libseat-devel pipewire-devel pango-devel cairo-gobject-devel libdisplay-info-devel) ;;
   debian)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
-    P_base=(polkit gnome-keyring pipewire pipewire-pulse wireplumber pulseaudio-utils network-manager bluez
+    P_base=(polkitd gnome-keyring pipewire pipewire-pulse wireplumber pulseaudio-utils network-manager bluez
       cliphist wl-clipboard grim brightnessctl playerctl git openssh-client fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
       power-profiles-daemon libxkbcommon0 libpam0g fontconfig curl)
     P_build=(cargo rustc gcc pkg-config libxkbcommon-dev libpam0g-dev)
@@ -157,7 +157,7 @@ wanted_packages() {
   on games && printf '%s\n' "${P_games[@]}"
   on login && printf '%s\n' "${P_login[@]}"
   # niri's build libraries: for yami-niri, or for upstream niri when the packaged one is too old
-  if on fork || { ((!APPLY)) && on core && ! niri_ok && ((!DRY)); }; then printf '%s\n' "${P_nirisrc[@]}"; fi
+  if on fork || { ((!APPLY)) && on core && ! niri_will_do && ((!DRY)); }; then printf '%s\n' "${P_nirisrc[@]}"; fi
   return 0
 }
 plan_packages() {

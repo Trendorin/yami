@@ -62,7 +62,7 @@ prebuilt_init() {
   PREBUILT_DIR="$CACHE/prebuilt/${PREBUILT_ASSET%.tar.gz}"
 }
 # the compiler is still wanted for yami-niri, or for niri itself when the packaged one is too old
-needs_compiler() { ((!PREBUILT)) || on fork || { ((!APPLY)) && on core && ! niri_ok && ((!DRY)); }; }
+needs_compiler() { ((!PREBUILT)) || on fork || { ((!APPLY)) && on core && ! niri_will_do && ((!DRY)); }; }
 
 # the checksum file signed by a release key, then the archive against it. Keys in the tree: no signature, no install
 prebuilt_verify() { # folder
