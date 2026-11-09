@@ -1,6 +1,6 @@
 # What yami restyles in other programs: GTK, Qt and KDE, the cursor, kitty, fastfetch, btop, Firefox,
 # MangoHud, foot, cava, starship. The choice lives in the shell's settings (themeApps, cursor), so an
-# update, a palette change and theme.py all keep to it; settings → color → apps changes it later. Off
+# update, a palette change and recolor all keep to it; settings → color → apps changes it later. Off
 # means yami leaves that program's files alone (kitty: the include line it added goes). Flags:
 # --restyle LIST|all|none, --shell-only. The Qt/GTK theme packages (component look) follow GTK or Qt.
 # shellcheck shell=bash

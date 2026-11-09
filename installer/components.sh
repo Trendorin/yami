@@ -1,5 +1,5 @@
 # What can be installed, each part on its own: a default for this machine (detect.sh), a flag
-# (--no-ID / --ID, --shell-only), the components page (menu.sh). An update repeats the choice of
+# (--no-ID / --ID, --shell-only), the first-run setup. An update repeats the choice of
 # the first install (install.json, written by `yami update stamp`). What yami restyles in other
 # programs is the other half of the choice (restyle.sh); `look` (the Qt/GTK theme packages) follows it.
 # shellcheck shell=bash
@@ -38,11 +38,11 @@ components_init() {
       c_set fork 0
     fi
   fi
-  # the first install is the base alone: the rest comes from the setup window (--full: everything now)
+  # the first install is the base alone: the rest comes from the first-run setup (--full: everything now)
   if ((SHELL_ONLY)); then
     for i in "${!C_ID[@]}"; do [[ ${C_ID[$i]} == core ]] || C_ON[i]=0; done
   fi
-  # the setup window sends the whole choice: what is not listed goes. Games are not on its list
+  # the first-run setup sends the whole choice: what is not listed goes. Games are not on its list
   # unless Steam is here: they keep their default
   if ((APPLY)); then
     for i in "${!C_ID[@]}"; do
@@ -94,7 +94,7 @@ c_desc() {
     look) t "qt6ct, adw-gtk3" "qt6ct, adw-gtk3" "qt6ct, adw-gtk3" ;;
   esac
 }
-# on the components page: look follows the restyle page
+# look is not offered: it follows what is restyled
 c_shown() {
   case $1 in
     look) return 1 ;;

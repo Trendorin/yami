@@ -22,7 +22,7 @@ plan_desktop() {
   on look && add "$(t "тема программ: Qt, KDE, GTK" "app theme: Qt, KDE, GTK" "tema dos aplicativos: Qt, KDE e GTK")" do_look
   return 0
 }
-# the setup window chose what to restyle: do_refresh writes it into the settings and repaints
+# the first-run setup chose what to restyle: do_refresh writes it into the settings and repaints
 plan_apply_look() {
   add "$(t "палитра: всё, что из неё выводится" "palette: everything derived from it" "paleta: tudo deriva dela")" do_refresh
   on look && add "$(t "тема программ: Qt, KDE, GTK" "app theme: Qt, KDE, GTK" "tema dos aplicativos: Qt, KDE e GTK")" do_look
@@ -44,7 +44,7 @@ do_fonts() {
   local dir="$HOME/.local/share/fonts/yami"
   install -Dm644 -t "$dir" "$ROOT"/fonts/*.ttf "$ROOT"/fonts/OFL-*.txt || return 1
   # Monocraft is 31 MB, the terminal's default font: --no-monocraft leaves it out (a marker keeps
-  # updates from bringing it back), theme.py then picks Terminess
+  # updates from bringing it back), recolor then picks Terminess
   local mono="$dir/Monocraft-nerd-fonts-patched.ttc" skip="$STATE/no-monocraft"
   if [[ $MONO == 0 ]]; then mkdir -p "$STATE" && : >"$skip"; elif [[ $MONO == 1 ]]; then rm -f -- "$skip"; fi
   if ! t_on kitty && [[ $MONO != 1 ]]; then
@@ -101,7 +101,7 @@ do_dotfiles() {
   "$BIN/yami-shell" config seed palette="${PAL_ID[$pal]}" accent= lang="$L" \
     fontUi="$([[ ${FONT_ID[$font]} == pixel ]] || echo sans)" ${fe:+fetchFull="$([[ $fe == full ]] && echo true || echo false)"} \
     ${th:+light="$([[ $th == light ]] && echo true || echo false)"} ${lk:+look="$lk"} || return 1
-  # what to restyle (themeApps, the cursor): theme.py below and every later run keep to it
+  # what to restyle (themeApps, the cursor): recolor below and every later run keep to it
   restyle_json || return 1
   # kitty: our file next to kitty.conf and one include line at its end; the rest of kitty.conf is yours
   if t_on kitty; then
@@ -124,7 +124,7 @@ do_dotfiles() {
 # the first Qt/GTK setup, only for the ones chosen to restyle
 do_look() { YAMI_RESTYLE="$(t_list)" YAMI_BIN="$BIN/yami-shell" "$ROOT/tools/apply-theme.sh"; }
 
-# update: everything generated from the palette again (new theme.py outputs), settings untouched
+# update: everything generated from the palette again (new recolor outputs), settings untouched
 do_refresh() {
   # an older settings file (appThemes) gets themeApps; a --restyle flag lands here too
   restyle_json || return 1

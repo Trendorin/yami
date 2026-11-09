@@ -31,11 +31,11 @@ uninstall() {
   rm -f "$BIN/yami-files" "$BIN/yami-view" "$BIN/yami-play" "$data/applications/yami-files.desktop" "$data/applications/yami-view.desktop" "$data/applications/yami-play.desktop" "$data/xdg-desktop-portal/portals/yami.portal" \
     "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yami.service" "$data/dbus-1/services/org.freedesktop.FileManager1.service" \
     "$CFG/xdg-desktop-portal/niri-portals.conf" "$CFG/btop/themes/yami.theme"
-  # the apps' own icons theme.py drew in the palette
+  # the apps' own icons recolor drew in the palette
   rm -f "$data/icons/hicolor/scalable/apps/yami-files.svg" "$data/icons/hicolor/scalable/apps/yami-view.svg" "$data/icons/hicolor/scalable/apps/yami-play.svg"
   # pixel cursors: yami-<accent>, and yami-<accent>-l for the light theme
   find "$data/icons" -maxdepth 1 -type d -regextype posix-extended -regex '.*/yami-[0-9a-f]{6}(-l)?' -exec rm -rf {} + 2>/dev/null
-  # the MangoHud config theme.py wrote (one without its mark is the user's own)
+  # the MangoHud config recolor wrote (one without its mark is the user's own)
   head -1 "$CFG/MangoHud/MangoHud.conf" 2>/dev/null | grep -qE '^# yami: written by (tools/theme.py|yami recolor)' && rm -f "$CFG/MangoHud/MangoHud.conf"
   rm -rf "$HOME/.local/share/fonts/yami" "$HOME/.local/share/yami" "$CFG/qt6ct/qss/yami"
   # the one file 2.7 could put outside the home folder for NVIDIA

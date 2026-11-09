@@ -152,7 +152,7 @@ welcome() {
       printf '  %s%s%s\n\n' "$T" "$(t "Поставлю всё сразу: niri, шелл и все модули." "I will install everything at once: niri, the shell and all modules." "Vou instalar tudo de uma vez: niri, o shell e todos os módulos.")" "$R"
     else
       printf '  %s%s%s\n' "$T" "$(t "Сейчас поставлю только основу: niri, шелл и терминал." "I will install only the base now: niri, the shell and a terminal." "Vou instalar só a base agora: niri, o shell e um terminal.")" "$R"
-      printf '  %s%s%s\n\n' "$D" "$(t "Файлы, плеер, скриншоты, экран входа и темы выберешь в окне настройки при первом входе." "Files, player, screenshots, login screen and themes are chosen in a setup window at the first login." "Arquivos, player, capturas, tela de login e temas são escolhidos numa janela no primeiro login.")" "$R"
+      printf '  %s%s%s\n\n' "$D" "$(t "Файлы, плеер, скриншоты, экран входа и темы выберешь в первой настройке, при первом входе." "Files, player, screenshots, login screen and themes are chosen in the first-run setup at the first login." "Arquivos, player, capturas, tela de login e temas são escolhidos na configuração inicial, no primeiro login.")" "$R"
     fi
     welcome_rows "$(t "система" "system" "sistema")" "$OS_NAME · $MEM_GB $(t "ГБ" "GB" "GB") · $THREADS $(t "потоков" "threads" "núcleos")"
     if ((SUDO)); then welcome_rows "$(t "пароль" "password" "senha")" "$(t "спрошу один раз, для пакетов" "asked once, for the packages" "pedida uma vez, para os pacotes")"; fi
@@ -272,7 +272,7 @@ explain() {
     *"requires rustc"* | *"is not supported by the following"*) t "Rust слишком старый: rustup update, затем запусти снова" "Rust is too old: rustup update, then run again" "Rust antigo demais: rustup update e rode novamente" ;;
   esac
 }
-# a line for whoever reads our output (the setup window, settings → updates): [percent/100] title
+# a line for whoever reads our output (the first-run setup, settings → updates): [percent/100] title
 step_line() { printf '  %s▸%s %s[%d/100] %s%s\n' "$A" "$R" "$T" "$1" "$2" "$R"; }
 # foreground output: every line as it is, and the percent moves while something compiles
 step_pipe() { # index crates
@@ -305,7 +305,7 @@ step() { # index
   crates="$(crates_of ${STEPS_F[$i]})"
   if [[ ! -t 1 || $SU == sudo || $SU == doas || $SU == "sudo -A" ]]; then
     # no terminal, or root without the shared root shell (its prompts must be seen): run in the
-    # foreground; [percent/100]: the setup window and the shell's updates tab draw their progress from it
+    # foreground; [percent/100]: the first-run setup and the shell's updates tab draw their progress from it
     step_line "$(percent 0 "$i")" "$title"
     # the step writes to the log and the reader follows the log until the step ends. Not a pipe: a
     # service the step starts would inherit it and everyone downstream would wait for that service

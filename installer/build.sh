@@ -100,7 +100,7 @@ do_install_bins() {
   ((any)) || return 99
   # ready binaries: nothing worth keeping in the cache (yami-greet is taken after this step, login.sh)
   ((PREBUILT)) && for b in yami-shell yami-files yami-view yami-play yami-shot yami-agents; do rm -f "$CACHE/target/release/$b"; done
-  # a separate setup window of the development tree is part of the shell now (`yami setup`)
+  # the separate setup program of the development tree is part of the shell now (`yami setup`)
   rm -f "$BIN/yami-setup" "$STATE/built/yami-setup"
   # `yami <command>`: the same binary, help instead of the shell when started without a command
   [[ -x $BIN/yami-shell ]] && ln -sfn yami-shell "$BIN/yami"

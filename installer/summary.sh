@@ -54,14 +54,14 @@ summary_install() {
   elif ((RUNNING_NIRI)); then
     printf '
   %s%s%s
-' "$T" "$(t "Основа готова. Сейчас откроется окно настройки." "The base is ready. The setup window opens now." "A base está pronta. A janela de configuração abre agora.")" "$R"
+' "$T" "$(t "Основа готова. Сейчас откроется первая настройка." "The base is ready. The first-run setup opens now." "A base está pronta. A configuração inicial abre agora.")" "$R"
   elif ((NO_DM)); then
     printf '\n  %s%s%s\n' "$T" "$(t "Основа готова. Экрана входа в системе нет, поэтому запусти стол из этой консоли:" "The base is ready. This system has no login screen, so start the desktop from this console:" "A base está pronta. Este sistema não tem tela de login, então inicie a área de trabalho neste console:")" "$R"
     printf '  %s%s%s\n' "$A" "niri-session" "$R"
-    printf '  %s%s%s\n' "$D" "$(t "Окно настройки предложит поставить экран входа, и в следующий раз войдёшь обычным способом." "The setup window offers a login screen, and next time you log in the usual way." "A janela de configuração oferece uma tela de login, e na próxima vez você entra normalmente.")" "$R"
+    printf '  %s%s%s\n' "$D" "$(t "Первая настройка предложит поставить экран входа, и в следующий раз войдёшь обычным способом." "The first-run setup offers a login screen, and next time you log in the usual way." "A configuração inicial oferece uma tela de login, e na próxima vez você entra normalmente.")" "$R"
   else
     printf '\n  %s%s%s\n' "$T" "$(t "Основа готова. Выйди из системы и войди в сеанс «Niri»:" "The base is ready. Log out and log in to the «Niri» session:" "A base está pronta. Saia e entre na sessão «Niri»:")" "$R"
-    printf '  %s%s%s\n' "$D" "$(t "там тебя встретит окно настройки и спросит, что поставить." "a setup window will meet you there and ask what to install." "uma janela de configuração vai perguntar o que instalar.")" "$R"
+    printf '  %s%s%s\n' "$D" "$(t "там тебя встретит первая настройка и спросит, что поставить." "the first-run setup will meet you there and ask what to install." "a configuração inicial vai perguntar o que instalar.")" "$R"
   fi
   printf '
   %s%s%s

@@ -9,12 +9,12 @@
 # A release installs ready binaries (x86_64, glibc 2.34 or newer) and asks for no compiler; otherwise it
 # builds from source. --from-source builds anyway, --main takes the development branch.
 #
-#   ./install.sh --full           the old way: everything now, no setup window
+#   ./install.sh --full           the old way: everything now, no first-run setup
 #   ./install.sh --yes            no questions
 #   ./install.sh --dry-run        show the plan, change nothing
 #   ./install.sh --uninstall      remove yami, restore what it replaced
 #   ./install.sh --update         rebuild from this tree, keep every setting, no sudo (`yami update`)
-#   ./install.sh --apply "files view …"   install exactly these modules (what the setup window runs)
+#   ./install.sh --apply "files view …"   install exactly these modules (what the first-run setup runs)
 #
 # Choices: --lang en|ru|pt-BR  --palette blood|ash|sakura|amber|venom|ice|dusk  --theme dark|light
 #   --look matte|glass|light|solid  --font sans|pixel  --fetch mini|full
@@ -133,8 +133,8 @@ while (($#)); do
   shift
 done
 [[ -t 0 && -t 1 ]] || { YES=1; ANIM=0; }
-# the first install is the base alone; the rest comes from the setup window. Run again over an
-# installed yami it is a repair: the same choice, nothing is dropped and no first-run window
+# the first install is the base alone; the rest comes from the first-run setup. Run again over an
+# installed yami it is a repair: the same choice, nothing is dropped and no first-run setup
 if ((!UPDATE && !FULL && !APPLY && !UNINSTALL)) && [[ -f $STATE/install.json && -x $BIN/yami-shell ]]; then
   REPAIR=1
 fi
@@ -213,7 +213,7 @@ if ((UPDATE)); then
   summary_update
 fi
 
-# what the setup window asked for: only these modules, nothing of the base again
+# what the first-run setup asked for: only these modules, nothing of the base again
 if ((APPLY)); then
   say "$(t "ставлю выбранное" "installing what you chose" "instalando o que você escolheu")"
   root_begin

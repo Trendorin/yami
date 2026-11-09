@@ -19,7 +19,7 @@ root_start() {
   ROOT_TOOL=$tool
   coproc ROOTSH {
     # shellcheck disable=SC2016
-    # окно настройки отдаёт пароль через askpass: терминала у него нет
+    # первая настройка отдаёт пароль через askpass: терминала у него нет
     if [[ $tool == sudo && -n ${SUDO_ASKPASS:-} ]]; then set -- sudo -A; else set -- "$tool"; fi
     "$@" bash -c 'while IFS= read -r p && IFS= read -r c; do
       i=/proc/$p/fd/0 o=/proc/$p/fd/1 e=/proc/$p/fd/2
@@ -63,7 +63,7 @@ root_end() {
   [[ $SU == asroot ]] || return 0
   root_stop
   SU=$ROOT_TOOL
-  # the setup window: no terminal, the password comes from its askpass
+  # the first-run setup: no terminal, the password comes from its askpass
   [[ $SU == sudo && -n ${SUDO_ASKPASS:-} ]] && SU="sudo -A"
   return 0
 }
