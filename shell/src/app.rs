@@ -669,7 +669,6 @@ pub fn run() {
     if crate::proc::have("yami-agents") {
         App::spawn(&["yami-agents".to_string()]);
     }
-    crate::agents::write_portals(&app.st.set);
     crate::profile::refresh(None, tx.clone());
     audio::spawn(tx.clone());
     media::spawn(tx.clone());

@@ -206,13 +206,13 @@ pub(crate) fn tab_widgets(ui: &mut Ui, st: &State, b: R) {
     row(ui, &mut y, "размер", name_of(SIZES, &w.size), "size");
     row(ui, &mut y, "цвет", name_of(COLORS, &w.color), "color");
     y += 4;
-    ui.toggle(R::new(px, y, pw / 2, 26), "подложка", "", w.frame, Act::SWidgetOpt(id, "frame"));
+    ui.toggle(R::new(px, y, if w.kind == "clock" { pw / 3 } else { pw / 2 }, 26), "подложка", "", w.frame, Act::SWidgetOpt(id, "frame"));
     if matches!(w.kind.as_str(), "graph" | "net" | "media") {
         ui.toggle(R::new(px + pw / 2, y, pw / 2, 26), "подпись", "", w.label, Act::SWidgetOpt(id, "label"));
     }
     if w.kind == "clock" {
-        ui.toggle(R::new(px + pw / 2, y, pw / 4, 26), "секунды", "", w.seconds, Act::SWidgetOpt(id, "seconds"));
-        ui.toggle(R::new(px + pw * 3 / 4, y, pw / 4, 26), "дата", "", w.date, Act::SWidgetOpt(id, "date"));
+        ui.toggle(R::new(px + pw / 3, y, pw / 3, 26), "секунды", "", w.seconds, Act::SWidgetOpt(id, "seconds"));
+        ui.toggle(R::new(px + pw * 2 / 3, y, pw / 3, 26), "дата", "", w.date, Act::SWidgetOpt(id, "date"));
     }
     y += 40;
     // живое превью графика
@@ -404,8 +404,7 @@ pub(crate) fn niri_parts(ui: &mut Ui, st: &State, b: R, mut y: i32) -> i32 {
         }
     }
     y += 46;
-    ui.wrap(PX, R::new(lx, y, b.w, 28), "что написано в config.kdl ниже строки yami — главнее любой части", ui.t.text_faint, 2);
-    y += 30;
+    y += ui.wrap(PX, R::new(lx, y, b.w, 40), "что написано в config.kdl ниже строки yami — главнее любой части", ui.t.text_faint, 2) + 12;
     y
 }
 

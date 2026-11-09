@@ -74,7 +74,7 @@ const fn m(id: &'static str, name: &'static str, what: &'static str) -> Module {
 
 fn modules() -> Vec<Module> {
     vec![
-        m("files", "yami-files", "файлы, диалоги, флешки и телефоны"),
+        m("files", "yami-files", "файлы, диалоги, флешки"),
         m("view", "yami-view", "картинки с быстрыми правками"),
         m("play", "yami-play", "видео и музыка (libmpv)"),
         m("shot", "yami-shot", "скриншоты, текст и QR"),
@@ -480,11 +480,13 @@ fn done_page(ui: &mut Ui, st: &State, b: R) {
         .into_iter()
         .filter(|id| *id != "files" || st.mods_here.files)
         .filter(|id| *id != "shot" || st.mods_here.shot)
+        // действие без клавиши (выбор обоев по умолчанию) здесь показывать нечем
+        .filter(|id| crate::keys::BINDS.iter().find(|x| x.id == *id).is_some_and(|bd| !crate::keys::key_of(&st.set, bd).is_empty()))
         .collect();
     for (i, id) in ids.iter().enumerate() {
         let Some(bd) = crate::keys::BINDS.iter().find(|x| x.id == *id) else { continue };
         let x = if i % 2 == 0 { b.x } else { b.x + half + 20 };
-        let key = crate::keys::key_of(&st.set, bd);
+        let key = crate::keys::key_of(&st.set, bd).replace("Slash", "/");
         let kw = (ui.w(PX, &key) + 16).max(64);
         ui.cv.pxbox(R::new(x, y, kw, 24), &BoxStyle::new(t.code_bg, t.border));
         ui.cv.text_in(ui.f, PX, R::new(x + 8, y, kw - 12, 24), &key, t.text_hi);

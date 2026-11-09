@@ -155,8 +155,6 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
         ui.toggle(R::new(cx + cw + 12, y + 52, cw, 26), "движение", "", a.motion, Act::SAnim(g, MOTION));
         y += 92;
     }
-    // высота вкладки — по нижней зоне (Canvas::reach)
-    let _ = y;
 }
 
 impl App {

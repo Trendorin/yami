@@ -397,7 +397,7 @@ const PAIRS: &[(&str, &str)] = &[
     ("эквалайзер", "equalizer"),
     ("размер", "size"),
     ("расставить", "arrange"),
-    ("на место", "reset"),
+    ("на место", "reposition"),
     ("убрать", "remove"),
 
     ("анимации", "animations"),
@@ -582,7 +582,7 @@ const PAIRS: &[(&str, &str)] = &[
     ("стоит", "installed"),
     ("поставится", "to install"),
     ("уйдёт", "to remove"),
-    ("файлы, диалоги, флешки и телефоны", "files, dialogs, drives, phones"),
+    ("файлы, диалоги, флешки", "files, dialogs, drives"),
     ("картинки с быстрыми правками", "pictures with quick edits"),
     ("видео и музыка (libmpv)", "video and music (libmpv)"),
     ("скриншоты, текст и QR", "screenshots, text and QR"),
