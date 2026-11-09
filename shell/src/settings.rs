@@ -108,7 +108,7 @@ pub fn scroll_of(st: &State) -> i32 {
 }
 
 /// полоса прокрутки: клетки дорожки и бегунок
-fn scrollbar(ui: &mut Ui, r: R, view: i32, full: i32, at: i32) {
+pub(crate) fn scrollbar(ui: &mut Ui, r: R, view: i32, full: i32, at: i32) {
     let t = ui.t;
     if full <= view {
         return;
@@ -165,7 +165,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     ui.cv.push_clip(R::new(body.x - 4, body.y - 4, body.w + 8, body.h + 8));
     ui.cv.reach = i32::MIN;
     (tb.draw)(ui, st, R::new(body.x, body.y - off, body.w, body.h));
-    let full = if tb.own_scroll { body.h } else { (ui.cv.reach + off + 12 - body.y).max(body.h) };
+    let full = if tb.own_scroll { body.h } else { ui.cv.reach.saturating_add(off + 12 - body.y).max(body.h) };
     st.sscroll_h.set(full);
     ui.cv.pop_clip();
     scrollbar(ui, R::new(body.right() + 18, body.y, 4, body.h), body.h, full, off);
@@ -176,7 +176,7 @@ impl App {
     pub fn settings_scroll(&mut self, d: i32) -> bool {
         let (w, h) = SIZE;
         let (view, own) = match &self.st.welcome {
-            Some(wz) => (crate::welcome::body_rect(w, h).h, wz.cur().own_scroll),
+            Some(wz) => (crate::welcome::body_rect(wz, w, h).h, wz.own_scroll()),
             None => (body_rect(w, h).h, find(self.st.stab).is_some_and(|t| t.own_scroll)),
         };
         let max = (self.st.sscroll_h.get() - view).max(0);

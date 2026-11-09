@@ -89,6 +89,7 @@ mod weather;
 mod welcome;
 mod widgets;
 mod wizinst;
+mod wizpages;
 
 fn main() {
     // sudo спрашивает пароль для установки модулей из первой настройки (wizinst.rs)

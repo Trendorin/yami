@@ -1,54 +1,53 @@
-// Первая настройка — окно настроек в другом виде: шаги слева, страница справа, внизу «назад»,
-// клетки шагов и «дальше». Шаг — вкладка настроек (её draw как есть, всё применяется сразу) или своя
-// страница: привет (язык, стиль, тема), niri (подключение, части yami, чужие бары и уведомления в
-// конфиге), модули (поставить или убрать через install.sh, wizinst.rs), готово (главные клавиши).
+// Первая настройка — мастер по шагам: одна тема на экран, крупный заголовок, карточки с миниатюрами,
+// вверху полоса шагов, внизу «назад» и «дальше». Всё применяется сразу. За кнопкой «все настройки»
+// на шаге — соответствующие вкладки настроек целиком (их draw как есть), поэтому мастер не беднее
+// настроек, но не похож на них. Страницы — wizpages.rs, установка модулей — wizinst.rs.
 // Открывается сама при первом входе (метка first-run: её кладёт установщик, а без настроек — сам
 // шелл, если его поставили пакетом), потом — `yami setup` и кнопка во вкладке «о шелле». Закрыть
 // можно в любой момент: метка снимается, выбранное остаётся.
 
 use crate::app::{App, Modal, SKind, State};
-use crate::font::{PX, PX24};
-use crate::gfx::{BoxStyle, R};
-use crate::settings::title;
+use crate::font::{self, PX, PX24};
+use crate::gfx::R;
+use crate::settings::{scroll_of, scrollbar, Tab};
 use crate::ui::{Act, Cur, Field, Tone, Ui};
 use crate::wizinst::Ev;
+use crate::wizpages as page;
+use std::time::{Duration, Instant};
 
 pub struct Step {
     pub id: &'static str,
-    pub name: &'static str,
-    pub icon: &'static str,
+    /// к какой части относится: части разделены на полосе вверху
+    pub chapter: &'static str,
+    pub title: &'static str,
+    pub sub: &'static str,
     pub draw: fn(&mut Ui, &State, R),
-    /// у страницы свой список с прокруткой (клавиши)
-    pub own_scroll: bool,
-    /// после него в списке — промежуток (конец группы)
-    pub gap: bool,
+    /// вкладки настроек о том же, целиком: кнопка «все настройки»
+    pub more: &'static [&'static str],
 }
 
-const fn step(id: &'static str, name: &'static str, icon: &'static str, draw: fn(&mut Ui, &State, R)) -> Step {
-    Step { id, name, icon, draw, own_scroll: false, gap: false }
+const fn step(id: &'static str, chapter: &'static str, title: &'static str, sub: &'static str, draw: fn(&mut Ui, &State, R), more: &'static [&'static str]) -> Step {
+    Step { id, chapter, title, sub, draw, more }
 }
 
-/// все шаги; id совпадают со вкладками настроек — их проверки (tab_probe) и прокрутка общие
 const ALL: &[Step] = &[
-    step("hello", "привет", "about", hello),
-    step("color", "цвет", "drop", crate::settabs::tab_color),
-    step("wall", "обои", "image", crate::wall::tab),
-    step("look", "вид", "eye", crate::settabs::tab_look),
-    step("anim", "анимации", "slides", crate::animtab::tab),
-    Step { gap: true, ..step("fonts", "шрифты", "text", crate::fonttab::tab) },
-    step("bar", "бар", "menu", crate::bartab::tab_bar),
-    step("dock", "док", "tile", crate::settabs::tab_dock),
-    step("widgets", "виджеты", "grid", crate::settabs::tab_widgets),
-    step("windows", "окна", "float", crate::settabs::tab_windows),
-    Step { own_scroll: true, gap: true, ..step("keys", "клавиши", "keys", crate::keys::tab) },
-    step("niri", "niri", "window", niri_page),
-    step("notif", "уведомления", "bell", crate::settabs::tab_notif),
-    step("system", "система", "gear", crate::settabs::tab_system),
-    step("agents", "службы", "bolt", crate::agents::tab),
-    step("games", "игры", "play", crate::games::tab),
-    Step { gap: true, ..step("login", "экран входа", "lock", crate::login::tab) },
-    step("modules", "модули", "plus", modules_page),
-    step("done", "готово", "check", done_page),
+    step("hello", "начало", "добро пожаловать в yami", "пара минут — и стол будет твоим. Всё применяется сразу, и всё потом можно поменять.", page::hello, &[]),
+    step("style", "начало", "какой стиль?", "панели, окна и программы yami будут выглядеть так", page::style, &["look"]),
+    step("color", "вид", "твой цвет", "весь стол и программы перекрасятся сразу", page::color, &["color"]),
+    step("wall", "вид", "обои", "своя картинка или узор в цвет палитры", page::wall, &["wall"]),
+    step("look", "вид", "пиксели и стекло", "насколько всё пиксельное и как выглядят панели", page::look, &["look", "fonts"]),
+    step("anim", "вид", "анимации", "как открываются окна и панели", page::anim, &["anim"]),
+    step("bar", "рабочий стол", "бар", "форма, край экрана и что на нём", page::bar, &["bar"]),
+    step("dock", "рабочий стол", "док", "закреплённые и открытые программы", page::dock, &["dock"]),
+    step("windows", "рабочий стол", "окна", "лента, как в niri, или обычный стол", page::windows, &["windows", "screens"]),
+    step("widgets", "рабочий стол", "виджеты", "что лежит на рабочем столе", page::widgets, &["widgets"]),
+    step("keys", "управление", "клавиши", "раскладки клавиатуры и главные сочетания", page::keys, &["keys"]),
+    step("niri", "управление", "подключим к niri", "одна строка в его конфиге — и заработают клавиши, вид и правила окон", page::niri, &["system"]),
+    step("modules", "система", "программы", "каждая — отдельная и работает без шелла", page::modules, &[]),
+    step("services", "система", "уведомления и службы", "что шелл берёт на себя", page::services, &["notif", "agents"]),
+    step("games", "система", "игры", "окна на весь экран, VRR и режим игры", crate::games::tab, &[]),
+    step("login", "система", "экран входа", "как выглядит вход в систему", crate::login::tab, &[]),
+    step("done", "готово", "готово", "yami настроен. Всё это живёт в настройках (Mod+S), а мастер снова откроет команда yami setup.", page::done, &[]),
 ];
 
 /// такой шаг есть (`yami setup STEP`)
@@ -142,6 +141,10 @@ pub struct Welcome {
     pub inst: Inst,
     pub pass: Field,
     pub others: Vec<crate::niricfg::Other>,
+    /// открыты «все настройки»: номер вкладки из Step::more
+    pub more: Option<usize>,
+    /// с какого мгновения показана страница: она появляется, а не вспыхивает
+    pub since: Instant,
 }
 
 impl Welcome {
@@ -149,8 +152,17 @@ impl Welcome {
         &ALL[self.steps.get(self.step).copied().unwrap_or(0)]
     }
 
-    fn changed(&self) -> bool {
+    pub fn changed(&self) -> bool {
         self.mods.iter().any(|m| m.have != m.want)
+    }
+
+    fn more_tab(&self) -> Option<&'static Tab> {
+        self.more.and_then(|i| self.cur().more.get(i)).and_then(|id| crate::settings::find(id))
+    }
+
+    /// у открытой вкладки свой список с прокруткой (клавиши)
+    pub fn own_scroll(&self) -> bool {
+        self.more_tab().is_some_and(|t| t.own_scroll)
     }
 }
 
@@ -179,327 +191,120 @@ fn probe_mods(mods: &mut [Module]) {
     }
 }
 
-/// где страница: как у настроек, только снизу — полоса с кнопками
-pub fn body_rect(w: i32, h: i32) -> R {
-    let fr = R::new(0, 0, w - 6, h - 6);
-    let side = 168;
-    R::new(1 + side + 20, 48, fr.right() - side - 1 - 48, fr.h - 64 - FOOT)
+/// ширина колонки, в которой всё стоит: окно шире, по бокам воздух
+const COL: i32 = 640;
+const FOOT: i32 = 54;
+
+fn col_x(w: i32) -> i32 {
+    (w - 6 - COL) / 2
 }
 
-const FOOT: i32 = 46;
+/// где страница: под заголовком и пояснением; у «всех настроек» пояснения нет, места больше
+pub fn body_rect(wz: &Welcome, w: i32, h: i32) -> R {
+    let top = if wz.more.is_some() { 126 } else { 134 };
+    R::new(col_x(w), top, COL, h - 6 - FOOT - top - 8)
+}
+
+/// полоса шагов: клетка на шаг, части разделены; пройденные — акцентом, открытые нажимаются
+fn progress(ui: &mut Ui, wz: &Welcome, r: R) {
+    let t = ui.t;
+    let n = wz.steps.len() as i32;
+    let parts = wz.steps.windows(2).filter(|p| ALL[p[0]].chapter != ALL[p[1]].chapter).count() as i32;
+    let (gap, part_gap) = (3, 13);
+    let cw = (r.w - (n - 1 - parts) * gap - parts * part_gap) / n.max(1);
+    let mut x = r.x;
+    for (i, &k) in wz.steps.iter().enumerate() {
+        if i > 0 && ALL[wz.steps[i - 1]].chapter != ALL[k].chapter {
+            x += part_gap - gap;
+        }
+        let c = if i == wz.step {
+            t.red
+        } else if i < wz.step {
+            t.red.alpha(0.5)
+        } else if i <= wz.seen {
+            t.text_faint.alpha(0.6)
+        } else {
+            t.border
+        };
+        ui.cv.fill(R::new(x, r.y, cw, r.h), c);
+        if i <= wz.seen {
+            ui.zone(R::new(x - 1, r.y - 8, cw + gap, r.h + 16), Act::WStep(i), Cur::Pointer);
+        }
+        x += cw + gap;
+    }
+}
 
 pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     let Some(wz) = &st.welcome else { return };
     let t = ui.t;
     let fr = R::new(0, 0, w - 6, h - 6);
+    let x = col_x(w);
     ui.frame(fr, false);
-    let n = wz.steps.len();
-    let sub = crate::tf!("шаг {} из {}", "step {} of {}", "passo {} de {}", wz.step + 1, n);
-    ui.header(R::new(1, 1, fr.w - 2, 30), "about", "первая настройка", &sub);
-    ui.zone(R::new(1, 1, fr.w - 2, 30), Act::MDrag, Cur::Default);
-    ui.ghost(R::new(fr.right() - 28, 5, 24, 22), "close", Act::CloseModal);
-    // шаги: пройденные — с галочкой, текущий — с полосой акцента
-    let side = R::new(1, 31, 168, h - 6 - 32);
-    ui.cv.fill(side, t.panel.alpha(0.5));
-    ui.cv.fill(R::new(side.right(), side.y, 1, side.h), t.border);
-    ui.zone(side, Act::Block, Cur::Default);
-    let mut y = side.y + 10;
-    for (i, &k) in wz.steps.iter().enumerate() {
-        let s = &ALL[k];
-        let r = R::new(side.x + 8, y, side.w - 16, 24);
-        ui.button(r, s.name, s.icon, Tone::Ghost, i == wz.step, true, Act::WStep(i));
-        if i == wz.step {
-            ui.cv.fill(R::new(r.x - 8, r.y, 3, r.h), t.red);
-        } else if i < wz.seen {
-            ui.cv.icon("check", r.right() - 11, r.y + 9, 1, t.ok.alpha(0.8));
-        }
-        y += 26;
-        if s.gap {
-            y += 8;
+    ui.zone(R::new(1, 1, fr.w - 2, 34), Act::MDrag, Cur::Default);
+    ui.ghost(R::new(fr.right() - 30, 8, 24, 22), "close", Act::CloseModal);
+    progress(ui, wz, R::new(x, 16, COL, 6));
+    let cur = wz.cur();
+    let nw = ui.text_in(PX, R::new(x, 38, COL / 2, 18), cur.chapter, t.red);
+    let count = crate::tf!("шаг {} из {}", "step {} of {}", "passo {} de {}", wz.step + 1, wz.steps.len());
+    ui.cv.text_in(ui.f, PX, R::new(x + nw + 12, 38, COL / 2, 18), &count, t.text_faint);
+    ui.text_in(PX24, R::new(x, 58, COL - 80, 30), cur.title, t.text_hi);
+    // начало и конец — с иероглифом, как на экране блокировки
+    if matches!(cur.id, "hello" | "done") {
+        ui.text(font::jp(64), x + COL - 66, 36, "闇", t.red.fade(0.75));
+    }
+    if wz.more.is_none() {
+        ui.wrap(PX, R::new(x, 92, COL - 80, 40), cur.sub, t.text_dim, 2);
+    } else {
+        // несколько вкладок — переключатели; одна — её имя
+        let mut bx = x;
+        for (i, id) in cur.more.iter().enumerate() {
+            let Some(tb) = crate::settings::find(id).filter(|tb| st.mods_here.shows(tb.id)) else { continue };
+            let bw = ui.w(PX, tb.name) + 42;
+            ui.button(R::new(bx, 92, bw, 24), tb.name, tb.icon, Tone::Ghost, wz.more == Some(i), true, Act::WMore(i as u8));
+            bx += bw + 6;
         }
     }
-    // страница
-    let body = body_rect(w, h);
-    let cur = wz.cur();
-    let off = if cur.own_scroll { 0 } else { crate::settings::scroll_of(st) };
-    ui.zone(R::new(side.right() + 1, 31, fr.right() - side.right() - 2, body.bottom() + 8 - 31), Act::SScroll, Cur::Default);
+    let body = body_rect(wz, w, h);
+    let tab = wz.more_tab();
+    let own = wz.own_scroll();
+    let off = if own { 0 } else { scroll_of(st) };
+    ui.zone(R::new(1, body.y - 6, fr.w - 2, body.h + 12), Act::SScroll, Cur::Default);
     ui.cv.push_clip(R::new(body.x - 4, body.y - 4, body.w + 8, body.h + 8));
     ui.cv.reach = i32::MIN;
-    (cur.draw)(ui, st, R::new(body.x, body.y - off, body.w, body.h));
-    let full = if cur.own_scroll { body.h } else { (ui.cv.reach + off + 12 - body.y).max(body.h) };
+    // страница появляется: сдвиг ступенями по 2 px и проявление
+    let ms = if st.set.anim() { st.set.anim_ms("windows") * 0.7 } else { 0.0 };
+    let k = if ms <= 0.0 { 1.0 } else { (wz.since.elapsed().as_secs_f32() * 1000.0 / ms).min(1.0) };
+    if k < 1.0 {
+        ui.anim = true;
+    }
+    let shift = (((1.0 - k) * (1.0 - k) * 16.0 / 2.0).round() as i32) * 2;
+    let was = ui.cv.opacity;
+    ui.cv.opacity = was * k;
+    let area = R::new(body.x + shift, body.y - off, body.w, body.h);
+    match tab {
+        Some(tb) => (tb.draw)(ui, st, area),
+        None => (cur.draw)(ui, st, area),
+    }
+    ui.cv.opacity = was;
+    let full = if own { body.h } else { ui.cv.reach.saturating_add(off + 12 - body.y).max(body.h) };
     st.sscroll_h.set(full);
     ui.cv.pop_clip();
-    if full > body.h {
-        ui.cv.fill(R::new(body.right() + 19, body.y, 2, body.h), t.border.alpha(0.5));
-        let th = (body.h * body.h / full).max(18);
-        let ty = body.y + (body.h - th) * off / (full - body.h).max(1);
-        ui.cv.fill(R::new(body.right() + 18, ty, 4, th), t.red);
-    }
-    // низ: назад · клетки шагов · дальше
+    scrollbar(ui, R::new(body.right() + 14, body.y, 4, body.h), body.h, full, off);
+    // низ: назад · все настройки шага · дальше
     let fy = fr.bottom() - FOOT;
-    let fx = side.right() + 1;
-    ui.cv.fill(R::new(fx, fy, fr.right() - fx - 1, FOOT - 1), t.panel.alpha(0.35));
-    ui.cv.fill(R::new(fx, fy, fr.right() - fx - 1, 1), t.border);
-    ui.zone(R::new(fx, fy, fr.right() - fx - 1, FOOT - 1), Act::Block, Cur::Default);
-    let by = fy + (FOOT - 28) / 2;
-    ui.button(R::new(body.x, by, 112, 28), "назад", "left", Tone::Plain, false, wz.step > 0, Act::WBack);
-    let last = wz.step + 1 >= n;
-    let (label, icon) = if last { ("закрыть", "check") } else { ("дальше", "right") };
-    ui.button(R::new(body.right() - 132, by, 132, 28), label, icon, Tone::Primary, false, true, Act::WNext);
-    let cell = 8;
-    let gap = 4;
-    let dots = n as i32 * (cell + gap) - gap;
-    let mut x = body.x + (body.w - dots) / 2;
-    for i in 0..n {
-        let c = if i == wz.step { t.red } else if i < wz.seen { t.ember.alpha(0.6) } else { t.border };
-        ui.cv.fill(R::new(x, by + 10, cell, cell), c);
-        ui.zone(R::new(x - 1, by + 4, cell + gap, 20), Act::WStep(i), Cur::Pointer);
-        x += cell + gap;
+    ui.cv.fill(R::new(1, fy, fr.w - 2, 1), t.border);
+    ui.zone(R::new(1, fy, fr.w - 2, FOOT - 1), Act::Block, Cur::Default);
+    let by = fy + (FOOT - 30) / 2;
+    ui.button(R::new(x, by, 124, 30), "назад", "left", Tone::Plain, false, wz.step > 0 || wz.more.is_some(), Act::WBack);
+    let mid = R::new(x + 170, by, COL - 340, 30);
+    if wz.more.is_some() {
+        ui.button(mid, "вернуться к шагу", "left", Tone::Ghost, false, true, Act::WMore(u8::MAX));
+    } else if !cur.more.is_empty() {
+        ui.button(mid, "все настройки", "gear", Tone::Ghost, false, true, Act::WMore(0));
     }
-}
-
-/// карточка выбора: значок, имя, две строки пояснения; выбранная — в рамке акцента
-fn card(ui: &mut Ui, r: R, icon: &str, name: &str, desc: &str, on: bool, act: Act) {
-    let t = ui.t;
-    let hov = ui.hover(r);
-    ui.cv.pxbox(r, &BoxStyle::new(if on { t.surface_hi } else { t.surface }, if on || hov { t.red } else { t.border }).shadow(2));
-    ui.cv.icon(icon, r.x + 14, r.y + 14, 3, if on { t.red } else { t.text_dim });
-    ui.text_in(PX, R::new(r.x + 50, r.y + 10, r.w - 60, 20), name, if on { t.text_hi } else { t.text });
-    ui.wrap(PX, R::new(r.x + 50, r.y + 32, r.w - 60, 36), desc, t.text_faint, 2);
-    ui.zone(r, act, Cur::Pointer);
-}
-
-fn hello(ui: &mut Ui, st: &State, b: R) {
-    let t = ui.t;
-    let s = &st.set;
-    let mut y = b.y;
-    ui.text_in(PX24, R::new(b.x, y, b.w, 30), "добро пожаловать в yami", t.text_hi);
-    y += 38;
-    let h = ui.wrap(PX, R::new(b.x, y, b.w, 60), "шелл для niri. Шаги слева — всё применяется сразу, и в любой шаг можно вернуться. Потом всё это живёт в настройках: Mod+S.", t.text_dim, 3);
-    y += h + 16;
-    y = title(ui, b.x, y, b.w, "язык");
-    let cur = if s.lang.is_empty() {
-        if yami_px::i18n::pt_br() {
-            "pt-BR"
-        } else if yami_px::i18n::translated() {
-            "en"
-        } else {
-            "ru"
-        }
-    } else {
-        s.lang.as_str()
-    };
-    let bw = (b.w - 16) / 3;
-    // названия языков — на своём языке, не переводятся
-    for (i, (code, name)) in [("ru", "Русский"), ("en", "English"), ("pt-BR", "Português (Brasil)")].into_iter().enumerate() { // i18n-ok
-        let r = R::new(b.x + i as i32 * (bw + 8), y, bw, 30);
-        ui.button(r, "", "", Tone::Plain, cur == code, true, Act::WLang(code));
-        ui.cv.text_in(ui.f, PX, R::new(r.x + 12, r.y, r.w - 24, r.h), name, if cur == code { t.text_hi } else { t.text });
-    }
-    y += 46;
-    y = title(ui, b.x, y, b.w, "стиль");
-    let cw = (b.w - 12) / 2;
-    let plain = s.preset == "plain";
-    card(ui, R::new(b.x, y, cw, 76), "grid", "пиксельный", "целые пиксели, ступенчатые углы, проявление растром", !plain, Act::WPlain(false));
-    card(ui, R::new(b.x + cw + 12, y, cw, 76), "window", "нейтральный", "скругления, мягкие тени, обычные шрифты", plain, Act::WPlain(true));
-    y += 92;
-    y = title(ui, b.x, y, b.w, "тема");
-    card(ui, R::new(b.x, y, cw, 64), "moon", "тёмная", "светлый текст на тёмном", !s.light, Act::SCycle("theme_dark"));
-    card(ui, R::new(b.x + cw + 12, y, cw, 64), "sun", "светлая", "тёмный текст на светлом", s.light, Act::SCycle("theme_light"));
-    y += 76;
-    ui.wrap(PX, R::new(b.x, y, b.w, 40), "дальше — цвет, обои, вид и шрифты; потом бар, док, окна и клавиши; в конце — niri и модули", t.text_faint, 2);
-}
-
-fn niri_page(ui: &mut Ui, st: &State, b: R) {
-    let t = ui.t;
-    let Some(w) = &st.welcome else { return };
-    let nl = &st.niri_link;
-    let half = (b.w - 20) / 2;
-    let (lx, rx) = (b.x, b.x + half + 20);
-    let mut y = title(ui, b.x, b.y, b.w, "конфиг niri остаётся твоим");
-    y += ui.wrap(PX, R::new(b.x, y, b.w, 60), "yami не переписывает конфиг niri: в его начало встаёт одна строка include, и всё, что ниже неё, главнее. Конфига нет — yami положит свой стартовый.", t.text_dim, 3) + 10;
-    let ver = match crate::niricfg::version() {
-        Some((a, v)) if crate::niricfg::too_old() => (crate::tf!("niri {}.{:02}: слишком старый, нужен 25.11 или новее", "niri {}.{:02}: too old, yami needs 25.11 or newer", "niri {}.{:02}: antigo demais, o yami precisa do 25.11 ou mais novo", a, v), t.warn),
-        Some((a, v)) => (format!("niri {a}.{v:02}"), t.text_faint),
-        None => ("niri ?".to_string(), t.text_faint),
-    };
-    let (state, c) = if nl.connected {
-        (crate::tf!("подключён: {}", "connected: {}", "conectado: {}", yami_px::paths::pretty(&nl.path)), t.ok)
-    } else if nl.exists {
-        (crate::tf!("не подключён к {}", "not in {}", "fora de {}", yami_px::paths::pretty(&nl.path)), t.warn)
-    } else {
-        ("конфига niri пока нет".to_string(), t.warn)
-    };
-    ui.text_in(PX, R::new(lx, y, b.w - 120, 22), &state, c);
-    ui.cv.text_in(ui.f, PX, R::new(b.right() - 110, y, 110, 22), &ver.0, ver.1);
-    y += 30;
-    if nl.connected {
-        ui.button(R::new(lx, y, half, 28), "убрать строку yami", "close", Tone::Plain, false, true, Act::WNiri("disconnect"));
-    } else {
-        ui.button(R::new(lx, y, half, 28), "подключить одной строкой", "plus", Tone::Primary, false, true, Act::WNiri("connect"));
-        if nl.exists && !nl.niri_default {
-            ui.button(R::new(rx, y, half, 28), "заменить стартовым yami", "reboot", Tone::Plain, false, true, Act::WNiri("replace"));
-        }
-    }
-    y += 34;
-    if nl.exists && !nl.connected && !nl.niri_default {
-        y += ui.wrap(PX, R::new(b.x, y, b.w, 20), "заменить: твой файл уйдёт в копию рядом, config.kdl.bak-yami-…", t.text_faint, 1) + 6;
-    }
-    if !st.niri_note.is_empty() {
-        y += ui.wrap(PX, R::new(b.x, y, b.w, 60), &st.niri_note, t.text_dim, 3) + 8;
-    }
-    y += 4;
-    y = title(ui, b.x, y, b.w, "что приносит yami");
-    y = crate::settabs::niri_parts(ui, st, b, y);
-    y += 6;
-    y = title(ui, b.x, y, b.w, "другие программы в конфиге niri");
-    if w.others.is_empty() {
-        ui.wrap(PX, R::new(b.x, y, b.w, 20), "ничего, что спорило бы с yami: ни второго бара, ни своих уведомлений", t.text_faint, 1);
-        return;
-    }
-    for (i, o) in w.others.iter().enumerate() {
-        let what = match o.kind {
-            "bar" => "второй бар",
-            "shell" => "второй шелл",
-            "notif" => "свои уведомления",
-            "wall" => "свои обои",
-            "idle" => "своё ожидание",
-            _ => "",
-        };
-        ui.cv.text_in(ui.f, PX, R::new(lx, y, 140, 26), o.prog, t.text_hi);
-        ui.text_in(PX, R::new(lx + 140, y, b.w - 140 - 150, 26), what, t.text_dim);
-        ui.button(R::new(b.right() - 140, y, 140, 26), "не запускать", "stop", Tone::Plain, false, true, Act::WOther(i));
-        y += 32;
-    }
-    ui.wrap(PX, R::new(b.x, y + 4, b.w, 40), "строка в конфиге станет комментарием с пометкой yami, сам файл — копией рядом", t.text_faint, 2);
-}
-
-fn modules_page(ui: &mut Ui, st: &State, b: R) {
-    let t = ui.t;
-    let Some(w) = &st.welcome else { return };
-    let half = (b.w - 20) / 2;
-    let mut y = title(ui, b.x, b.y, b.w, "модули");
-    // поставлен пакетом: выбирать здесь нечего, модули ставит менеджер пакетов
-    let packaged = !crate::update::enabled();
-    let hint = if packaged { "каждый — отдельная программа и работает без шелла. Стоит то, что поставлено пакетами." } else { "каждый — отдельная программа и работает без шелла. Отмеченные поставятся, снятые уйдут." };
-    y += ui.wrap(PX, R::new(b.x, y, b.w, 40), hint, t.text_dim, 2) + 12;
-    for (i, m) in w.mods.iter().enumerate() {
-        let x = if i % 2 == 0 { b.x } else { b.x + half + 20 };
-        let r = R::new(x, y, half, 40);
-        if packaged {
-            ui.cv.text_in(ui.f, PX, R::new(r.x, r.y, r.w, 20), m.name, if m.have { t.text_hi } else { t.text_dim });
-            ui.text_in(PX, R::new(r.x, r.y + 18, r.w, 20), m.what, t.text_faint);
-            if m.have {
-                let nw = ui.w(PX, m.name);
-                ui.text_in(PX, R::new(r.x + nw + 10, r.y, r.w - nw - 10, 20), "стоит", t.ok);
-            }
-            if i % 2 == 1 {
-                y += 48;
-            }
-            continue;
-        }
-        ui.toggle(r, m.name, m.what, m.want, Act::WMod(i));
-        let nw = ui.w(PX, m.name);
-        let (tag, c) = match (m.have, m.want) {
-            (true, true) => ("стоит", t.ok),
-            (false, true) => ("поставится", t.red),
-            (true, false) => ("уйдёт", t.warn),
-            _ => ("", t.text_faint),
-        };
-        if !tag.is_empty() {
-            ui.text_in(PX, R::new(r.x + 26 + nw + 10, r.y + 2, r.w - 36 - nw, 20), tag, c);
-        }
-        if i % 2 == 1 {
-            y += 48;
-        }
-    }
-    if w.mods.len() % 2 == 1 {
-        y += 48;
-    }
-    y += 4;
-    if packaged {
-        ui.wrap(PX, R::new(b.x, y, b.w, 60), "yami поставлен пакетом: модули ставит менеджер пакетов — пакеты yami-files, yami-view, yami-play, yami-shot, yami-agents, yami-greet", t.text_dim, 3);
-        return;
-    }
-    if !crate::wizinst::can_install() {
-        ui.wrap(PX, R::new(b.x, y, b.w, 60), "ставить нечем: нет ни исходников yami, ни git. Каждый модуль ставится и сам: yami-files install", t.warn, 3);
-        return;
-    }
-    let inst = &w.inst;
-    if inst.running {
-        let (k, n, text) = inst.step.clone().unwrap_or((0, 1, String::new()));
-        let cells = 24;
-        let cw = (b.w - (cells - 1) * 3) / cells;
-        let lit = (k as i32 * cells) / (n.max(1) as i32);
-        for i in 0..cells {
-            ui.cv.fill(R::new(b.x + i * (cw + 3), y, cw, 10), if i < lit { t.red } else { t.border });
-        }
-        y += 18;
-        ui.cv.text_in(ui.f, PX, R::new(b.x, y, b.w, 20), &format!("[{k}/{n}] {text}"), t.text);
-        y += 24;
-        for l in inst.lines.iter().rev().take(3).rev() {
-            ui.cv.text_in(ui.f, PX, R::new(b.x, y, b.w, 18), l, t.text_faint);
-            y += 18;
-        }
-        return;
-    }
-    if let Some(e) = &inst.failed {
-        y += ui.wrap(PX, R::new(b.x, y, b.w, 60), e, t.warn, 3) + 8;
-    } else if inst.done && !w.changed() {
-        ui.text_in(PX, R::new(b.x, y, b.w, 22), "готово: модули на месте", t.ok);
-        return;
-    }
-    if !w.changed() {
-        ui.wrap(PX, R::new(b.x, y, b.w, 40), "отметь, что поставить или убрать; ставит install.sh, ход виден здесь", t.text_faint, 2);
-        return;
-    }
-    let go = if inst.failed.is_some() { "ещё раз" } else { "применить" };
-    if inst.pass {
-        let f = st.field_focus == Some("w_pass");
-        ui.field(R::new(b.x, y, half, 28), &w.pass, if inst.wrong { "неверный пароль, ещё раз" } else { "пароль sudo — для пакетов" }, f, true, Act::SField("w_pass"));
-        ui.button(R::new(b.x + half + 20, y, half, 28), go, "down", Tone::Primary, false, !w.pass.text.is_empty(), Act::WInstall);
-        y += 36;
-        ui.wrap(PX, R::new(b.x, y, b.w, 40), "пароль уходит только sudo и нигде не сохраняется", t.text_faint, 2);
-    } else {
-        ui.button(R::new(b.x, y, half, 28), go, "down", Tone::Primary, false, true, Act::WInstall);
-        if !inst.sudo {
-            ui.wrap(PX, R::new(b.x + half + 20, y, half, 40), "sudo нет: пакеты потом одной командой — yami update need", t.text_faint, 2);
-        }
-    }
-}
-
-fn done_page(ui: &mut Ui, st: &State, b: R) {
-    let t = ui.t;
-    let mut y = b.y;
-    ui.text_in(PX24, R::new(b.x, y, b.w, 30), "готово", t.text_hi);
-    y += 38;
-    y += ui.wrap(PX, R::new(b.x, y, b.w, 60), "yami настроен. Всё это живёт в настройках (Mod+S), а мастер снова откроет команда yami setup.", t.text_dim, 3) + 16;
-    y = title(ui, b.x, y, b.w, "главные клавиши");
-    let half = (b.w - 20) / 2;
-    let ids: Vec<&str> = ["launcher", "settings", "terminal", "files", "clipboard", "shot", "walls", "lock", "overview", "hotkeys", "close", "power"]
-        .into_iter()
-        .filter(|id| *id != "files" || st.mods_here.files)
-        .filter(|id| *id != "shot" || st.mods_here.shot)
-        // действие без клавиши (выбор обоев по умолчанию) здесь показывать нечем
-        .filter(|id| crate::keys::BINDS.iter().find(|x| x.id == *id).is_some_and(|bd| !crate::keys::key_of(&st.set, bd).is_empty()))
-        .collect();
-    for (i, id) in ids.iter().enumerate() {
-        let Some(bd) = crate::keys::BINDS.iter().find(|x| x.id == *id) else { continue };
-        let x = if i % 2 == 0 { b.x } else { b.x + half + 20 };
-        let key = crate::keys::key_of(&st.set, bd).replace("Slash", "/");
-        let kw = (ui.w(PX, &key) + 16).max(64);
-        ui.cv.pxbox(R::new(x, y, kw, 24), &BoxStyle::new(t.code_bg, t.border));
-        ui.cv.text_in(ui.f, PX, R::new(x + 8, y, kw - 12, 24), &key, t.text_hi);
-        ui.cv.text_in(ui.f, PX, R::new(x + kw + 10, y, half - kw - 10, 24), crate::keys::title_of(bd), t.text);
-        if i % 2 == 1 {
-            y += 32;
-        }
-    }
-    if ids.len() % 2 == 1 {
-        y += 32;
-    }
-    y += 6;
-    ui.wrap(PX, R::new(b.x, y, b.w, 40), "все клавиши — в настройках → клавиши; их подсказка в niri — Mod+Shift+/", t.text_faint, 2);
+    let last = wz.step + 1 >= wz.steps.len();
+    let (label, icon) = if last { ("закрыть", "check") } else if wz.step == 0 { ("начать", "right") } else { ("дальше", "right") };
+    ui.button(R::new(x + COL - 144, by, 144, 30), label, icon, Tone::Primary, false, true, Act::WNext);
 }
 
 impl App {
@@ -515,7 +320,7 @@ impl App {
         let mut mods = modules();
         probe_mods(&mut mods);
         let step = steps.iter().position(|&i| ALL[i].id == at).unwrap_or(0);
-        let wz = Welcome { step, seen: step, steps, mods, inst: Inst { sudo: crate::wizinst::has_sudo(), ..Default::default() }, pass: Field::default(), others: vec![] };
+        let wz = Welcome { step, seen: step, steps, mods, inst: Inst { sudo: crate::wizinst::has_sudo(), ..Default::default() }, pass: Field::default(), others: vec![], more: None, since: Instant::now() };
         if self.st.modal != Some(Modal::Settings) {
             self.toggle_modal(Modal::Settings, false);
         }
@@ -528,6 +333,8 @@ impl App {
         let i = i.min(wz.steps.len().saturating_sub(1));
         wz.step = i;
         wz.seen = wz.seen.max(i);
+        wz.more = None;
+        wz.since = Instant::now();
         let id = wz.cur().id;
         self.st.stab = id;
         self.st.sscroll = (0, id);
@@ -548,9 +355,28 @@ impl App {
                     let _ = tx.send(crate::app::Msg::Install(Ev::NeedsPassword(crate::wizinst::needs_password())));
                 });
             }
-            _ => self.tab_probe(),
+            // шаг — сама вкладка настроек: её проверки
+            "games" | "login" => self.tab_probe(),
+            _ => {}
         }
         self.dirty(&SKind::Modal);
+    }
+
+    /// «все настройки» шага: вкладка настроек целиком; u8::MAX — обратно к шагу
+    fn welcome_more(&mut self, i: u8) {
+        let Some(wz) = self.st.welcome.as_mut() else { return };
+        let cur = wz.cur();
+        let tab = cur.more.get(i as usize).copied();
+        wz.more = tab.map(|_| i as usize);
+        wz.since = Instant::now();
+        let id = tab.unwrap_or(cur.id);
+        self.st.stab = id;
+        self.st.sscroll = (0, id);
+        self.st.field_focus = None;
+        self.keys_capture(None);
+        if tab.is_some() {
+            self.tab_probe();
+        }
     }
 
     /// мастер закрывают (крестик, Esc, «закрыть»): метка первого входа снимается, всё выбранное — на диск
@@ -575,7 +401,16 @@ impl App {
         let at = self.st.welcome.as_ref().map_or(0, |w| w.step);
         match a {
             Act::WStep(i) => self.welcome_go(*i),
-            Act::WBack => self.welcome_go(at.saturating_sub(1)),
+            Act::WBack => {
+                // сначала закрываются «все настройки», потом — шаг назад
+                if self.st.welcome.as_ref().is_some_and(|w| w.more.is_some()) {
+                    self.welcome_more(u8::MAX);
+                } else {
+                    self.welcome_go(at.saturating_sub(1));
+                }
+            }
+            Act::WMore(i) => self.welcome_more(*i),
+            Act::WSet(k) => page::set(self, k),
             Act::WNext => {
                 let n = self.st.welcome.as_ref().map_or(0, |w| w.steps.len());
                 if at + 1 >= n {
@@ -730,5 +565,12 @@ pub fn mock(st: &mut State, arg: &str) {
     st.stab = ALL[steps[step]].id;
     st.sscroll = (0, st.stab);
     st.mods_here = Here { files: true, view: false, play: false, shot: true, agents: true, greet: false };
-    st.welcome = Some(Welcome { step, seen: step, steps, mods, inst, pass: Field::default(), others });
+    let more = (state == "more").then_some(0);
+    st.welcome = Some(Welcome { step, seen: step, steps, mods, inst, pass: Field::default(), others, more, since: Instant::now().checked_sub(Duration::from_secs(9)).unwrap_or_else(Instant::now) });
+    if state == "more" {
+        if let Some(id) = ALL[st.welcome.as_ref().map_or(0, |w| w.steps[w.step])].more.first() {
+            st.stab = id;
+            st.sscroll = (0, id);
+        }
+    }
 }

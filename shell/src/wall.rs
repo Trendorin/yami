@@ -329,13 +329,9 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
 }
 
 // ── вкладка «обои» ──────────────────────────────────────────────────────────
-pub fn tab(ui: &mut Ui, st: &State, b: R) {
-    let s = &st.set;
+/// превью в пропорциях экрана: то, что сейчас на рабочем столе
+pub(crate) fn preview(ui: &mut Ui, st: &State, pv: R) {
     let t = ui.t;
-    let half = (b.w - 20) / 2;
-    let mut y = title(ui, b.x, b.y, b.w, "картинка");
-    // превью в пропорциях экрана — то, что сейчас на рабочем столе
-    let pv = R::new(b.x, y, 256, 144);
     ui.cv.pxbox(pv, &BoxStyle::new(t.code_bg, t.border));
     let inner = pv.inset(3);
     ui.cv.push_clip(inner);
@@ -346,6 +342,15 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
         ui.cv.image_scaled(img, R::new(inner.x + (inner.w - dw) / 2, inner.y + (inner.h - dh) / 2, dw, dh), 1.0);
     }
     ui.cv.pop_clip();
+}
+
+pub fn tab(ui: &mut Ui, st: &State, b: R) {
+    let s = &st.set;
+    let t = ui.t;
+    let half = (b.w - 20) / 2;
+    let mut y = title(ui, b.x, b.y, b.w, "картинка");
+    let pv = R::new(b.x, y, 256, 144);
+    preview(ui, st, pv);
     let (rx, rw) = (pv.right() + 16, b.right() - pv.right() - 16);
     let mut ry = y + 2;
     let skwd = s.wall_skwd.then_some(st.skwd.pick.as_ref()).flatten();

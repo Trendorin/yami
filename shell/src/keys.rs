@@ -452,7 +452,7 @@ pub fn combo(m: &Modifiers, key: &str) -> String {
 const ROW_H: i32 = 30;
 
 /// раздел «раскладка»: коды xkb и сочетание переключения
-fn layout_rows(ui: &mut Ui, st: &State, list: R, mut ry: i32) -> i32 {
+pub(crate) fn layout_rows(ui: &mut Ui, st: &State, list: R, mut ry: i32) -> i32 {
     let t = ui.t;
     let s = &st.set;
     let focused = st.field_focus == Some("kb_layout");

@@ -17,7 +17,7 @@ const OPEN: u8 = 0;
 const CLOSE: u8 = 1;
 const SPEED: u8 = 2;
 const MOTION: u8 = 3;
-const DEMO: u8 = 4;
+pub(crate) const DEMO: u8 = 4;
 /// пауза между открытием и закрытием образца, мс
 const HOLD: f32 = 600.0;
 
@@ -56,7 +56,7 @@ fn demo_k(st: &State, gi: usize) -> Option<(f32, bool)> {
 }
 
 /// образец группы: «сцена» и на ней панель той формы, что у группы
-fn sample(ui: &mut Ui, st: &State, gi: usize, r: R) {
+pub(crate) fn sample(ui: &mut Ui, st: &State, gi: usize, r: R) {
     let t = ui.t;
     let id = ANIM_GROUPS[gi].0;
     let hov = ui.hover(r);

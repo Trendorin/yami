@@ -41,6 +41,10 @@ pub enum Act {
     WInstall,
     WNiri(&'static str),
     WOther(usize),
+    /// «все настройки» шага: номер вкладки, u8::MAX — обратно к шагу
+    WMore(u8),
+    /// выбор на странице мастера: что именно, см. wizpages::set
+    WSet(&'static str),
     /// настройки → вид: набор значков / курсоров по номеру карточки (iconsets.rs)
     SIconSet(usize),
     SCursorSet(usize),
