@@ -71,6 +71,9 @@ Please do not post it in public issues: send a [private report on GitHub](https:
   counts with a matching principal (`gpg.minTrustLevel=fully`, and «No principal matched» is
   refused even where an old git would exit 0). Releases are cut
   with `tools/release.sh`, which refuses to make an unsigned tag once keys exist.
+- Ready binaries: a release's archive is used only when `SHA256SUMS.sig` checks out against
+  `keys/allowed_signers` of the tag being installed (namespace `yami-release`) and the archive
+  matches `SHA256SUMS`; a missing or foreign signature stops the install before anything changes.
 - Installing: `install.sh --update` from the new tree as the user, no sudo; the previous binaries
   are kept for `yami update rollback`. A game in focus postpones the shell restart.
 - Private or public repository: the same HTTPS URL. While it is private, git uses the user's

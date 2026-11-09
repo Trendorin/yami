@@ -9,6 +9,10 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+- Ready binaries: on x86_64 with glibc 2.34 or newer a release installs signed, ready programs, with no compiler and in a few minutes, updates too; anywhere else, or with `--from-source`, it builds as before. Packages come from the same files: a `.deb` per program, `packaging/arch/PKGBUILD`, `packaging/fedora/yami.spec` and a Gentoo ebuild, and a package meets you with the first-run setup at the first login.
+- The password typed into the first-run setup can no longer reach the screen or the install log: sudo asks it through a link only it can start. Installing modules from that window with a password also skipped the steps after the build, and no longer does.
+- Your niri config stays yours in one more case: a config that started from niri's own and was edited since gets the include line and is no longer replaced. A link (stow, a dotfiles repository) stays a link when yami disconnects, and `yami niri disconnect` is respected by later updates.
+- The Nix flake builds the shell and each module again after the split into repositories.
 - Everything of yami lives in one folder, `~/.config/yami`, like other shells have it: `shell.json` (was `~/.config/yami-shell.json`), `files.json` (was `~/.config/yami-files.json`), `scripts/` (was `modules/`), themes, templates and `niri/`. The old files move there by themselves.
 - Your niri config stays yours: yami no longer replaces `~/.config/niri/config.kdl` but adds one include line at its top (`yami niri connect`, `yami niri disconnect`), and what you write below it wins. A missing config or niri's own starting one gets yami's starting config, the old file kept next to it. Settings → system → niri switches each part yami brings: its niri look, keys, window rules, colours, screens.
 - With bash as the login shell (Arch and others) the shell no longer stays away after login: niri-session dropped `~/.local/bin` from the PATH, so neither the bar nor the keys like `Mod+Space` started. On CachyOS fish hid it.

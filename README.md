@@ -200,6 +200,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Trendorin/yami/main/install.
 
 or from a checkout: `git clone https://github.com/Trendorin/yami yami && yami/install.sh`.
 
+On x86_64 with glibc 2.34 or newer (Ubuntu 22.04, Debian 12, Fedora 35 and everything newer) a release installs
+ready binaries with a checked signature: no compiler, a few minutes. Anywhere else it builds from source. Packages for
+Arch, Debian, Fedora, Gentoo and Nix: [docs/PACKAGING.md](docs/PACKAGING.md).
+
 It installs only the base: niri, the shell, a terminal and what the desktop cannot start without. Run it as
 yourself, not with sudo: it asks for the password once, where it is needed, and before anything else it says
 how long it will take and how much disk it needs. Then log out and pick the **Niri** session (no login screen
@@ -223,6 +227,9 @@ No flag is needed for a normal install; these are for the rest:
 | `--no-ID`, `--ID` | with `--full`: a module off or on |
 | `--restyle LIST` | what yami restyles: `all`, `none` or a list of `gtk` `qt` `cursor` `kitty` `fastfetch` `btop` `firefox` `mangohud` `foot` `cava` `starship`; a program left out is never touched (later: settings → color → apps) |
 | `--no-sudo` | home directory only: no packages, no system files |
+| `--from-source` | build everything here instead of taking the release's ready binaries |
+| `--main` | the head of the development branch instead of the newest release (builds from source) |
+| `--prebuilt DIR\|URL` | take the ready binaries from this folder or address |
 | `--dry-run` | print the plan, change nothing |
 | `--no-count` | do not add this machine to the «installs» badge (one anonymous request, [details](docs/SECURITY.md#install-count)); `DO_NOT_TRACK=1` does the same |
 | `--uninstall` | remove yami and its modules, restore the backups and the previous login manager |
@@ -235,12 +242,13 @@ What the base install does:
    NetworkManager, BlueZ, power-profiles-daemon, Noto fonts, cliphist, grim, kitty, btop and the night
    light with its native package manager, in one transaction. Names a repository does not carry are reported, not fatal. Enables Bluetooth
    and power profiles, and NetworkManager when nothing else manages the network.
-2. Builds the shell with `cargo build --release --locked` (Rust ≥ 1.89; rustup
-   is used when the distribution's toolchain is older) into `~/.local/bin`.
+2. Puts the release's ready binaries into `~/.local/bin` after checking their signature, or builds
+   the shell with `cargo build --release --locked` (Rust ≥ 1.89; rustup is used when the
+   distribution's toolchain is older) when there are none for this system.
 3. Installs the pixel fonts (Tiny5, DotGothic16, Terminess).
 4. Connects yami to niri's config with one include line at its top (your config stays yours, what
-   you write below the line wins); without a config, or with niri's own starting one, it writes
-   yami's starting config and keeps the old file as `config.kdl.bak-yami-DATE`.
+   you write below the line wins); without a config, or with niri's own starting one left as it was, it
+   writes yami's starting config and keeps the old file as `config.kdl.bak-yami-DATE`.
 
 yami stays out of your drivers and your boot: no session environment for a driver, no module
 options, no initramfs. Everything is logged to `~/.cache/yami/install.log`. On NixOS use the flake
