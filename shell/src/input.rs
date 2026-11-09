@@ -131,6 +131,8 @@ impl App {
                     // клик мимо панели — по затемнению или ловцу: закрыть
                     match self.surf_kind(sid) {
                         Some(SKind::Dim) if self.st.modal == Some(Modal::Walls) => self.walls_back(),
+                        // щелчок мимо мастера не закрывает его: сначала вопрос
+                        Some(SKind::Dim) if self.st.welcome.is_some() => self.welcome_ask(),
                         Some(SKind::Dim) => self.close_modal(),
                         Some(SKind::Catcher) => {
                             self.close_popup();

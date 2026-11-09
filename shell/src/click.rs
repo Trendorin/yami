@@ -38,8 +38,12 @@ impl App {
                 }
             }
             Act::CloseModal => {
-                self.welcome_end();
-                self.close_modal();
+                // крестик мастера не закрывает его сразу: нечаянный щелчок не должен стоить настройки
+                if self.st.welcome.is_some() {
+                    self.welcome_ask();
+                } else {
+                    self.close_modal();
+                }
             }
             // ── выбор обоев ─────────────────────────────────────────────────
             Act::WallPick(i) => self.walls_pick(i),

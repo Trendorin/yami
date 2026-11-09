@@ -296,6 +296,8 @@ pub struct State {
     pub niri_link: crate::niricfg::Status,
     /// первая настройка открыта (окно настроек в виде шагов) и пора ли её открыть (первый вход)
     pub welcome: Option<crate::welcome::Welcome>,
+    /// мастер закрыт, но не пройден: следующее открытие настроек вернётся в него, на тот же шаг
+    pub welcome_parked: Option<crate::welcome::Welcome>,
     pub welcome_due: bool,
     /// какие модули стоят: вкладки без своего модуля прячутся
     pub mods_here: crate::welcome::Here,
@@ -503,6 +505,7 @@ impl State {
             game_probe: Default::default(),
             niri_link: Default::default(),
             welcome: None,
+            welcome_parked: None,
             welcome_due: false,
             mods_here: crate::welcome::Here::probe(),
             niri_note: String::new(),

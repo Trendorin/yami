@@ -112,6 +112,7 @@ const TARGETS: &[&str] = &[
     "settings:updates-pick",
     "settings:updates-need",
     "welcome:hello",
+    "welcome:hello-leave",
     "welcome:style",
     "welcome:color",
     "welcome:color-more",

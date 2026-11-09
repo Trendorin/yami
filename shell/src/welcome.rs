@@ -4,11 +4,12 @@
 // настроек, но не похож на них. Страницы — wizpages.rs, установка модулей — wizinst.rs.
 // Открывается сама при первом входе (метка first-run: её кладёт установщик, а без настроек — сам
 // шелл, если его поставили пакетом), потом — `yami setup` и кнопка во вкладке «о шелле». Закрыть
-// можно в любой момент: метка снимается, выбранное остаётся.
+// нечаянно нельзя: крестик и Esc спрашивают, а закрытый не пройдя мастер ждёт: настройки возвращают
+// в него на тот же шаг, а метка хранит этот шаг до следующего входа. Метка снимается только в конце.
 
 use crate::app::{App, Modal, SKind, State};
 use crate::font::{self, PX, PX24};
-use crate::gfx::R;
+use crate::gfx::{BoxStyle, R};
 use crate::settings::{scroll_of, scrollbar, Tab};
 use crate::ui::{Act, Cur, Field, Tone, Ui};
 use crate::wizinst::Ev;
@@ -145,6 +146,10 @@ pub struct Welcome {
     pub more: Option<usize>,
     /// с какого мгновения показана страница: она появляется, а не вспыхивает
     pub since: Instant,
+    /// открыт вопрос «выйти из настройки?»
+    pub ask: bool,
+    /// пройден до конца или закрыт насовсем: ждать его больше не надо
+    pub finished: bool,
 }
 
 impl Welcome {
@@ -164,6 +169,11 @@ impl Welcome {
     pub fn own_scroll(&self) -> bool {
         self.more_tab().is_some_and(|t| t.own_scroll)
     }
+}
+
+/// метка «первая настройка не пройдена»; внутри — шаг, на котором остановились
+fn marker() -> std::path::PathBuf {
+    yami_px::paths::state_dir().join("first-run")
 }
 
 fn has_steam() -> bool {
@@ -305,12 +315,48 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     let last = wz.step + 1 >= wz.steps.len();
     let (label, icon) = if last { ("закрыть", "check") } else if wz.step == 0 { ("начать", "right") } else { ("дальше", "right") };
     ui.button(R::new(x + COL - 144, by, 144, 30), label, icon, Tone::Primary, false, true, Act::WNext);
+    if wz.ask {
+        leave_sheet(ui, fr);
+    }
+}
+
+/// вопрос перед выходом: поверх всего окна, главная кнопка — остаться
+fn leave_sheet(ui: &mut Ui, fr: R) {
+    let t = ui.t;
+    ui.cv.fill(R::new(1, 1, fr.w - 2, fr.h - 2), t.bg.alpha(0.82));
+    ui.zone(fr, Act::Block, Cur::Default);
+    let (w, h) = (470, 218);
+    let r = R::new(fr.x + (fr.w - w) / 2, fr.y + (fr.h - h) / 2, w, h);
+    ui.cv.pxbox(r, &BoxStyle::new(t.surface, t.red).shadow(3));
+    ui.zone(r, Act::Block, Cur::Default);
+    ui.text_in(PX24, R::new(r.x + 24, r.y + 18, r.w - 48, 30), "выйти из настройки?", t.text_hi);
+    ui.wrap(PX, R::new(r.x + 24, r.y + 54, r.w - 48, 44), "всё выбранное сохранено. Вернуться можно в любой момент: откроется этот же шаг.", t.text_dim, 2);
+    let b = r.x + 24;
+    let bw = r.w - 48;
+    ui.button(R::new(b, r.y + 104, bw, 32), "продолжить настройку", "right", Tone::Primary, false, true, Act::WLeave(0));
+    let half = (bw - 10) / 2;
+    ui.button(R::new(b, r.y + 146, half, 30), "вернусь позже", "close", Tone::Plain, false, true, Act::WLeave(1));
+    ui.button(R::new(b + half + 10, r.y + 146, half, 30), "больше не показывать", "", Tone::Ghost, false, true, Act::WLeave(2));
+    ui.wrap(PX, R::new(b, r.y + 184, bw, 22), "позже: кнопка настроек на баре или команда yami setup", t.text_faint, 1);
 }
 
 impl App {
     /// открыть первую настройку на шаге (id шага; неизвестный — первый)
     pub fn welcome_open(&mut self, at: &str) {
         if self.st.locked {
+            return;
+        }
+        // ждёт незаконченный: вернуться в него, а не начинать заново (шаг задан — на него)
+        if self.st.welcome_parked.is_some() {
+            if self.st.modal != Some(Modal::Settings) {
+                self.toggle_modal(Modal::Settings, false);
+            }
+            if at != "hello" {
+                let i = self.st.welcome.as_ref().and_then(|w| w.steps.iter().position(|&k| ALL[k].id == at));
+                if let Some(i) = i {
+                    self.welcome_go(i);
+                }
+            }
             return;
         }
         self.st.mods_here = Here::probe();
@@ -320,7 +366,7 @@ impl App {
         let mut mods = modules();
         probe_mods(&mut mods);
         let step = steps.iter().position(|&i| ALL[i].id == at).unwrap_or(0);
-        let wz = Welcome { step, seen: step, steps, mods, inst: Inst { sudo: crate::wizinst::has_sudo(), ..Default::default() }, pass: Field::default(), others: vec![], more: None, since: Instant::now() };
+        let wz = Welcome { step, seen: step, steps, mods, inst: Inst { sudo: crate::wizinst::has_sudo(), ..Default::default() }, pass: Field::default(), others: vec![], more: None, since: Instant::now(), ask: false, finished: false };
         if self.st.modal != Some(Modal::Settings) {
             self.toggle_modal(Modal::Settings, false);
         }
@@ -336,6 +382,11 @@ impl App {
         wz.more = None;
         wz.since = Instant::now();
         let id = wz.cur().id;
+        // метка помнит шаг: следующий вход вернётся сюда
+        let mark = marker();
+        if mark.exists() {
+            let _ = std::fs::write(&mark, id);
+        }
         self.st.stab = id;
         self.st.sscroll = (0, id);
         self.st.field_focus = None;
@@ -384,13 +435,50 @@ impl App {
         if self.st.welcome.is_none() {
             return;
         }
-        let _ = std::fs::remove_file(yami_px::paths::state_dir().join("first-run"));
+        let _ = std::fs::remove_file(marker());
+        self.welcome_save();
+        if let Some(wz) = self.st.welcome.as_mut() {
+            wz.finished = true;
+            yami_px::ui::wipe(&mut wz.pass.text);
+        }
+    }
+
+    fn welcome_save(&mut self) {
         let j = self.st.set.to_json();
         let _ = crate::config::write_atomic(&crate::config::settings_path(), &j);
         self.set_saved = j;
-        if let Some(wz) = self.st.welcome.as_mut() {
-            yami_px::ui::wipe(&mut wz.pass.text);
+    }
+
+    /// крестик, Esc, щелчок мимо: сначала спросить
+    pub fn welcome_ask(&mut self) {
+        if let Some(w) = self.st.welcome.as_mut() {
+            w.ask = true;
+            self.st.field_focus = None;
+            self.dirty(&SKind::Modal);
         }
+    }
+
+    /// окно настроек закрылось: мастер, который не пройден, ждёт (close_modal)
+    pub fn welcome_park(&mut self) {
+        let Some(mut w) = self.st.welcome.take() else { return };
+        yami_px::ui::wipe(&mut w.pass.text);
+        w.pass = Field::default();
+        w.ask = false;
+        if w.finished {
+            return;
+        }
+        w.inst.pass = false;
+        self.welcome_save();
+        self.st.welcome_parked = Some(w);
+        self.toast_note(&crate::tf!("первая настройка ждёт", "the first-run setup is waiting", "a configuração inicial está esperando"), &crate::tf!("вернуться: кнопка настроек на баре, откроется этот же шаг", "to go back: the settings button on the bar opens this same step", "para voltar: o botão de configurações na barra abre este mesmo passo"));
+    }
+
+    /// настройки открылись, а мастер ждал: вернуться в него на тот же шаг
+    pub fn welcome_unpark(&mut self) {
+        let Some(w) = self.st.welcome_parked.take() else { return };
+        let at = w.step;
+        self.st.welcome = Some(w);
+        self.welcome_go(at);
     }
 
     /// клики мастера; true — это был он
@@ -410,6 +498,21 @@ impl App {
                 }
             }
             Act::WMore(i) => self.welcome_more(*i),
+            Act::WLeave(0) => {
+                if let Some(w) = self.st.welcome.as_mut() {
+                    w.ask = false;
+                }
+            }
+            Act::WLeave(1) => {
+                // close_modal оставит мастер ждать
+                self.close_modal();
+                return true;
+            }
+            Act::WLeave(_) => {
+                self.welcome_end();
+                self.close_modal();
+                return true;
+            }
             Act::WSet(k) => page::set(self, k),
             Act::WNext => {
                 let n = self.st.welcome.as_ref().map_or(0, |w| w.steps.len());
@@ -524,7 +627,9 @@ impl App {
             return;
         }
         self.st.welcome_due = false;
-        self.welcome_open("hello");
+        // метка помнит шаг, на котором остановились
+        let saved = std::fs::read_to_string(marker()).unwrap_or_default();
+        self.welcome_open(if has_step(saved.trim()) { saved.trim() } else { "hello" });
     }
 }
 
@@ -566,7 +671,7 @@ pub fn mock(st: &mut State, arg: &str) {
     st.sscroll = (0, st.stab);
     st.mods_here = Here { files: true, view: false, play: false, shot: true, agents: true, greet: false };
     let more = (state == "more").then_some(0);
-    st.welcome = Some(Welcome { step, seen: step, steps, mods, inst, pass: Field::default(), others, more, since: Instant::now().checked_sub(Duration::from_secs(9)).unwrap_or_else(Instant::now) });
+    st.welcome = Some(Welcome { step, seen: step, steps, mods, inst, pass: Field::default(), others, more, since: Instant::now().checked_sub(Duration::from_secs(9)).unwrap_or_else(Instant::now), ask: state == "leave", finished: false });
     if state == "more" {
         if let Some(id) = ALL[st.welcome.as_ref().map_or(0, |w| w.steps[w.step])].more.first() {
             st.stab = id;

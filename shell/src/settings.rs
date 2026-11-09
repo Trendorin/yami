@@ -319,13 +319,15 @@ impl App {
         // первая настройка: Enter и Tab — по шагам, Esc закрывает
         if let Some(at) = self.st.welcome.as_ref().map(|w| w.step) {
             match e.keysym {
+                // Esc спрашивает, а вопрос Esc и Enter просто убирают: случайно не закрыть
                 Keysym::Escape => {
-                    self.welcome_end();
-                    self.close_modal();
+                    let asking = self.st.welcome.as_ref().is_some_and(|w| w.ask);
+                    self.settings_click(&if asking { Act::WLeave(0) } else { Act::CloseModal });
                     return;
                 }
                 Keysym::Return | Keysym::KP_Enter => {
-                    self.settings_click(&Act::WNext);
+                    let asking = self.st.welcome.as_ref().is_some_and(|w| w.ask);
+                    self.settings_click(&if asking { Act::WLeave(0) } else { Act::WNext });
                     return;
                 }
                 Keysym::Tab | Keysym::ISO_Left_Tab => {

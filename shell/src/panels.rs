@@ -27,6 +27,11 @@ impl App {
             self.dirty(&SKind::Modal);
             return;
         }
+        // та же клавиша при открытом мастере: спросить, а не закрыть молча
+        if same && m == Modal::Settings && self.st.welcome.is_some() {
+            self.welcome_ask();
+            return;
+        }
         self.close_all();
         if same {
             return;
@@ -67,6 +72,10 @@ impl App {
             Modal::Reply => "yami-reply",
             Modal::Walls => "yami-walls",
         }, Anchor::empty(), (w, h + 12), (0, 0, 0, 0), -1, KeyboardInteractivity::Exclusive);
+        // мастер, который закрыли не пройдя: настройки возвращают в него
+        if m == Modal::Settings {
+            self.welcome_unpark();
+        }
     }
 
     /// тащим настройки за заголовок: окно открывается по центру (без якоря), при первом сдвиге
@@ -114,11 +123,7 @@ impl App {
         }
         if self.st.modal == Some(Modal::Settings) {
             self.sets_free();
-            // мастер закрыли не сам (лаунчер, другое окно): метка первого входа остаётся, при
-            // следующем запуске он откроется снова; пароль — из памяти
-            if let Some(mut w) = self.st.welcome.take() {
-                yami_px::ui::wipe(&mut w.pass.text);
-            }
+            self.welcome_park();
         }
         if self.st.modal == Some(Modal::Launcher) {
             self.st.launcher.thumbs_free();
