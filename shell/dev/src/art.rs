@@ -156,10 +156,9 @@ fn accent(root: &std::path::Path) -> String {
     format!("#{}", ids.iter().zip(hexes.iter()).find(|(i, _)| i.as_str() == want).map_or("c4161c", |(_, h)| h.as_str()))
 }
 
-/// значки 7×7 из библиотеки yami-px: рядом с этим репозиторием или в YAMI_MODULES_DIR
+/// значки 7×7 из библиотеки yami-px (shell/px этого репозитория)
 fn icons(root: &std::path::Path) -> BTreeMap<String, Vec<String>> {
-    let dir = std::env::var_os("YAMI_MODULES_DIR").map(std::path::PathBuf::from).unwrap_or_else(|| root.join("../yami-modules"));
-    let src = std::fs::read_to_string(dir.join("yami-px/src/gfx.rs")).unwrap_or_default();
+    let src = std::fs::read_to_string(root.join("shell/px/src/gfx.rs")).unwrap_or_default();
     let block = Regex::new(r#""(\w+)" => &\[((?:"[.#]{7}",? ?){7})\]"#).unwrap();
     let row = Regex::new(r#""([.#]{7})""#).unwrap();
     block.captures_iter(&src).map(|m| (m[1].to_string(), row.captures_iter(&m[2]).map(|r| r[1].to_string()).collect())).collect()

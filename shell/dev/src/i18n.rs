@@ -255,7 +255,9 @@ pub fn todo(args: &[String]) -> i32 {
         eprintln!("i18n-todo: CODE is one of {}", PARTIAL.join(" "));
         return 2;
     };
-    for (i, e) in missing(&dir_arg(args, 1), code).iter().enumerate() {
+    // «installer» вместо папки — строки установщика (installer/lang/<код>.sh)
+    let list = if args.get(1).is_some_and(|a| a == "installer") { installer_missing(code) } else { missing(&dir_arg(args, 1), code) };
+    for (i, e) in list.iter().enumerate() {
         println!("{}\t{e}", i + 1);
     }
     0
@@ -266,6 +268,9 @@ pub fn add(args: &[String]) -> i32 {
         eprintln!("i18n-add: CODE FILE [DIR], CODE is one of {}", PARTIAL.join(" "));
         return 2;
     };
+    if args.get(2).is_some_and(|a| a == "installer") {
+        return installer_add(code, file);
+    }
     let src = dir_arg(args, 2);
     let list = missing(&src, code);
     let quote = Regex::new(r#"(^|[^\\])""#).unwrap();
@@ -340,15 +345,21 @@ fn coverage(dirs: &[PathBuf]) -> (Vec<String>, String) {
 }
 
 /// установщик: английские строки t "рус" "eng" ["port"] (подстановки — только {} и значения после шаблонов)
-/// и названия из массивов *_EN=(…) против таблиц installer/lang/<код>.sh; тоже по частям, считается процент
-fn installer() -> (Vec<String>, String) {
+/// и названия из массивов *_EN=(…), по порядку в файлах; плюс ошибки в самих вызовах
+fn installer_needed() -> (Vec<String>, Vec<String>) {
     let root = crate::root();
     let call = Regex::new(&format!(r"(?:^|[\s(;|&])t {S} {S}")).unwrap();
     let arr = Regex::new(r"^[A-Z]+_EN=\(([^)]*)\)").unwrap();
-    let row = Regex::new(&format!(r"^  \[{S}\]={S}$")).unwrap();
     let mut files = vec![root.join("install.sh")];
-    files.extend(std::fs::read_dir(root.join("installer")).map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "sh")).collect::<Vec<_>>()).unwrap_or_default());
-    let (mut problems, mut need) = (vec![], BTreeSet::new());
+    let mut parts: Vec<PathBuf> = std::fs::read_dir(root.join("installer")).map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "sh")).collect()).unwrap_or_default();
+    parts.sort();
+    files.extend(parts);
+    let (mut problems, mut need, mut seen) = (vec![], vec![], HashSet::new());
+    let mut push = |s: String| {
+        if seen.insert(s.clone()) {
+            need.push(s);
+        }
+    };
     for f in &files {
         let name = f.strip_prefix(&root).unwrap_or(f).display().to_string();
         for (i, line) in std::fs::read_to_string(f).unwrap_or_default().lines().enumerate() {
@@ -361,39 +372,119 @@ fn installer() -> (Vec<String>, String) {
                 } else if m[2].contains('$') {
                     problems.push(format!("{name}:{}: «{}»: a variable inside the text, use {{}} and pass the value after the three texts", i + 1, &m[2]));
                 } else {
-                    need.insert(m[2].to_string());
+                    push(m[2].to_string());
                 }
             }
             if let Some(m) = arr.captures(line) {
-                need.extend(m[1].split_whitespace().map(String::from));
+                m[1].split_whitespace().for_each(|s| push(s.to_string()));
             }
         }
     }
+    (problems, need)
+}
+
+fn installer_table(code: &str) -> PathBuf {
+    crate::root().join(format!("installer/lang/{code}.sh"))
+}
+
+/// строки таблицы installer/lang/<код>.sh: (английский, перевод); строка не по форме — Err(она)
+fn installer_rows(text: &str) -> Vec<Result<(String, String), String>> {
+    let row = Regex::new(&format!(r"^  \[{S}\]={S}$")).unwrap();
+    text.lines()
+        .filter(|l| !l.starts_with('#') && *l != "TR=(" && *l != ")")
+        .map(|l| row.captures(l).map(|m| (m[1].to_string(), m[2].to_string())).ok_or_else(|| l.to_string()))
+        .collect()
+}
+
+/// что не так с переводом строки установщика (пусто — годится): bash раскрыл бы $ и `, кавычка закрыла бы строку
+fn installer_bad(code: &str, en: &str, tr: &str) -> &'static str {
+    if tr.trim().is_empty() {
+        "empty"
+    } else if tr.contains(['$', '`', '"', '\\']) {
+        "a quote, $, ` or \\ (bash would read it)"
+    } else if en.matches("{}").count() != tr.matches("{}").count() {
+        "{} differ"
+    } else if code != "uk" && CYR.is_match(tr) {
+        "Cyrillic"
+    } else {
+        ""
+    }
+}
+
+/// строки установщика, которых нет в таблице языка, по порядку
+fn installer_missing(code: &str) -> Vec<String> {
+    let have: HashSet<String> = installer_rows(&std::fs::read_to_string(installer_table(code)).unwrap_or_default()).into_iter().flatten().map(|r| r.0).collect();
+    installer_needed().1.into_iter().filter(|e| !have.contains(e)).collect()
+}
+
+/// i18n-add … installer: «номер<TAB>перевод» → строки перед закрывающей «)» таблицы
+fn installer_add(code: &str, file: &str) -> i32 {
+    let list = installer_missing(code);
+    let (mut rows, mut bad) = (vec![], 0);
+    for line in std::fs::read_to_string(file).unwrap_or_default().lines().filter(|l| !l.trim().is_empty()) {
+        let Some((n, tr)) = line.split_once('\t') else {
+            eprintln!("i18n-add: no tab: {line}");
+            bad += 1;
+            continue;
+        };
+        let Some(en) = n.trim().parse::<usize>().ok().and_then(|n| list.get(n.wrapping_sub(1))) else {
+            eprintln!("i18n-add: no string number {n}");
+            bad += 1;
+            continue;
+        };
+        let tr = tr.trim_end_matches(['\r', '\n']);
+        match installer_bad(code, en, tr) {
+            "" => rows.push(format!("  [\"{en}\"]=\"{tr}\"\n")),
+            why => {
+                eprintln!("i18n-add: {n}: {why}: «{en}» → «{tr}»");
+                bad += 1;
+            }
+        }
+    }
+    let path = installer_table(code);
+    let name = match code { "es" => "Español", "de" => "Deutsch", "fr" => "Français", "uk" => "Українська", "pl" => "Polski", c => c };
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|_| {
+        format!("# {name}: the installer's lines keyed by the English text (t in installer/ui.sh, lang_load).\n# A line missing here shows in English; yami-dev check-i18n checks the keys and the {{}} of each line.\n# shellcheck shell=bash disable=SC2034\nTR=(\n)\n")
+    });
+    let Some(end) = text.rfind("\n)") else {
+        eprintln!("i18n-add: {} has no table", path.display());
+        return 1;
+    };
+    let out = format!("{}\n{}{}", &text[..end], rows.concat(), &text[end + 1..]);
+    if std::fs::write(&path, out).is_err() {
+        eprintln!("i18n-add: cannot write {}", path.display());
+        return 1;
+    }
+    println!("i18n-add: {} added to {}, {bad} refused, {} left", rows.len(), path.display(), list.len() - rows.len());
+    i32::from(bad > 0)
+}
+
+/// таблицы установщика против его строк; тоже по частям, считается процент
+fn installer() -> (Vec<String>, String) {
+    let (mut problems, need) = installer_needed();
+    let need: HashSet<String> = need.into_iter().collect();
     let mut line = vec![];
     for code in PARTIAL {
         let file = format!("installer/lang/{code}.sh");
-        let Ok(text) = std::fs::read_to_string(root.join(&file)) else { continue };
+        let Ok(text) = std::fs::read_to_string(installer_table(code)) else { continue };
         let mut have: HashSet<String> = HashSet::new();
-        for l in text.lines().filter(|l| !l.starts_with('#') && *l != "TR=(" && *l != ")") {
-            let Some(m) = row.captures(l) else {
-                problems.push(format!("{file}: not a table row: {l}"));
-                continue;
+        for r in installer_rows(&text) {
+            let (en, tr) = match r {
+                Ok(r) => r,
+                Err(l) => {
+                    problems.push(format!("{file}: not a table row: {l}"));
+                    continue;
+                }
             };
-            let (en, tr) = (&m[1], &m[2]);
-            if !need.contains(en) {
+            if !need.contains(&en) {
                 problems.push(format!("{file}: «{en}» is no longer a line of the installer"));
             }
-            if !have.insert(en.to_string()) {
+            match installer_bad(code, &en, &tr) {
+                "" => {}
+                why => problems.push(format!("{file}: {why}: «{en}» → «{tr}»")),
+            }
+            if !have.insert(en.clone()) {
                 problems.push(format!("{file}: duplicate key «{en}»"));
-            }
-            if en.matches("{}").count() != tr.matches("{}").count() {
-                problems.push(format!("{file}: {{}} differ for «{en}»"));
-            }
-            if tr.contains(['$', '`']) {
-                problems.push(format!("{file}: «{tr}» would expand in bash"));
-            }
-            if *code != "uk" && CYR.is_match(tr) {
-                problems.push(format!("{file}: «{en}» is Cyrillic: «{tr}»"));
             }
         }
         if !need.is_empty() {

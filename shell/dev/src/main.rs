@@ -3,7 +3,7 @@
 //
 //   yami-dev check-docs [-v]            английские и русские документы — один текст
 //   yami-dev check-i18n [ПАПКА …]       у каждой русской строки есть перевод
-//   yami-dev i18n-todo КОД [ПАПКА]       непереведённые строки языка, по номерам
+//   yami-dev i18n-todo КОД [ПАПКА]       непереведённые строки языка, по номерам (ПАПКА installer — установщик)
 //   yami-dev i18n-add КОД ФАЙЛ [ПАПКА]   вписать переводы «номер<TAB>текст» в таблицу языка
 //   yami-dev readme-art [#акцент]       картинки README
 //   yami-dev changelog ВЕРСИЯ           «Unreleased» становится выпуском
@@ -40,7 +40,7 @@ fn main() {
         Some("changelog") => docs::changelog(rest),
         Some("shots") => shots::run(rest),
         _ => {
-            eprintln!("yami-dev: check-docs [-v] | check-i18n [DIR…] | i18n-todo CODE [DIR] | i18n-add CODE FILE [DIR] | readme-art [#accent] | changelog VERSION | shots …");
+            eprintln!("yami-dev: check-docs [-v] | check-i18n [DIR…] | i18n-todo CODE [DIR|installer] | i18n-add CODE FILE [DIR|installer] | readme-art [#accent] | changelog VERSION | shots …");
             2
         }
     });
