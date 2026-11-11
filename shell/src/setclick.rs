@@ -368,7 +368,9 @@ impl App {
                 }
                 "wall_apply" => {
                     let p = self.st.wall_field.text.clone();
-                    self.set_wall(&p);
+                    if !self.wall_dir_typed(&p) {
+                        self.set_wall(&p);
+                    }
                 }
                 "curtain_style" => {
                     s.curtain_style = crate::curtain::next_style(&s.curtain_style).into();

@@ -182,6 +182,7 @@ impl App {
             Msg::WallsListed(gen, dir, files, more) => self.walls_listed(gen, dir, files, more),
             Msg::WallThumb(gen, i, img) => self.walls_thumb(gen, i, img),
             Msg::WallsAsked(folder, got, back) => self.walls_asked(folder, got, back),
+            Msg::WallDir(got) => self.wall_dir_picked(got),
             Msg::SkwdLayers(drawn) => self.skwd_layers(drawn),
             Msg::Curtain(n, imgs) => self.curtain_ready(n, imgs),
             Msg::Theme => {

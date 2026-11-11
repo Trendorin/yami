@@ -384,8 +384,32 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     ui.button(R::new(rx, ry, rw, 28), "пиксельные из палитры", "image", Tone::Plain, false, own(s).is_some(), Act::SWall("reset"));
     y = pv.bottom() + 10;
     let focused = st.field_focus == Some("wall");
-    ui.field(R::new(b.x, y, b.w - 130, 30), &st.wall_field, "или путь к файлу", focused, false, Act::SField("wall"));
+    ui.field(R::new(b.x, y, b.w - 130, 30), &st.wall_field, "или путь к файлу или папке", focused, false, Act::SField("wall"));
     ui.button(R::new(b.right() - 120, y + 2, 120, 26), "применить", "check", Tone::Primary, false, true, Act::SCycle("wall_apply"));
+    y += 40;
+    // папка обоев (wallDir): из неё сетка выбора; пусто — находится сама (walls.rs dir). Путь — как
+    // есть, без перевода; выбрать — окно yami-files, без него папку вписывают в поле выше
+    let auto = s.wall_dir.trim().is_empty();
+    ui.cv.icon("folder", b.x + 2, y + 9, 2, t.text_faint);
+    let lw = ui.text_in(PX, R::new(b.x + 22, y, 160, 30), "папка", t.text_faint);
+    // кнопки — по ширине надписей (португальские длиннее)
+    let (pw, aw) = (ui.w(PX, "выбрать папку…") + 44, ui.w(PX, "авто") + 44);
+    let bw = if auto { pw } else { pw + 8 + aw };
+    let px0 = b.x + 22 + lw + 12;
+    let pr = R::new(px0, y, b.right() - bw - 12 - px0, 30);
+    if auto {
+        ui.text_in(PX, pr, "авто: Pictures/Wallpapers", t.text_dim);
+    } else {
+        ui.cv.push_clip(pr);
+        ui.cv.text_in(ui.f, PX, pr, &yami_px::paths::pretty(&yami_px::paths::expand(&s.wall_dir)), t.text);
+        ui.cv.pop_clip();
+    }
+    let mut bx = b.right() - bw;
+    if !auto {
+        ui.button(R::new(bx, y + 2, aw, 26), "авто", "reboot", Tone::Ghost, false, true, Act::SWall("dir_auto"));
+        bx += aw + 8;
+    }
+    ui.button(R::new(bx, y + 2, pw, 26), "выбрать папку…", "folder", Tone::Plain, false, st.mods_here.files, Act::SWall("dir"));
     y += 44;
     y = title(ui, b.x, y, b.w, "как показывать");
     opt_btn(ui, R::new(b.x, y, half, 26), "подгонка", name_of(FITS, &s.wall_fit), Act::SWall("fit"));
@@ -542,6 +566,16 @@ impl App {
             }
             "reset" => {
                 self.set_wall("");
+                return true;
+            }
+            // папка обоев: выбрать в окне yami-files или вернуть «авто»; сохранится само (flush)
+            "dir" => {
+                self.wall_dir_ask();
+                return true;
+            }
+            "dir_auto" => {
+                s.wall_dir.clear();
+                self.dirty(&SKind::Modal);
                 return true;
             }
             "fit" => s.wall_fit = next_of(FITS, &s.wall_fit).into(),

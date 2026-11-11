@@ -422,6 +422,43 @@ impl App {
         });
     }
 
+    /// папка обоев из настроек: окно выбора yami-files (настройки на это время закрыты: они слой
+    /// поверх окон), потом выбор обоев на новой папке и назад в настройки; отмена — сразу назад
+    pub fn wall_dir_ask(&mut self) {
+        let s = &self.st.set;
+        let from = if s.wall_dir.trim().is_empty() { yami_px::paths::pictures() } else { yami_px::paths::expand(&s.wall_dir) };
+        self.close_modal();
+        let tx = self.tx.clone();
+        let title = crate::i18n::tr("папка обоев").to_string();
+        std::thread::spawn(move || {
+            let got = crate::proc::files_pick("dir", &from, &["--title", &title]);
+            let _ = tx.send(Msg::WallDir(got));
+        });
+    }
+
+    pub fn wall_dir_picked(&mut self, got: Option<String>) {
+        match got {
+            Some(d) => {
+                self.st.set.wall_dir = d;
+                self.walls_start(true);
+            }
+            None => self.open_settings_tab("wall"),
+        }
+    }
+
+    /// в поле пути вписали папку: она — папка обоев, и выбор открывается на ней
+    pub fn wall_dir_typed(&mut self, p: &str) -> bool {
+        let p = p.trim();
+        if p.is_empty() || !yami_px::paths::expand(p).is_dir() {
+            return false;
+        }
+        self.st.set.wall_dir = p.to_string();
+        self.st.wall_field.set(&self.st.set.wallpaper.clone());
+        self.st.field_focus = None;
+        self.walls_open(true);
+        true
+    }
+
     /// ответ окна выбора: папка — открыть выбор на ней, файл — поставить обои, отмена — назад в выбор
     pub fn walls_asked(&mut self, folder: bool, got: Option<String>, back: bool) {
         match (folder, got) {

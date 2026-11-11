@@ -195,6 +195,8 @@ pub enum Msg {
     WallThumb(u64, usize, Option<crate::gfx::Img>),
     /// ответ окна выбора yami-files из выбора обоев: папка ли, что выбрано, вернуться ли в настройки
     WallsAsked(bool, Option<String>, bool),
+    /// папка обоев из окна выбора, открытого из настроек (None — отменили)
+    WallDir(Option<String>),
     /// мониторы, где обои рисует skwd-paper (skwd.rs, слои niri)
     SkwdLayers(Vec<String>),
     /// проверка обновлений (update.rs)
