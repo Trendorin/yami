@@ -124,6 +124,52 @@ pub struct Canvas<'a> {
     pub style: Style,
 }
 
+/// проверка вёрстки для `shot --fit`: где лёг каждый текст (координаты буфера), под какой
+/// обрезкой, в каком буфере и обрезан ли он многоточием или по числу строк
+#[derive(Clone, Debug)]
+pub struct Laid {
+    pub r: R,
+    pub clip: R,
+    pub buf: usize,
+    pub s: String,
+    pub cut: bool,
+    /// у обрезанного: сколько букв влезло (без многоточия)
+    pub fit: usize,
+    /// слой: диалог или фишка в руке поверх страницы начинают новый, тексты разных слоёв друг другу не мешают
+    pub layer: u32,
+}
+static LAYER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static WATCH: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static LAID: std::sync::Mutex<Vec<Laid>> = std::sync::Mutex::new(Vec::new());
+
+/// начать (или бросить) запись текстов; в обычной работе выключено и стоит один atomic load
+pub fn watch_text(on: bool) {
+    WATCH.store(on, std::sync::atomic::Ordering::Relaxed);
+    if let Ok(mut l) = LAID.lock() {
+        l.clear();
+    }
+}
+pub fn take_text() -> Vec<Laid> {
+    LAID.lock().map(|mut l| std::mem::take(&mut *l)).unwrap_or_default()
+}
+/// дальше рисуется поверх уже нарисованного (диалог, перетаскиваемое): для проверки вёрстки это не наложение
+pub fn text_layer() {
+    LAYER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+/// последний записанный текст — обрезанная часть строки s
+fn laid_cut(s: &str) {
+    if !WATCH.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    if let Ok(mut l) = LAID.lock() {
+        if let Some(x) = l.last_mut() {
+            x.cut = true;
+            x.fit = x.s.chars().filter(|c| *c != '…').count();
+            x.s = s.to_string();
+        }
+    }
+}
+
 /// цвет тени для всех новых холстов процесса: тема одна на процесс, а холстов много
 static SHADE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0xb4000000);
 
@@ -801,12 +847,22 @@ impl<'a> Canvas<'a> {
     // ── текст ───────────────────────────────────────────────────────────────
     /// строка от левого края; y — верх строки высотой face.line(). Возвращает ширину.
     pub fn text(&mut self, fonts: &mut Fonts, face: Face, x: i32, y: i32, s: &str, c: C) -> i32 {
-        if let Some(sh) = self.text_shade.take() {
+        if let Some(sh) = self.text_shade {
             // сдвиг — на «пиксель» шрифта: у Tiny5 это 1/8 кегля, у мелкого текста — 1 px
             let d = (fonts.line(face) / 16).max(1);
-            self.text(fonts, face, x + d, y + d, s, sh);
-            self.text_shade = Some(sh);
+            self.glyphs(fonts, face, x + d, y + d, s, sh);
         }
+        let w = self.glyphs(fonts, face, x, y, s, c);
+        if WATCH.load(std::sync::atomic::Ordering::Relaxed) && w > 0 {
+            let r = R::new(x + self.ox, y + self.oy, w, fonts.line(face));
+            if let Ok(mut l) = LAID.lock() {
+                l.push(Laid { r, clip: self.clip, buf: self.buf.as_ptr() as usize, s: s.to_string(), cut: false, fit: 0, layer: LAYER.load(std::sync::atomic::Ordering::Relaxed) });
+            }
+        }
+        w
+    }
+
+    fn glyphs(&mut self, fonts: &mut Fonts, face: Face, x: i32, y: i32, s: &str, c: C) -> i32 {
         let col = self.eff(c);
         let mut pen = x;
         let base = y + fonts.ascent(face);
@@ -841,7 +897,9 @@ impl<'a> Canvas<'a> {
             self.text(fonts, face, r.x, y, s, c)
         } else {
             let e = fonts.elide(face, s, r.w);
-            self.text(fonts, face, r.x, y, &e, c)
+            let w = self.text(fonts, face, r.x, y, &e, c);
+            laid_cut(s);
+            w
         }
     }
     pub fn text_center(&mut self, fonts: &mut Fonts, face: Face, r: R, s: &str, c: C) -> i32 {
@@ -858,6 +916,11 @@ impl<'a> Canvas<'a> {
         let lh = fonts.line(face) + 2;
         for (i, l) in lines.iter().enumerate() {
             self.text(fonts, face, r.x, r.y + i as i32 * lh, l, c);
+        }
+        // не влезло в max_lines: хвост пропал
+        let solid = |t: &str| t.chars().filter(|c| !c.is_whitespace()).count();
+        if WATCH.load(std::sync::atomic::Ordering::Relaxed) && lines.iter().map(|l| solid(l)).sum::<usize>() < solid(s) {
+            laid_cut(s);
         }
         lines.len() as i32 * lh
     }

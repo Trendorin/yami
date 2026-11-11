@@ -145,6 +145,9 @@ const TARGETS: &[&str] = &[
     "icons",
 ];
 
+/// снимки тесноты: обрезка многоточием там задумана (--fit её не считает)
+const CROWD: &[&str] = &["bar:pill", "bar:tasks-crowd"];
+
 /// надписи, которые и в английском интерфейсе пишутся по-русски
 const NATIVE: &[&str] = &["Русский"]; // i18n-ok
 
@@ -155,6 +158,7 @@ pub fn run(args: &[String]) -> i32 {
     let mut lang = String::new();
     let mut out = PathBuf::from("shots");
     let mut defaults = false;
+    let mut fit = false;
     let mut mode: Option<bool> = None;
     let mut targets: Vec<String> = vec![];
     let mut it = args.iter();
@@ -163,10 +167,11 @@ pub fn run(args: &[String]) -> i32 {
             "--lang" => lang = it.next().cloned().unwrap_or_default(),
             "-o" | "--out" => out = it.next().map(PathBuf::from).unwrap_or(out),
             "--defaults" => defaults = true,
+            "--fit" => fit = true,
             "--theme" => mode = it.next().map(|m| m == "light"),
             "--transparent" => CLEAR.store(true, std::sync::atomic::Ordering::Relaxed),
             "-h" | "--help" | "list" => {
-                println!("yami-shell shot [TARGET…] [--lang ru|en] [--defaults] [--transparent] [-o DIR]\ntargets: {}", TARGETS.join(" "));
+                println!("yami-shell shot [TARGET…] [--lang CODE] [--defaults] [--fit] [--transparent] [-o DIR]\ntargets: {}", TARGETS.join(" "));
                 return 0;
             }
             t if TARGETS.contains(&t) => targets.push(t.to_string()),
@@ -199,10 +204,19 @@ pub fn run(args: &[String]) -> i32 {
         return 2;
     }
     crate::i18n::audit(crate::i18n::translated());
-    let mut bad = 0;
+    yami_px::gfx::watch_text(fit);
+    let (mut bad, mut loose) = (0, 0);
     for t in &targets {
         let path = out.join(format!("{}.png", t.replace(':', "-")));
         shoot(&mut st, &mut res, t, &path);
+        if fit {
+            // эти снимки и проверяют тесноту: там многоточие — задуманное
+            let p: Vec<String> = fit_problems().into_iter().filter(|p| !(CROWD.contains(&t.as_str()) && p.starts_with("cut "))).collect();
+            loose += p.len();
+            for s in p {
+                println!("{}  layout: {s}", path.display());
+            }
+        }
         let missed: Vec<String> = crate::i18n::take_missed().into_iter().filter(|s| !NATIVE.contains(&s.as_str())).collect();
         if missed.is_empty() {
             println!("{}", path.display());
@@ -215,7 +229,42 @@ pub fn run(args: &[String]) -> i32 {
         eprintln!("shot: {bad} untranslated string(s): add them to PAIRS in i18n.rs or use tf!/tr()");
         return 1;
     }
+    if loose > 0 {
+        eprintln!("shot: {loose} text(s) do not fit: cut, past the edge or over another text");
+        return 1;
+    }
     0
+}
+
+/// --fit: надписи, которым не хватило места (длинные языки): обрезаны многоточием или по
+/// строкам, вылезли за свою обрезку, легли на другую надпись того же холста
+fn fit_problems() -> Vec<String> {
+    let laid = yami_px::gfx::take_text();
+    let vis: Vec<(crate::gfx::R, &yami_px::gfx::Laid)> = laid.iter().map(|l| (l.r.inter(&l.clip), l)).filter(|(r, _)| r.w > 0 && r.h > 0).collect();
+    let mut out = vec![];
+    for (_, l) in &vis {
+        if l.cut && l.s.contains("~/") {
+            // длинный путь и должен сокращаться многоточием
+        } else if l.cut {
+            out.push(format!("cut «{}» (fits {} of {})", l.s, l.fit, l.s.chars().count()));
+        } else if l.r.x < l.clip.x || l.r.right() > l.clip.right() {
+            out.push(format!("past the edge «{}»", l.s));
+        }
+    }
+    for (i, (ra, a)) in vis.iter().enumerate() {
+        for (rb, b) in &vis[i + 1..] {
+            if a.buf != b.buf || a.layer != b.layer || a.s == b.s {
+                continue;
+            }
+            let o = ra.inter(rb);
+            if o.w >= 2 && o.h >= 3 {
+                out.push(format!("overlap «{}» × «{}»", a.s, b.s));
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
@@ -662,6 +711,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
         match kind {
             "bar" => {
                 crate::wall::draw(&mut ui, st, w, h);
+                yami_px::gfx::text_layer();
                 let (top, side, _) = crate::bar::geo(&st.set, w);
                 ui.cv.ox = side;
                 ui.cv.oy = top;
@@ -679,6 +729,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             "widget" => crate::widgets::draw(&mut ui, st, 900, w, h),
             "grid" => {
                 crate::wall::draw(&mut ui, st, w, h);
+                yami_px::gfx::text_layer();
                 crate::widgets::draw_grid(&mut ui, st, w, h);
                 ui.cv.ox = (w - crate::widgets::EDITBAR_W) / 2;
                 ui.cv.oy = 40;

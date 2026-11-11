@@ -254,10 +254,11 @@ impl<'a, 'b, A: Action> Ui<'a, 'b, A> {
         // содержимое по центру
         let face = font::PX;
         let tw = if text.is_empty() { 0 } else { self.w(face, text) };
-        let iw = if icon.is_empty() { 0 } else { 14 };
+        // длинная надпись (другой язык) важнее значка: значок уступает ей место
+        let iw = if icon.is_empty() || (tw > 0 && tw + 21 + 8 > r.w) { 0 } else { 14 };
         let gap = if tw > 0 && iw > 0 { 7 } else { 0 };
         let total = tw + iw + gap;
-        let mut x = r.x + (r.w - total) / 2 + d;
+        let mut x = (r.x + (r.w - total) / 2).max(r.x + 4) + d;
         if iw > 0 {
             self.cv.icon(icon, x, r.y + (r.h - 14) / 2 + d, 2, fg);
             x += iw + gap;

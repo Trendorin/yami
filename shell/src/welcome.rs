@@ -344,6 +344,7 @@ fn burst(ui: &mut Ui, (cx, cy): (i32, i32), el: f32) {
 /// вопрос перед выходом: поверх всего окна, главная кнопка — остаться
 fn leave_sheet(ui: &mut Ui, fr: R) {
     let t = ui.t;
+    yami_px::gfx::text_layer();
     ui.cv.fill(R::new(1, 1, fr.w - 2, fr.h - 2), t.bg.alpha(0.82));
     ui.zone(fr, Act::Block, Cur::Default);
     let (w, h) = (470, 218);

@@ -176,6 +176,7 @@ pub(crate) fn tab_bar(ui: &mut Ui, st: &State, b: R) {
     }
     // фишка в руке — поверх всего
     if let Some(d) = drag {
+        yami_px::gfx::text_layer();
         let w = chip_w(ui, &d.name);
         chip(ui, R::new(d.x - d.off.0, d.y - d.off.1 - 2, w, 24), &d.name, true);
     }

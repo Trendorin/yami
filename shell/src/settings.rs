@@ -90,13 +90,21 @@ pub fn find(id: &str) -> Option<&'static Tab> {
 }
 
 /// где рисовать содержимое (видимая часть) — общее для рисования и колеса
-fn body_rect(w: i32, h: i32) -> R {
+fn body_rect(w: i32, h: i32, sw: i32) -> R {
     let fr = R::new(0, 0, w - 6, h - 6);
-    R::new(1 + SIDE_W + 20, 48, fr.right() - SIDE_W - 1 - 48, fr.h - 64)
+    R::new(1 + sw + 20, 48, fr.right() - sw - 1 - 48, fr.h - 64)
 }
 
-fn side_rect(h: i32) -> R {
-    R::new(1, 31, SIDE_W, h - 6 - 32)
+fn side_rect(h: i32, sw: i32) -> R {
+    R::new(1, 31, sw, h - 6 - 32)
+}
+
+/// ширина колонки вкладок: по самой длинной вкладке на языке интерфейса (немецкие длиннее
+/// русских), не уже SIDE_W и не шире SIDE_W + 36; высоты от неё не зависят
+fn side_w(ui: &mut Ui, st: &State) -> i32 {
+    let longest = GROUPS.iter().flat_map(|g| g.1.iter()).filter(|tb| st.mods_here.shows(tb.id)).map(|tb| ui.w(PX, tb.name)).max().unwrap_or(0);
+    // поля колонки 2×8, значок 14 + 7, по 8 у краёв кнопки
+    (longest + 16 + 21 + 16).clamp(SIDE_W, SIDE_W + 36)
 }
 
 /// прокрутка открытой вкладки (сдвиг запомнен для неё; другая вкладка начинается сверху)
@@ -133,7 +141,8 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     ui.zone(R::new(1, 1, fr.w - 2, 30), Act::MDrag, Cur::Default);
     ui.ghost(R::new(fr.right() - 28, 5, 24, 22), "close", Act::CloseModal);
     // вкладки группами; список длиннее окна — листается колесом
-    let side = side_rect(h);
+    let sw = side_w(ui, st);
+    let side = side_rect(h, sw);
     ui.cv.fill(side, t.panel.alpha(0.5));
     ui.cv.fill(R::new(side.right(), side.y, 1, side.h), t.border);
     ui.zone(side, Act::SSideScroll, Cur::Default);
@@ -159,7 +168,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     ui.cv.pop_clip();
     scrollbar(ui, R::new(side.right() - 5, side.y + 2, 4, side.h - 4), side.h, side_full, st.stab_scroll);
     // содержимое: фон-зона для колеса, вкладка со сдвигом, полоса прокрутки справа
-    let body = body_rect(w, h);
+    let body = body_rect(w, h, sw);
     let tb = find(st.stab).unwrap_or(&GROUPS[0].1[0]);
     let off = if tb.own_scroll { 0 } else { scroll_of(st) };
     ui.zone(R::new(side.right() + 1, 31, fr.right() - side.right() - 2, fr.h - 32), Act::SScroll, Cur::Default);
@@ -178,7 +187,7 @@ impl App {
         let (w, h) = SIZE;
         let (view, own) = match &self.st.welcome {
             Some(wz) => (crate::welcome::body_rect(wz, w, h).h, wz.own_scroll()),
-            None => (body_rect(w, h).h, find(self.st.stab).is_some_and(|t| t.own_scroll)),
+            None => (body_rect(w, h, SIDE_W).h, find(self.st.stab).is_some_and(|t| t.own_scroll)),
         };
         let max = (self.st.sscroll_h.get() - view).max(0);
         if max == 0 || own {
@@ -193,7 +202,7 @@ impl App {
     /// колесо над списком вкладок
     pub fn settings_side_scroll(&mut self, d: i32) {
         let h = SIZE.1;
-        let max = (self.st.stab_h.get() - side_rect(h).h).max(0);
+        let max = (self.st.stab_h.get() - side_rect(h, SIDE_W).h).max(0);
         self.st.stab_scroll = (self.st.stab_scroll + d * WHEEL).clamp(0, max);
         self.dirty(&SKind::Modal);
     }
@@ -212,7 +221,7 @@ pub fn num_btn(ui: &mut Ui, r: R, label: &str, v: i32, key: &'static str) {
     let t = ui.t;
     let hov = ui.hover(r);
     ui.cv.pxbox(r, &BoxStyle::new(if hov { t.surface_hi } else { t.surface }, if hov { t.red } else { t.border }).bevel(true));
-    ui.text_in(PX, R::new(r.x + 8, r.y, r.w - 80, r.h), label, t.text_dim);
+    ui.text_in(PX, R::new(r.x + 8, r.y, r.w - 84, r.h), label, t.text_dim);
     ui.zone(r, Act::SNum(key, 1), Cur::Pointer);
     let (l, rr) = (R::new(r.right() - 72, r.y + 2, 16, r.h - 4), R::new(r.right() - 18, r.y + 2, 16, r.h - 4));
     for (b, icon) in [(l, "left"), (rr, "right")] {
@@ -354,7 +363,7 @@ impl App {
             }
             // листать вкладку: страница, начало, конец
             Keysym::Page_Down | Keysym::Page_Up => {
-                let page = (body_rect(SIZE.0, SIZE.1).h - 40) / WHEEL;
+                let page = (body_rect(SIZE.0, SIZE.1, SIDE_W).h - 40) / WHEEL;
                 self.settings_scroll(if e.keysym == Keysym::Page_Down { page } else { -page });
             }
             Keysym::Home => {

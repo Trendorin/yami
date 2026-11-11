@@ -478,8 +478,9 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     let k = &st.keys;
     let cat = if k.cat.is_empty() { "shell" } else { k.cat };
     // категории: две строки кнопок
-    // португальские названия длиннее: три кнопки в ряд вместо пяти
-    let per = if crate::i18n::pt_br() { 3 } else { 5 };
+    // в ряд столько кнопок, сколько позволяет самое длинное название на языке интерфейса (5, 4 или 3)
+    let longest = CATS.iter().map(|(_, ru, en)| ui.f.width(PX, crate::i18n::select(ru, en))).max().unwrap_or(0);
+    let per = (3..=5).rev().find(|p| (b.w - (p - 1) * 6) / p >= longest + 16).unwrap_or(3);
     let cw = (b.w - (per - 1) * 6) / per;
     for (i, (id, ru, en)) in CATS.iter().enumerate() {
         let r = R::new(b.x + (i as i32 % per) * (cw + 6), b.y + (i as i32 / per) * 32, cw, 26);
