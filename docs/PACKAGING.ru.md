@@ -14,7 +14,7 @@
 ./stage.sh --prefix /usr --destdir "$pkgdir" --managed --only yami-shell
 ```
 
-`--only` берёт одну программу (`yami-shell` `yami-files` `yami-view` `yami-play` `yami-shot` `yami-agents` `yami-greet`), без него — все; `--managed` оставляет метку `share/yami/package-managed`, которая выключает обновления в этих же бинарниках. Службы `org.freedesktop.FileManager1` в пакете нет: в большинстве систем ею владеет Nautilus, а «показать в папке» для всех программ — личный выбор каждого (`yami-files install` спросит и положит её в домашнюю папку).
+`--only` берёт одну программу (`yami-shell`, с ним его службы yami-agents, `yami-files` `yami-view` `yami-play` `yami-shot` `yami-greet`), без него — все; `--managed` оставляет метку `share/yami/package-managed`, которая выключает обновления в этих же бинарниках. Службы `org.freedesktop.FileManager1` в пакете нет: в большинстве систем ею владеет Nautilus, а «показать в папке» для всех программ — личный выбор каждого (`yami-files install` спросит и положит её в домашнюю папку).
 
 | Система | Файл |
 |---|---|
@@ -27,7 +27,7 @@
 
 ## Nix
 
-Во flake есть пакет (шелл, yami-files, yami-view, yami-play, yami-shot, yami-agents и экран входа yami-greet; модули — входы flake в версиях из `modules.lock`), модуль NixOS и модуль Home Manager. Модуль NixOS — системная половина `install.sh`: niri, службы, с которыми говорит шелл, порталы с диалогом файлов и выбором показа экрана от yami, шрифты, команды, которые запускает шелл, и экран входа. Модуль Home Manager — домашняя половина: конфиг niri, настройки шелла, kitty, fontconfig и программы по умолчанию.
+Во flake есть пакет (шелл с его службами yami-agents, yami-files, yami-view, yami-play, yami-shot и экран входа yami-greet; модули — входы flake в версиях из `modules.lock`), модуль NixOS и модуль Home Manager. Модуль NixOS — системная половина `install.sh`: niri, службы, с которыми говорит шелл, порталы с диалогом файлов и выбором показа экрана от yami, шрифты, команды, которые запускает шелл, и экран входа. Модуль Home Manager — домашняя половина: конфиг niri, настройки шелла, kitty, fontconfig и программы по умолчанию.
 
 ```nix
 {

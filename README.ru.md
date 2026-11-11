@@ -275,9 +275,11 @@ install -Dm755 target/release/yami-shell ~/.local/bin/yami-shell
 
 ## Модули
 
-Всё, что сверх шелла, — отдельные программы в своих репозиториях. Первая настройка добавляет и убирает
+Программы вокруг шелла — отдельные, каждая в своём репозитории. Первая настройка добавляет и убирает
 их, и любая работает без шелла yami: бери в свой райс одним файлом: `./yami-files install`, root не
-нужен.
+нужен. Собственные службы шелла, yami-agents (окна паролей polkit и дисков, выбор экрана и портал
+показа, автоподключение), приходят с шеллом из этого репозитория; они работают отдельным процессом,
+так что перезапуск шелла никогда не обрывает трансляцию.
 
 | Модуль | Что | Нужно |
 |---|---|---|
@@ -285,15 +287,15 @@ install -Dm755 target/release/yami-shell ~/.local/bin/yami-shell
 | [yami-view](https://github.com/Trendorin/yami-view) | просмотр и быстрая правка картинок | любой композитор Wayland |
 | [yami-play](https://github.com/Trendorin/yami-play) | плеер видео и музыки | libmpv |
 | [yami-shot](https://github.com/Trendorin/yami-shot) | скриншоты: заморозить, выделить, разметить, прочитать текст и QR | layer-shell, grim |
-| [yami-agents](https://github.com/Trendorin/yami-agents) | окна паролей polkit и дисков, выбор экрана и портал показа, автоподключение; каждая часть отдельно | polkit; для показа экрана niri |
 | [yami-greet](https://github.com/Trendorin/yami-greet) | экран входа | greetd, niri |
 | [yami-niri](https://github.com/Trendorin/yami-niri) | niri с tearing для игр и realtime-потоком | сборка из исходников |
 
-Их системные пакеты ставятся вместе с ними: диски и телефоны (udisks2, gvfs) — с yami-files и yami-agents,
+Их системные пакеты ставятся вместе с ними: диски и телефоны (udisks2, gvfs) — с yami-files и шеллом,
 распознавание текста и QR — с yami-shot. Если на машине есть Steam, первая настройка предложит и `games`
 (GameMode, MangoHud).
 
-Каждый модуль рисует через [yami-px](https://github.com/Trendorin/yami-px) и читает один вид: `~/.config/yami/style.json`
+Каждый модуль рисует через [yami-px](shell/px), библиотеку рисования в этом репозитории (модуль берёт
+её по тегу `px-vX.Y.Z`), и читает один вид: `~/.config/yami/style.json`
 для всех, `style.<module>.json` для того, чем отличается один. Вне yami модуль нейтрален: системный
 шрифт, скруглённые углы, мягкие тени. Пиксельный вид шелла — пресет `yami`, а настроить можно
 вплоть до каждого цвета: [docs/CONFIG.ru.md](docs/CONFIG.ru.md#вид-всех-модулей).
@@ -448,7 +450,7 @@ yami-shell binds list                  # клавиши: id, сочетание,
 | `config/portal/` | какой бэкенд портала что обслуживает |
 | `config/niri/` | конфигурация niri (клавиши приходят от шелла) |
 | `config/kitty/`, `config/fontconfig/` | терминал и отрисовка пиксельных шрифтов |
-| `tools/theme.py` | экспорт палитры: Qt, KDE, GTK, kitty, fastfetch, niri, обои |
+| `shell/px`, `shell/agents` | yami-px, библиотека рисования всех модулей; yami-agents, службы шелла |
 | `tools/apply-theme.sh` | шрифты и стиль Qt и GTK |
 | `fonts/` | пиксельные шрифты в комплекте (SIL OFL) |
 | `install.sh`, `installer/` | установщик: вход и порядок шагов, по файлу на каждую задачу |
@@ -476,13 +478,13 @@ yami-shell binds list                  # клавиши: id, сочетание,
 
 | Команда | Что делает |
 |---|---|
-| `tools/check.sh` | сборка без предупреждений, проверки перевода, английские и русские документы в одном виде (`tools/check-docs.py`), синтаксис скриптов, конфиг niri, пробный прогон установщика (то же гоняет CI) |
+| `tools/check.sh` | сборка без предупреждений, проверки перевода, английские и русские документы в одном виде (`yami-dev check-docs`), синтаксис скриптов, конфиг niri, пробный прогон установщика (то же гоняет CI) |
 | `tools/map.sh [ТЕКСТ]` | все исходники с описанием в одну строку |
 | `yami-shell shot [ЦЕЛЬ…] --lang en [--transparent] -o ПАПКА` | панели в PNG без композитора; падает на непереведённых надписях |
-| `yami-files shot`, `yami-view shot`, `yami-play shot`, `yami-shot shot`, `yami-agents shot` | то же для каждого модуля (первая настройка — цели шелла `welcome:STEP`) |
+| `yami-agents shot`, `yami-files shot`, `yami-view shot`, `yami-play shot`, `yami-shot shot` | то же для каждого модуля (первая настройка — цели шелла `welcome:STEP`) |
 | `tools/check-modules.sh [ИМЯ…]` | все модули рядом с этим репозиторием: без предупреждений, тесты, переводы, каждое состояние в обоих видах и на трёх языках |
 | `yami-greet shot -o DIR`, `yami-greet --demo` | экран входа offscreen во всех состояниях; `--demo` запускает его без greetd (пароль `yami`) во вложенном niri |
-| `tools/readme-art.py`, `tools/readme-shots.sh` | логотип и карточки README; настоящие скриншоты твоего сеанса (пустой стол, простые имена устройств, всё возвращается) |
+| `yami-dev readme-art`, `tools/readme-shots.sh` | логотип и карточки README; настоящие скриншоты твоего сеанса (пустой стол, простые имена устройств, всё возвращается) |
 | `tools/release.sh X.Y.Z` | выпуск: changelog, версии, проверка, подписанный тег, push (`--keygen` — один раз для ключа) |
 | `tools/deploy.sh` | собрать, поставить в `~/.local/bin` и перезапустить шелл (не трогает, пока в фокусе игра); `--modules` — ещё и модули рядом с этим репозиторием, `--modules-only` — только они |
 

@@ -17,7 +17,8 @@ DEV="$ROOT/shell/target/release/yami-dev"
 printf '{"preset":"plain"}\n' >"$TMP/plain.json"
 printf '{"preset":"yami","palette":"ash"}\n' >"$TMP/yami.json"
 list=("$@")
-((${#list[@]})) || list=(yami-px yami-files yami-view yami-play yami-shot yami-agents yami-greet)
+# yami-px and yami-agents are checked with the shell (tools/check.sh): they live in shell/px and shell/agents
+((${#list[@]})) || list=(yami-files yami-view yami-play yami-shot yami-greet)
 for m in "${list[@]}"; do
   d="$MODS/$m"
   [[ -d $d ]] || { bad "$m: no $d"; continue; }
@@ -36,7 +37,6 @@ for m in "${list[@]}"; do
   fi
   (cd "$d" && cargo test --release --quiet >"$TMP/test.log" 2>&1) && ok "tests" || { tail -20 "$TMP/test.log"; bad "tests"; }
   for f in "$d"/*.sh; do [[ -f $f ]] && { bash -n "$f" || bad "syntax: $f"; }; done
-  [[ $m == yami-px ]] && continue
   "$DEV" check-i18n "$d/src" >/dev/null && ok "i18n" || { "$DEV" check-i18n "$d/src" | head; bad "i18n"; }
   exe="$d/target/release/$m"
   for look in plain yami; do

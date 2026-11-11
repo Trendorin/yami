@@ -79,8 +79,9 @@ assets() { # ver
   local v=$1 key
   [[ "$(cat VERSION)" == "$v" ]] || { say "$(t "готовые бинари: дерево не на $v, пропускаю" "ready binaries: the tree is not at $v, skipped")"; return 0; }
   key="$(git config user.signingkey || true)"
-  tools/dist.sh --deb --strict ${key:+--sign "$key"} || die "$(t "tools/dist.sh не прошёл" "tools/dist.sh failed")"
-  local up=(dist/"yami-$v-x86_64-linux.tar.gz" dist/*.deb dist/SHA256SUMS)
+  # --loose: each module also as one file, what its own README tells to download (`yami-files install`)
+  tools/dist.sh --deb --loose --strict ${key:+--sign "$key"} || die "$(t "tools/dist.sh не прошёл" "tools/dist.sh failed")"
+  local up=(dist/"yami-$v-x86_64-linux.tar.gz" dist/*.deb dist/yami-files dist/yami-view dist/yami-play dist/yami-shot dist/SHA256SUMS)
   [[ -f dist/SHA256SUMS.sig ]] && up+=(dist/SHA256SUMS.sig)
   gh release upload "v$v" --clobber "${up[@]}" >/dev/null
   say "$(t "готовые бинари: приложены к выпуску" "ready binaries: attached to the release")"

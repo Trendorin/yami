@@ -14,7 +14,7 @@ Inside the archive `stage.sh` puts the programs where a package wants them:
 ./stage.sh --prefix /usr --destdir "$pkgdir" --managed --only yami-shell
 ```
 
-`--only` takes one program (`yami-shell` `yami-files` `yami-view` `yami-play` `yami-shot` `yami-agents` `yami-greet`), without it all of them; `--managed` leaves the mark `share/yami/package-managed`, which turns the updater off in these same binaries. A package does not carry the `org.freedesktop.FileManager1` service: it belongs to Nautilus on most systems, and «show in folder» for every app is each person's choice (`yami-files install` asks and puts it into the home folder).
+`--only` takes one program (`yami-shell`, which brings its services yami-agents, `yami-files` `yami-view` `yami-play` `yami-shot` `yami-greet`), without it all of them; `--managed` leaves the mark `share/yami/package-managed`, which turns the updater off in these same binaries. A package does not carry the `org.freedesktop.FileManager1` service: it belongs to Nautilus on most systems, and «show in folder» for every app is each person's choice (`yami-files install` asks and puts it into the home folder).
 
 | System | File |
 |---|---|
@@ -27,7 +27,7 @@ Ubuntu 26.04 has no niri package: `install.sh` builds niri there, a `.deb` needs
 
 ## Nix
 
-The flake has the package (the shell, yami-files, yami-view, yami-play, yami-shot, yami-agents and the login screen yami-greet, the modules as flake inputs at the versions of `modules.lock`), a NixOS module and a Home Manager module. The NixOS module is the system half of `install.sh`: niri, the services the shell talks to, the portals with yami's file dialog and screen-share picker, fonts, the commands the shell runs and the login screen. The Home Manager module is the home half: niri's config, the shell's settings, kitty, fontconfig and the default apps.
+The flake has the package (the shell with its services yami-agents, yami-files, yami-view, yami-play, yami-shot and the login screen yami-greet, the modules as flake inputs at the versions of `modules.lock`), a NixOS module and a Home Manager module. The NixOS module is the system half of `install.sh`: niri, the services the shell talks to, the portals with yami's file dialog and screen-share picker, fonts, the commands the shell runs and the login screen. The Home Manager module is the home half: niri's config, the shell's settings, kitty, fontconfig and the default apps.
 
 ```nix
 {

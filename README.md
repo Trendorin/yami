@@ -268,9 +268,11 @@ equalizer), `playerctl` (media), `nmcli` (Wi-Fi), BlueZ (Bluetooth), `cliphist` 
 
 ## Modules
 
-Everything beyond the shell is a separate program in its own repository. The first-run setup adds and
+The programs around the shell are separate, each in its own repository. The first-run setup adds and
 removes them, and any of them works without the yami shell: take one into your own setup with
-one file and `./yami-files install`, no root needed.
+one file and `./yami-files install`, no root needed. The shell's own services, yami-agents (the polkit
+and drive password windows, the screen-share picker and portal, automount), come with the shell from
+this repository; they run as their own process, so restarting the shell never stops a stream.
 
 | Module | What | Needs |
 |---|---|---|
@@ -278,15 +280,15 @@ one file and `./yami-files install`, no root needed.
 | [yami-view](https://github.com/Trendorin/yami-view) | image viewer and quick editor | any Wayland compositor |
 | [yami-play](https://github.com/Trendorin/yami-play) | video and music player | libmpv |
 | [yami-shot](https://github.com/Trendorin/yami-shot) | screenshots: freeze, select, mark up, read text and QR | layer-shell, grim |
-| [yami-agents](https://github.com/Trendorin/yami-agents) | polkit and drive password windows, the screen-share picker and portal, automount; each part on its own | polkit; niri for screen sharing |
 | [yami-greet](https://github.com/Trendorin/yami-greet) | the login screen | greetd, niri |
 | [yami-niri](https://github.com/Trendorin/yami-niri) | niri with tearing for games and a realtime thread | a build from source |
 
-Their system packages come with them: drives and phones (udisks2, gvfs) with yami-files and yami-agents,
+Their system packages come with them: drives and phones (udisks2, gvfs) with yami-files and the shell,
 text and QR recognition with yami-shot. With Steam on the machine the first-run setup also offers `games`
 (GameMode, MangoHud).
 
-Every module draws through [yami-px](https://github.com/Trendorin/yami-px) and reads one look: `~/.config/yami/style.json`
+Every module draws through [yami-px](shell/px), the drawing library in this repository (a module takes
+it by the tag `px-vX.Y.Z`), and reads one look: `~/.config/yami/style.json`
 for all of them, `style.<module>.json` for what one does differently. Outside yami a module is
 neutral: the system font, rounded corners, soft shadows. The pixel look of the shell is the preset
 `yami`, and the keys go down to every colour: [docs/CONFIG.md](docs/CONFIG.md#the-look-of-every-module).
@@ -440,7 +442,7 @@ yami-shell binds list                  # keybindings: id, keys, action
 | `config/portal/` | which portal backend serves what |
 | `config/niri/` | niri configuration (keybindings come from the shell) |
 | `config/kitty/`, `config/fontconfig/` | terminal and pixel font rendering |
-| `tools/theme.py` | palette export: Qt, KDE, GTK, kitty, fastfetch, niri, wallpaper |
+| `shell/px`, `shell/agents` | yami-px, the drawing library every module uses; yami-agents, the shell's services |
 | `tools/apply-theme.sh` | fonts and widget style for Qt and GTK |
 | `fonts/` | bundled pixel fonts (SIL OFL) |
 | `install.sh`, `installer/` | the installer: the entry and the order of its steps, one module per job |
@@ -468,13 +470,13 @@ log in, `~/.local/lib/yami-niri/yami-niri.sh off`.
 
 | Command | Does |
 |---|---|
-| `tools/check.sh` | build without warnings, i18n checks, the English and Russian docs in step (`tools/check-docs.py`), script syntax, niri config, installer dry run (CI runs it too) |
+| `tools/check.sh` | build without warnings, i18n checks, the English and Russian docs in step (`yami-dev check-docs`), script syntax, niri config, installer dry run (CI runs it too) |
 | `tools/map.sh [TEXT]` | every source file with its one-line description |
 | `yami-shell shot [TARGET…] --lang en [--transparent] -o DIR` | render panels to PNG without a compositor; fails on untranslated text |
-| `yami-files shot`, `yami-view shot`, `yami-play shot`, `yami-shot shot`, `yami-agents shot` | the same for each module (the first-run setup is the shell's `welcome:STEP` targets) |
+| `yami-agents shot`, `yami-files shot`, `yami-view shot`, `yami-play shot`, `yami-shot shot` | the same for each module (the first-run setup is the shell's `welcome:STEP` targets) |
 | `tools/check-modules.sh [NAME…]` | every module next to this repository: no warnings, tests, translations, every state in both looks and three languages |
 | `yami-greet shot -o DIR`, `yami-greet --demo` | the login screen offscreen in each state; `--demo` runs it without greetd (password `yami`) inside a nested niri |
-| `tools/readme-art.py`, `tools/readme-shots.sh` | the README's logo and cards; real screenshots of your session (empty workspace, plain device names, everything put back) |
+| `yami-dev readme-art`, `tools/readme-shots.sh` | the README's logo and cards; real screenshots of your session (empty workspace, plain device names, everything put back) |
 | `tools/release.sh X.Y.Z` | cut a release: changelog, versions, check, signed tag, push (`--keygen` once for the key) |
 | `tools/deploy.sh` | build, install to `~/.local/bin` and restart the running shell (refuses while a game has focus); `--modules` adds the modules next to this repository, `--modules-only` installs only them |
 
