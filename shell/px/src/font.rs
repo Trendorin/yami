@@ -58,6 +58,19 @@ fn cap(font: &FontRef<'static>) -> Option<f32> {
     Some((o.bounds.max.y - o.bounds.min.y).abs() / font.units_per_em()?)
 }
 
+/// Tiny5 из самого бинаря (фича tiny5): у модуля, поставленного без шелла, шрифта в системе может не быть
+#[cfg(feature = "tiny5")]
+fn embedded(srcs: &mut Vec<Src>) -> Option<usize> {
+    static TINY5: &[u8] = include_bytes!("../fonts/Tiny5.ttf");
+    let font = FontRef::try_from_slice(TINY5).ok()?;
+    srcs.push(Src { font, pixel: true, k: 1.0 });
+    Some(srcs.len() - 1)
+}
+#[cfg(not(feature = "tiny5"))]
+fn embedded(_: &mut Vec<Src>) -> Option<usize> {
+    None
+}
+
 /// высота прописной у Tiny5: по ней вёрстана разметка всех панелей. Модуль в чужой системе может
 /// жить вовсе без Tiny5, а размеры должны совпасть
 const TINY_CAP: f32 = 0.625;
@@ -150,7 +163,7 @@ impl Fonts {
         // общее семейство (sans, serif) — что fontconfig даст; имя найденного может быть любым
         let generic = matches!(family.to_lowercase().as_str(), "sans" | "sans-serif" | "serif" | "monospace");
         let custom = if family.is_empty() || family.eq_ignore_ascii_case("tiny5") { None } else { add(family, (!generic).then_some(family), !generic && is_pixel_family(family), &mut srcs) };
-        let tiny = add("Tiny5", Some("tiny5"), true, &mut srcs);
+        let tiny = add("Tiny5", Some("tiny5"), true, &mut srcs).or_else(|| embedded(&mut srcs));
         if let Some(c) = custom {
             if !srcs[c].pixel {
                 let a = tiny.and_then(|t| cap(&srcs[t].font)).unwrap_or(TINY_CAP);

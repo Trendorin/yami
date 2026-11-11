@@ -9,6 +9,10 @@ license = "MIT"
 repository = "https://github.com/Trendorin/yami"
 publish = false
 
+[features]
+# Tiny5 внутри бинаря (+0.4 МБ): модуль в чужой системе рисует пиксельный вид и без установленного шрифта
+tiny5 = []
+
 [dependencies]
 ab_glyph = "0.2"
 resvg = { version = "0.45", default-features = false }
