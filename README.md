@@ -51,7 +51,7 @@ Everything it does and its flags: [Installation](#installation).
 - **Desktop widgets.** Clock, calendar, weather, Bluetooth devices with their battery, the output of your own script, music card with an
   audio-reactive equalizer, and graphs
   for CPU, RAM, temperature and rx/tx network traffic in five styles (bars, line, blocks, wave,
-  dots) and four animations. Drag them into place in edit mode, hide or resize them. Widgets
+  dots) and four animations. Drag them into place in edit mode (they stick to a grid, the screen centre and each other; Shift drags freely), hide or resize them. Widgets
   without a frame follow the wallpaper under them: dark text on a light spot, light on a dark one.
 - **Pixel dock.** Pinned apps and open windows on any edge, window markers, a hover animation to
   choose (grow, wave, lift or none) that steps in whole pixels, a stepped bounce on launch; never, smart (empty workspace) or always hidden.

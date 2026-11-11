@@ -1,6 +1,8 @@
 // Виджеты рабочего стола: свой слой bottom (над обоями, под окнами). Каждый — со своими
 // настройками (вид графика, анимация, размер, цвет, подложка…): ПКМ по виджету или
-// настройки → виджеты. В режиме расстановки таскаются мышью по сетке 8 px.
+// настройки → виджеты. В режиме расстановки таскаются мышью: видимая часть липнет к краям монитора,
+// кресту посередине, барам, соседям и сетке GRID (snap, из yami-lite; с Shift — свободно), сетка — своя
+// поверхность под ними (SKind::EditGrid, draw_grid).
 
 use crate::app::{App, SKind, State};
 use crate::clock::{local_now, RU_DAY_FULL, RU_MON, RU_MON_NOM};
@@ -670,13 +672,15 @@ pub fn days_in_month(y: i32, m: u32) -> u32 {
     }
 }
 
+/// ширина панели расстановки
+pub const EDITBAR_W: i32 = 640;
+
 pub fn draw_editbar(ui: &mut Ui, _st: &State, w: i32, _h: i32) {
     let t = ui.t;
     let r = R::new(0, 0, w - 4, 40);
     ui.cv.pxbox(r, &BoxStyle::new(t.glass_panel(), t.red).shadow(4));
     ui.zone(r, Act::Block, Cur::Default);
     ui.cv.icon("grid", 12, 13, 2, t.red);
-    ui.text_in(PX, R::new(34, 0, 300, 40), "расстановка: тащи, ⚙ — настройки виджета", t.text);
     let mut x = r.right() - 6;
     for (label, icon, act, tone) in [("готово", "check", Act::EditDone, Tone::Primary), ("виджеты", "gear", Act::SEdit, Tone::Plain)] {
         let bw = ui.w(PX, label) + 34;
@@ -684,6 +688,89 @@ pub fn draw_editbar(ui: &mut Ui, _st: &State, w: i32, _h: i32) {
         ui.button(R::new(x, 8, bw, 24), label, icon, tone, false, true, act);
         x -= 6;
     }
+    ui.text_in(PX, R::new(34, 0, x - 40, 40), "тащи: липнет к сетке и соседям, Shift — свободно", t.text);
+}
+
+/// шаг сетки расстановки, px; линии идут от креста посередине монитора (из yami-lite)
+pub const GRID: i32 = 32;
+/// откуда притягивают края монитора, крест, бары и соседи; сетка — слабее
+const MAGNET: i32 = 12;
+const GRID_MAGNET: i32 = 8;
+/// поверхность виджета выше видимой части на запас под всплытие (render.rs) и больше на тень
+pub const RISE: i32 = 16;
+pub const SHADOW: i32 = 4;
+
+/// видимая часть виджета, чья поверхность w×h стоит на (x, y): к ней и притягивать
+pub fn visible(x: i32, y: i32, w: i32, h: i32) -> R {
+    R::new(x, y + RISE, w - SHADOW, h - RISE - SHADOW)
+}
+
+/// одна ось: начало pos у отрезка длиной size. guides — линии (координата, это крест); к линии
+/// прилипает начало или конец отрезка, к кресту — ещё и середина. Нет линии рядом — сетка от
+/// середины монитора origin (начало или конец на её линии). Возвращает начало и прилип ли к кресту
+fn snap_axis(pos: i32, size: i32, origin: i32, guides: &[(i32, bool)]) -> (i32, bool) {
+    let mut best: Option<(i32, i32, bool)> = None;
+    for &(g, cross) in guides {
+        let mid = if cross { Some(g - size / 2) } else { None };
+        for c in [Some(g), Some(g - size), mid].into_iter().flatten() {
+            let d = (c - pos).abs();
+            if d <= MAGNET && best.is_none_or(|b| d < b.0) {
+                best = Some((d, c, cross));
+            }
+        }
+    }
+    if let Some((_, c, cross)) = best {
+        return (c, cross);
+    }
+    let round = |v: i32| origin + ((v - origin) as f32 / GRID as f32).round() as i32 * GRID;
+    let (a, b) = (round(pos), round(pos + size) - size);
+    let c = if (a - pos).abs() <= (b - pos).abs() { a } else { b };
+    if (c - pos).abs() <= GRID_MAGNET {
+        (c, false)
+    } else {
+        (pos, false)
+    }
+}
+
+/// куда встать видимой части w×h, которую тянут в (x, y), на мониторе ow×oh: края монитора, крест
+/// посередине, кромки баров (bars — горизонтальные линии), стороны других виджетов — встык и
+/// вровень; дальше — сетка. Третье — к какой линии креста прилипло (её подсветить)
+#[allow(clippy::too_many_arguments)]
+pub fn snap(x: i32, y: i32, w: i32, h: i32, ow: i32, oh: i32, bars: &[i32], others: &[R]) -> (i32, i32, (bool, bool)) {
+    let mut gx = vec![(0, false), (ow, false), (ow / 2, true)];
+    let mut gy = vec![(0, false), (oh, false), (oh / 2, true)];
+    gy.extend(bars.iter().filter(|b| **b > 0 && **b < oh).map(|b| (*b, false)));
+    for o in others {
+        gx.extend([(o.x, false), (o.right(), false)]);
+        gy.extend([(o.y, false), (o.bottom(), false)]);
+    }
+    let (nx, cx) = snap_axis(x, w, ow / 2, &gx);
+    let (ny, cy) = snap_axis(y, h, oh / 2, &gy);
+    (nx, ny, (cx, cy))
+}
+
+/// сетка расстановки под виджетами: лёгкая вуаль для контраста, линии через GRID точками от креста
+/// посередине; линия креста горит, пока к ней прилип виджет
+pub fn draw_grid(ui: &mut Ui, st: &State, w: i32, h: i32) {
+    let t = ui.t;
+    ui.cv.fill(R::new(0, 0, w, h), t.bg.alpha(0.3));
+    let dot = t.text.fade(0.22);
+    for x in ((w / 2) % GRID..w).step_by(GRID as usize) {
+        for y in (0..h).step_by(4) {
+            ui.cv.fill(R::new(x, y, 1, 1), dot);
+        }
+    }
+    for y in ((h / 2) % GRID..h).step_by(GRID as usize) {
+        for x in (0..w).step_by(4) {
+            ui.cv.fill(R::new(x, y, 1, 1), dot);
+        }
+    }
+    let (cx, cy) = st.snap_cross;
+    let line = |on: bool| if on { (t.red, 2) } else { (t.red.fade(0.45), 1) };
+    let (c, lw) = line(cx);
+    ui.cv.fill(R::new(w / 2 - lw / 2, 0, lw, h), c);
+    let (c, lw) = line(cy);
+    ui.cv.fill(R::new(0, h / 2 - lw / 2, w, lw), c);
 }
 
 impl State {
@@ -729,7 +816,6 @@ impl App {
         if out.is_empty() {
             return;
         }
-        let (ow, oh) = self.output_size(&out);
         let want: Vec<Widget> = self.st.set.widgets.iter().filter(|w| w.on && !self.st.locked).cloned().collect();
         // лишние — закрыть
         let have: Vec<(u32, u32)> = self.surfs.iter().filter_map(|(sid, s)| if let SKind::Widget(id) = s.kind { if s.closing { None } else { Some((*sid, id)) } } else { None }).collect();
@@ -749,8 +835,9 @@ impl App {
                 y = auto_y;
                 auto_y += wh + 16;
             }
-            x = x.clamp(0, (ow - ww).max(0));
-            y = y.clamp(top, (oh - wh).max(top));
+            let (x0, x1, y0, y1) = self.widget_bounds(&out, ww, wh);
+            x = x.clamp(x0, x1);
+            y = y.clamp(y0, y1);
             let raised = self.st.editing;
             let sid = have.iter().find(|(_, id)| *id == w.id).map(|(s, _)| *s);
             match sid {
@@ -781,16 +868,34 @@ impl App {
         self.widget_contrast();
     }
 
+    /// где может стоять поверхность виджета ww×wh на out: видимая часть — между барами и внутри
+    /// монитора (запас под всплытие может уйти под верхний бар; выше края — нет: y < 0 значит «ещё не ставили»)
+    pub fn widget_bounds(&self, out: &str, ww: i32, wh: i32) -> (i32, i32, i32, i32) {
+        let (ow, oh) = self.output_size(out);
+        let top = (self.bar_bottom(out) - RISE).max(0);
+        let low = self.bar_reserve_bottom(out);
+        (0, (ow - ww + SHADOW).max(0), top, (oh - low - wh + SHADOW).max(top))
+    }
+
     pub fn set_editing(&mut self, on: bool) {
         self.st.editing = on;
         if on {
             let out = self.focus_out();
+            if self.find(&SKind::EditGrid).is_empty() {
+                // над обоями, под окнами и под поднятыми виджетами; мышь проходит насквозь
+                let id = self.mk(SKind::EditGrid, &out, Layer::Bottom, "yami-grid", Anchor::all(), (0, 0), (0, 0, 0, 0), -1, KeyboardInteractivity::None);
+                if let Some(s) = self.surfs.get_mut(&id) {
+                    s.input = Some(vec![]);
+                }
+            }
             if self.find(&SKind::EditBar).is_empty() {
                 let top = self.bar_bottom(&out) + 12;
-                self.mk(SKind::EditBar, &out, Layer::Overlay, "yami-menu", Anchor::TOP, (520, 52), (top, 0, 0, 0), -1, KeyboardInteractivity::Exclusive);
+                self.mk(SKind::EditBar, &out, Layer::Overlay, "yami-menu", Anchor::TOP, (EDITBAR_W, 52), (top, 0, 0, 0), -1, KeyboardInteractivity::Exclusive);
             }
         } else {
             self.close_kind(&SKind::EditBar);
+            self.close_kind(&SKind::EditGrid);
+            self.st.snap_cross = (false, false);
         }
         self.sync_widgets();
         self.dirty_where(|k| matches!(k, SKind::Widget(_)));
@@ -809,5 +914,37 @@ impl App {
         if e.keysym == Keysym::Escape && self.st.editing {
             self.set_editing(false);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn widgets_stick_to_edges_neighbours_cross_and_grid() {
+        let (ow, oh) = (1920, 1080);
+        // у левого края — к краю; правым краем — к правому краю монитора
+        assert_eq!(snap(9, 300, 200, 100, ow, oh, &[], &[]).0, 0);
+        assert_eq!(snap(1715, 300, 200, 100, ow, oh, &[], &[]).0, 1720);
+        // серединой к кресту — и он горит
+        let (x, _, cross) = snap(855, 300, 200, 100, ow, oh, &[], &[]);
+        assert_eq!((x, cross.0), (860, true));
+        // встык справа к соседу и вровень с его верхом
+        let n = R::new(400, 300, 200, 100);
+        assert_eq!(snap(607, 500, 100, 100, ow, oh, &[], &[n]).0, 600);
+        assert_eq!(snap(700, 306, 100, 100, ow, oh, &[], &[n]).1, 300);
+        // к нижней кромке бара сверху
+        assert_eq!(snap(300, 40, 100, 100, ow, oh, &[36], &[]).1, 36);
+        // в стороне от всего — линия сетки (от середины: 960 + клетки), далеко от неё — как есть
+        assert_eq!(snap(990, 701, 100, 100, ow, oh, &[], &[]).0, 992);
+        assert_eq!(snap(1010, 701, 100, 100, ow, oh, &[], &[]).0, 1010);
+        assert_eq!(snap(300, 703, 100, 100, ow, oh, &[], &[]).1, 700);
+    }
+
+    #[test]
+    fn visible_part_leaves_rise_and_shadow() {
+        let v = visible(48, 100, 364, 132);
+        assert_eq!((v.x, v.y, v.w, v.h), (48, 116, 360, 112));
     }
 }

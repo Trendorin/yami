@@ -112,7 +112,7 @@ impl App {
             }
             let rise = match s.kind {
                 SKind::Modal | SKind::Popup => 12,
-                SKind::Widget(_) => 16,
+                SKind::Widget(_) => crate::widgets::RISE,
                 SKind::Osd | SKind::EditBar | SKind::Dock | SKind::CurtainBadge => 8,
                 SKind::Menu => 4,
                 _ => 0,
@@ -149,13 +149,14 @@ impl App {
                 SKind::Title(win) => crate::titles::draw(&mut ui, st, *win, w, h),
                 SKind::Grip(win) => crate::titles::draw_grip(&mut ui, st, *win, w, h),
                 SKind::EditBar => crate::widgets::draw_editbar(&mut ui, st, w, h),
+                SKind::EditGrid => crate::widgets::draw_grid(&mut ui, st, w, h),
                 SKind::Dock => crate::dock::draw(&mut ui, st, w, h),
                 SKind::DockEdge => {}
                 SKind::Curtain => crate::curtain::draw(&mut ui, st, &s.output, w, h),
                 SKind::CurtainBadge => crate::curtain::draw_badge(&mut ui, w, h),
             }
             // развёртка — только панели: не обои, не оверлей скриншота, не шторка
-            if st.set.scanlines && !matches!(s.kind, SKind::Dim | SKind::Catcher | SKind::Wall | SKind::Curtain | SKind::CurtainBadge | SKind::DockEdge | SKind::Title(_) | SKind::Grip(_)) {
+            if st.set.scanlines && !matches!(s.kind, SKind::Dim | SKind::Catcher | SKind::Wall | SKind::EditGrid | SKind::Curtain | SKind::CurtainBadge | SKind::DockEdge | SKind::Title(_) | SKind::Grip(_)) {
                 ui.cv.scanlines(if st.t.light { 0.06 } else { 0.22 });
             }
             if k < 1.0 && !matches!(s.kind, SKind::Dim | SKind::Catcher) {

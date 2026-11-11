@@ -248,15 +248,27 @@ impl App {
             }
             Act::WDrag(id) => {
                 if p.moved {
-                    let snap = |v: f64| ((v / 2.0).round() * 2.0) as i32;
-                    let nx = snap(start.0 as f64 + dx);
-                    let ny = snap(start.1 as f64 + dy);
-                    let (ow, oh) = self.surfs.get(&sid).map(|s| self.output_size(&s.output)).unwrap_or((1920, 1080));
-                    let top = self.surfs.get(&sid).map(|s| self.bar_bottom(&s.output)).unwrap_or(BAR_H);
-                    let (ww, wh) = self.surfs.get(&sid).map(|s| (s.w, s.h)).unwrap_or((0, 0));
-                    let nx = nx.clamp(0, (ow - ww).max(0));
-                    let low = self.surfs.get(&sid).map(|s| self.bar_reserve_bottom(&s.output)).unwrap_or(0);
-                    let ny = ny.clamp(top, (oh - wh - low).max(top));
+                    let (nx, ny) = ((start.0 as f64 + dx).round() as i32, (start.1 as f64 + dy).round() as i32);
+                    let Some((out, ww, wh)) = self.surfs.get(&sid).map(|s| (s.output.clone(), s.w, s.h)) else { return };
+                    let (ow, oh) = self.output_size(&out);
+                    // Shift — без магнитов, по 2 px; иначе видимая часть липнет к краям, кресту, барам,
+                    // соседям и сетке (widgets::snap)
+                    let (nx, ny, cross) = if self.mods.shift {
+                        (nx / 2 * 2, ny / 2 * 2, (false, false))
+                    } else {
+                        use crate::widgets::{visible, RISE};
+                        let v = visible(nx, ny, ww, wh);
+                        let bars = [self.bar_bottom(&out), oh - self.bar_reserve_bottom(&out)];
+                        let others: Vec<crate::gfx::R> = self.surfs.iter().filter(|(k, s)| **k != sid && matches!(s.kind, SKind::Widget(_)) && !s.closing && s.output == out).map(|(_, s)| visible(s.margin.0, s.margin.1, s.w, s.h)).collect();
+                        let (vx, vy, cross) = crate::widgets::snap(v.x, v.y, v.w, v.h, ow, oh, &bars, &others);
+                        (vx, vy - RISE, cross)
+                    };
+                    let (x0, x1, y0, y1) = self.widget_bounds(&out, ww, wh);
+                    let (nx, ny) = (nx.clamp(x0, x1), ny.clamp(y0, y1));
+                    if self.st.snap_cross != cross {
+                        self.st.snap_cross = cross;
+                        self.dirty(&SKind::EditGrid);
+                    }
                     if let Some(w) = self.st.set.widget_mut(id) {
                         w.x = nx;
                         w.y = ny;
@@ -314,8 +326,12 @@ impl App {
             self.sync_wall();
         }
         if let Act::WDrag(_) = p.act {
-            // виджет переставили: обои под ним другие
+            // виджет переставили: обои под ним другие; крест гаснет
             self.widget_contrast();
+            if self.st.snap_cross != (false, false) {
+                self.st.snap_cross = (false, false);
+                self.dirty(&SKind::EditGrid);
+            }
         }
     }
 

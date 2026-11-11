@@ -323,7 +323,7 @@ const PAIRS: &[(&str, &str)] = &[
     ("подпись", "label"),
     ("спрятать", "hide"),
     ("убрать совсем", "remove"),
-    ("расстановка: тащи, ⚙ — настройки виджета", "arrange: drag, ⚙ — widget settings"),
+    ("тащи: липнет к сетке и соседям, Shift — свободно", "drag: sticks to the grid and neighbours, Shift: free"),
     ("виджеты", "widgets"),
     // ── настройки ──
     ("настройки", "settings"),

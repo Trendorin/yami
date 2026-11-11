@@ -75,6 +75,8 @@ pub enum SKind {
     /// ручка размера в правом нижнем углу плавающего окна (titles.rs)
     Grip(u64),
     EditBar,
+    /// сетка под виджетами, пока их расставляют (widgets.rs)
+    EditGrid,
     /// шторка для трансляций и значок «скрыто» (curtain.rs)
     Curtain,
     CurtainBadge,
@@ -244,6 +246,8 @@ pub struct State {
     pub bar_ed: crate::settings::BarEd,
     pub sel_widget: u32,
     pub editing: bool,
+    /// к какой линии креста (по x, по y) прилип виджет, который тащат: она горит на сетке
+    pub snap_cross: (bool, bool),
     pub notifs: notif::Notifs,
     /// образец во вкладке анимаций: группа и когда пошёл (animtab.rs)
     pub anim_demo: Option<(u8, std::time::Instant)>,
@@ -480,6 +484,7 @@ impl State {
             bar_ed: Default::default(),
             sel_widget: 0,
             editing: false,
+            snap_cross: (false, false),
             notifs: notif::Notifs::default(),
             anim_demo: None,
             osd: None,

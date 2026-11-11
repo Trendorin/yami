@@ -222,7 +222,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("area · window · screen", "área · janela · tela"),
     ("arrange", "organizar"),
     ("arrange widgets", "organizar widgets"),
-    ("arrange: drag, ⚙ — widget settings", "organizar: arraste; ⚙ — configurações do widget"),
+    ("drag: sticks to the grid and neighbours, Shift: free", "arraste: gruda na grade e nos vizinhos, Shift: livre"),
     ("arrow", "seta"),
     ("arrows, Enter sets it, Esc goes back", "setas para escolher, Enter para definir, Esc para voltar"),
     ("as is", "como está"),

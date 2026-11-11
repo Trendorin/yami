@@ -91,6 +91,7 @@ const TARGETS: &[&str] = &[
     "popup:weather-none",
     "notif",
     "notif:shot",
+    "grid",
     "osd",
     "lock",
     "curtain",
@@ -603,6 +604,12 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             }
             crate::notif::size(st, &mut res.fonts)
         }
+        "grid" => {
+            // расстановка виджетов: сетка, горит вертикаль креста, панель сверху
+            st.editing = true;
+            st.snap_cross = (true, false);
+            (1280, 720)
+        }
         "osd" => {
             st.osd = Some((match arg { "curtain" => "curtain", "bright" => "bright", _ => "volume" }, Instant::now()));
             st.bright = Some(0.65);
@@ -670,6 +677,15 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             "popup" => crate::popups::draw(&mut ui, st, w, h),
             "menu" => crate::menu::draw(&mut ui, st, w, h),
             "widget" => crate::widgets::draw(&mut ui, st, 900, w, h),
+            "grid" => {
+                crate::wall::draw(&mut ui, st, w, h);
+                crate::widgets::draw_grid(&mut ui, st, w, h);
+                ui.cv.ox = (w - crate::widgets::EDITBAR_W) / 2;
+                ui.cv.oy = 40;
+                crate::widgets::draw_editbar(&mut ui, st, crate::widgets::EDITBAR_W, 52);
+                ui.cv.ox = 0;
+                ui.cv.oy = 0;
+            }
             "notif" => crate::notif::draw(&mut ui, st, w, h),
             "osd" => crate::notif::draw_osd(&mut ui, st, w, h),
             "lock" => crate::lock::draw(&mut ui, st, w, h, true),
