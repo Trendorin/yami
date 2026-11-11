@@ -291,6 +291,7 @@ the screen-share picker and automount belong to [yami-agents](#yami-agents).
 | `audioNames` | `{}` | your names for sound devices (outputs and microphones): PipeWire name (`pactl list short sinks`, `pactl list short sources`) → label, e.g. `{"alsa_output.usb-…-00.analog-stereo": "Headphones"}` |
 | `mediaArtNet` | `true` | album covers from the player's web links (`curl`, https after redirects, ≤ 16 MB); off: only local files |
 | `lyricsNet` | `true` | lyrics from lrclib.net (artist, title and length are sent) when the player has none and there is no `.lrc` or `.txt` file next to the track; asked only while the music popup shows lyrics, answers cached in `~/.cache/yami/lyrics` |
+| `btReconnect` | `true` | when Bluetooth turns on (and once per login), connect the paired and trusted headphones, speakers, keyboards and mice that are not connected yet; phones and computers connect by themselves. Settings → bluetooth |
 | `weatherCity`, `weatherUnits` | `""`, `"c"` | the `weather` bar module and widget: a city (`Berlin`) or `latitude, longitude`, asked from open-meteo.com every 20 minutes while one of them is shown; `f` gives °F and mph. Settings → services → network |
 | `portalFiles` | `true` | file dialogs from yami-files (else GTK) |
 
@@ -365,7 +366,7 @@ new wallpaper, a move, or a settings change.
 
 `widgets` is a list of `{"id", "kind", "on", "x", "y", "source", "style", "anim", "size",
 "color", "frame", "label", "seconds", "date", "text"}`: `kind` is `clock` `graph` `net` `media`
-`cal` `weather` `script` `note`; graphs take `source` `cpu` `ram` `temp` `gpu` `swap` and
+`cal` `weather` `bt` `script` `note` (`bt`: the connected Bluetooth devices with their battery, a click opens settings → bluetooth); graphs take `source` `cpu` `ram` `temp` `gpu` `swap` and
 `style` `bars` `line` `blocks` `wave` `dots`; a `script` widget takes the script's file name as
 `source`. `x`/`y` of -1 means the default place. Easier to arrange with the
 mouse: settings → widgets, edit mode.

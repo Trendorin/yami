@@ -114,8 +114,11 @@ impl App {
                     b.msg = std::mem::take(&mut self.st.bt.msg);
                     b.busy = std::mem::take(&mut self.st.bt.busy);
                 }
+                self.bt_turned_on(&b);
                 self.st.bt = b;
-                self.dirty_where(|k| matches!(k, SKind::Popup | SKind::Bar));
+                let widget = self.st.set.widgets.iter().any(|w| w.on && w.kind == "bt");
+                let tab = self.st.modal == Some(Modal::Settings) && self.st.stab == "bt";
+                self.dirty_where(|k| matches!(k, SKind::Popup | SKind::Bar) || (widget && matches!(k, SKind::Widget(_))) || (tab && *k == SKind::Modal));
             }
             Msg::Pam(ok) => self.on_pam(ok),
             Msg::Prof(p) => self.on_prof(p),
@@ -193,5 +196,25 @@ impl App {
         // в режиме «стол»: под заголовок нужно место сверху
         self.fit_title(id);
         self.session_place(id);
+    }
+}
+
+impl App {
+    /// bluetooth только что включился (или шелл впервые за вход застал его включённым): переподключить
+    /// сопряжённые доверенные устройства, если так настроено (btReconnect, #36). Перезапуск шелла
+    /// (msg restart) — тоже «впервые», поэтому раз за вход — по метке в XDG_RUNTIME_DIR
+    fn bt_turned_on(&mut self, b: &crate::net::BtState) {
+        if !self.st.set.bt_reconnect || !b.powered {
+            return;
+        }
+        let was = &self.st.bt;
+        let turned_on = was.present && !was.powered;
+        let first = !was.present && {
+            let dir = std::env::var_os("XDG_RUNTIME_DIR").map(std::path::PathBuf::from);
+            dir.is_some_and(|d| std::fs::OpenOptions::new().write(true).create_new(true).open(d.join("yami-bt-reconnected")).is_ok())
+        };
+        if turned_on || first {
+            crate::net::bt_reconnect(b.devices.iter().filter(|d| d.reconnectable()).map(|d| d.path.clone()).collect(), self.tx.clone());
+        }
     }
 }

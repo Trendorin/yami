@@ -42,6 +42,7 @@ const TARGETS: &[&str] = &[
     "settings:look-sets",
     "settings:wall",
     "settings:system",
+    "settings:bt",
     "settings:about",
     "launcher",
     "launcher:calc",
@@ -78,6 +79,8 @@ const TARGETS: &[&str] = &[
     "widget:weather-s",
     "widget:weather-l",
     "widget:weather-none",
+    "widget:bt",
+    "widget:bt-l",
     "widget:script",
     "widget:script-none",
     "popup:weather",
@@ -286,6 +289,11 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
         "settings" => {
             st.modal = Some(Modal::Settings);
             st.stab = crate::settings::find(arg).map(|t| t.id).unwrap_or("color");
+            if arg == "bt" {
+                // образец, а не адаптер этой машины: подключённые с зарядом, сопряжённое, новое рядом
+                mock_bt(st);
+                st.bt.discovering = true;
+            }
             if st.sel_widget == 0 {
                 st.sel_widget = st.set.widgets.first().map(|w| w.id).unwrap_or(0);
             }
@@ -526,6 +534,9 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             // погода и скрипт (#6): размер и «нет данных» — суффиксом (weather-s, script-none)
             let (k, var) = arg.split_once('-').unwrap_or((arg, ""));
             mock_weather(st, var != "none");
+            if k == "bt" {
+                mock_bt(st);
+            }
             let mut w = Widget { on: true, ..Widget::new(900, k) };
             if matches!(var, "s" | "l") {
                 w.size = var.into();
@@ -722,8 +733,8 @@ fn mock_tray(st: &mut State) {
 
 fn mock_bt(st: &mut State) {
     use crate::net::BtDev;
-    let dev = |n: &str, icon: &str, c: bool, p: bool, b: Option<u8>| BtDev { path: format!("/org/bluez/hci0/{n}"), name: n.into(), icon: icon.into(), connected: c, paired: p, battery: b };
-    st.bt = crate::net::BtState { present: true, powered: true, adapter: "/org/bluez/hci0".into(), devices: vec![dev("headphones", "audio-headset", true, true, Some(80)), dev("mouse", "input-mouse", false, true, None), dev("speaker", "audio-card", false, false, None)], msg: "AuthenticationFailed".into(), busy: "/org/bluez/hci0/speaker".into(), ..Default::default() };
+    let dev = |n: &str, icon: &str, c: bool, p: bool, b: Option<u8>| BtDev { path: format!("/org/bluez/hci0/{n}"), name: n.into(), icon: icon.into(), connected: c, paired: p, trusted: p, battery: b };
+    st.bt = crate::net::BtState { present: true, powered: true, adapter: "/org/bluez/hci0".into(), devices: vec![dev("headphones", "audio-headset", true, true, Some(80)), dev("keyboard", "input-keyboard", true, true, Some(12)), dev("mouse", "input-mouse", false, true, None), dev("speaker", "audio-card", false, false, None)], msg: "AuthenticationFailed".into(), busy: "/org/bluez/hci0/speaker".into(), ..Default::default() };
 }
 
 /// датчики образца, а не этой машины: снимки одинаковы везде и не выдают железо

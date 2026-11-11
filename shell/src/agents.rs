@@ -45,6 +45,7 @@ pub fn toggle(s: &mut Settings, k: &str) -> bool {
         "notif_cast" => &mut s.notif_cast,
         "media_art_net" => &mut s.media_art_net,
         "lyrics_net" => &mut s.lyrics_net,
+        "bt_reconnect" => &mut s.bt_reconnect,
         "portal_files" => &mut s.portal_files,
         _ => return false,
     };

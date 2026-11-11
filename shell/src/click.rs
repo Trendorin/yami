@@ -159,6 +159,11 @@ impl App {
                 net::bt_toggle_dev(d, self.tx.clone(), self.st.bt.clone());
             }
             Act::BtScan => net::bt_scan(&self.st.bt.adapter.clone(), self.tx.clone()),
+            Act::BtForget(path) => net::bt_forget(&self.st.bt.adapter.clone(), &path, self.tx.clone(), self.st.bt.clone()),
+            Act::BtSettings => {
+                self.close_popup();
+                self.open_settings_tab("bt");
+            }
             Act::Dnd => {
                 self.st.set.dnd = !self.st.set.dnd;
                 self.settings_changed();

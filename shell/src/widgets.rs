@@ -14,7 +14,7 @@ use smithay_client_toolkit::seat::keyboard::{KeyEvent, Keysym};
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 use smithay_client_toolkit::shell::WaylandSurface;
 
-pub const KINDS: &[(&str, &str)] = &[("clock", "часы"), ("graph", "график"), ("net", "сеть"), ("media", "музыка"), ("cal", "календарь"), ("weather", "погода"), ("script", "скрипт")];
+pub const KINDS: &[(&str, &str)] = &[("clock", "часы"), ("graph", "график"), ("net", "сеть"), ("media", "музыка"), ("cal", "календарь"), ("weather", "погода"), ("bt", "bluetooth"), ("script", "скрипт")];
 pub const SOURCES: &[(&str, &str)] = &[("cpu", "процессор"), ("ram", "память"), ("temp", "температура"), ("gpu", "видеокарта")];
 pub const STYLES: &[(&str, &str)] = &[("bars", "столбики"), ("line", "линия"), ("blocks", "клетки"), ("wave", "волна"), ("dots", "точки")];
 pub const ANIMS: &[(&str, &str)] = &[("scroll", "бегущий"), ("rise", "рост"), ("flicker", "мерцание"), ("none", "без анимации")];
@@ -47,6 +47,7 @@ pub fn size_of(w: &Widget) -> (i32, i32) {
         "media" => ((320, 112), (400, 136), (500, 170)),
         "cal" => ((236, 220), (280, 252), (350, 316)),
         "weather" => ((230, 96), (300, 150), (390, 176)),
+        "bt" => ((230, 76), (300, 120), (380, 164)),
         "script" => ((220, 64), (300, 110), (400, 160)),
         _ => ((200, 100), (300, 140), (400, 200)),
     };
@@ -152,6 +153,37 @@ fn weather(ui: &mut Ui, st: &State, w: &Widget, r: R, c: C) {
         ui.text_center(PX, R::new(b.x, b.y, b.w, 16), crate::weather::day_name(i, d), t.text_dim);
         ui.cv.icon(crate::weather::icon(d.code, true), b.x + b.w / 2 - 7, b.y + 18, 2, c);
         ui.cv.text_center(ui.f, PX, R::new(b.x, b.y + 36, b.w, 16), &format!("{} {}", crate::weather::deg(d.hi), crate::weather::deg(d.lo)), t.text_faint);
+    }
+}
+
+/// bluetooth на столе (#36): подключённые устройства с зарядом; щелчок — настройки → bluetooth
+fn bt(ui: &mut Ui, st: &State, w: &Widget, r: R, c: C) {
+    let t = ui.t;
+    let s = &st.bt;
+    ui.zone(r, Act::BtSettings, Cur::Pointer);
+    let on: Vec<&crate::net::BtDev> = s.devices.iter().filter(|d| d.connected).collect();
+    let head = if !s.present { "нет адаптера".to_string() } else if !s.powered { crate::i18n::tr("выключен").to_string() } else if on.is_empty() { crate::i18n::tr("ничего не подключено").to_string() } else { crate::tf!("подключено {}", "{} connected", "{} conectados", on.len()) };
+    ui.cv.icon("bt", r.x, r.y + 2, 2, if on.is_empty() { t.text_faint } else { c });
+    ui.text_in(PX, R::new(r.x + 22, r.y, r.w - 22, 18), &head, t.text_dim);
+    let n = match w.size.as_str() {
+        "s" => 1,
+        "l" => 4,
+        _ => 3,
+    };
+    let mut y = r.y + 26;
+    for d in on.into_iter().take(n) {
+        if y + 20 > r.bottom() {
+            break;
+        }
+        ui.cv.icon(d.icon7(), r.x, y + 3, 2, c);
+        let right = if d.battery.is_some() { 70 } else { 0 };
+        ui.text_in(PX, R::new(r.x + 22, y, r.w - 22 - right, 20), &d.name, t.text);
+        if let Some(p) = d.battery {
+            let col = if p <= 15 { t.warn } else { c };
+            ui.cv.battery(r.right() - 66, y + 3, 2, p as f32 / 100.0, t.text_dim, col, t.surface_hi.lerp(t.border, 0.45));
+            ui.text_right(PX, R::new(r.right() - 40, y, 40, 20), &format!("{p}%"), t.text_dim);
+        }
+        y += 26;
     }
 }
 
@@ -483,10 +515,14 @@ fn draw_widget(ui: &mut Ui, st: &State, w: &Widget, sw: i32, sh: i32) {
             let pad = if w.frame { 12 } else { 2 };
             calendar(ui, st, R::new(pad, pad, r.w - 2 * pad, r.h - 2 * pad), 0, c, false);
         }
-        "weather" | "script" => {
+        "weather" | "script" | "bt" => {
             panel(ui, w, r);
             let pad = if w.frame { 12 } else { 4 };
-            let f = if w.kind == "weather" { weather } else { script };
+            let f = match w.kind.as_str() {
+                "weather" => weather,
+                "bt" => bt,
+                _ => script,
+            };
             f(ui, st, w, R::new(pad, pad, r.w - 2 * pad, r.h - 2 * pad), c);
         }
         _ => {}

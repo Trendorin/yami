@@ -9,6 +9,7 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+- Bluetooth without a terminal (#36): settings → bluetooth lists the connected, paired and nearby devices with their battery, and connects, disconnects, pairs and forgets them; the bar popup opens it with «all devices»; a `bt` desktop widget shows what is connected and how charged it is; paired headphones, speakers, keyboards and mice reconnect when Bluetooth turns on (`btReconnect`). All through BlueZ on D-Bus, nothing else to install.
 - Updates and modules trust only what the installed version was built with: the release keys are part of the program, a tag is taken by its full name and the build runs from the very commit the checked tag names, so a branch called like a version cannot stand in for it. `yami report` also hides the weather city and the names of hidden drives.
 - Ready binaries: on x86_64 with glibc 2.34 or newer a release installs signed, ready programs, with no compiler and in a few minutes, updates too; anywhere else, or with `--from-source`, it builds as before. Packages come from the same files: a `.deb` per program, `packaging/arch/PKGBUILD`, `packaging/fedora/yami.spec` and a Gentoo ebuild, and a package meets you with the first-run setup at the first login.
 - The password typed into the first-run setup can no longer reach the screen or the install log: sudo asks it through a link only it can start. Installing modules from that window with a password also skipped the steps after the build, and no longer does.

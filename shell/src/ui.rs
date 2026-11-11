@@ -127,6 +127,10 @@ pub enum Act {
     BtPower(bool),
     BtDev(String),
     BtScan,
+    /// забыть сопряжённое устройство (#36)
+    BtForget(String),
+    /// настройки → bluetooth: все устройства (#36)
+    BtSettings,
     /// полный менеджер bluetooth (blueman или bluetoothctl в терминале)
     BtManager,
     Dnd,

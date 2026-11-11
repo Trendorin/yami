@@ -17,6 +17,7 @@ mod displays;
 mod audio;
 mod bar;
 mod bartab;
+mod bttab;
 mod bundle;
 mod calc;
 mod cli;

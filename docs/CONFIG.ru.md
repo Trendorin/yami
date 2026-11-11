@@ -292,6 +292,7 @@ MangoHud получает конфиг в палитре и пиксельном
 | `audioNames` | `{}` | твои имена звуковых устройств (выходов и микрофонов): имя PipeWire (`pactl list short sinks`, `pactl list short sources`) → подпись, например `{"alsa_output.usb-…-00.analog-stereo": "Headphones"}` |
 | `mediaArtNet` | `true` | обложки альбомов по веб-ссылкам плеера (`curl`, после переадресаций только https, ≤ 16 МБ); выключено — только локальные файлы |
 | `lyricsNet` | `true` | тексты песен с lrclib.net (уходят исполнитель, название и длительность), когда у плеера текста нет и рядом с треком нет файла `.lrc` или `.txt`; спрашивается, только пока всплывашка музыки показывает текст, ответы — в кеше `~/.cache/yami/lyrics` |
+| `btReconnect` | `true` | когда Bluetooth включается (и раз за вход), подключать сопряжённые доверенные наушники, колонки, клавиатуры и мыши, которые ещё не подключены; телефоны и компьютеры подключаются сами. Настройки → bluetooth |
 | `weatherCity`, `weatherUnits` | `""`, `"c"` | модуль бара и виджет `weather`: город (`Берлин`) или `широта, долгота`, спрашивается у open-meteo.com раз в 20 минут, пока один из них виден; `f` — °F и mph. Настройки → службы → сеть |
 | `portalFiles` | `true` | диалоги файлов от yami-files (иначе GTK) |
 
@@ -368,7 +369,7 @@ printf '{"text":"%s","icon":"temp","color":"accent","click":"xdg-open https://wt
 
 `widgets` — список `{"id", "kind", "on", "x", "y", "source", "style", "anim", "size",
 "color", "frame", "label", "seconds", "date", "text"}`: `kind` — `clock` `graph` `net` `media`
-`cal` `weather` `script` `note`; графики берут `source` `cpu` `ram` `temp` `gpu` `swap` и
+`cal` `weather` `bt` `script` `note` (`bt` — подключённые устройства Bluetooth с зарядом, щелчок открывает настройки → bluetooth); графики берут `source` `cpu` `ram` `temp` `gpu` `swap` и
 `style` `bars` `line` `blocks` `wave` `dots`; виджет `script` берёт имя файла скрипта в `source`. `x`/`y` равные -1 — место по умолчанию. Расставлять проще мышью:
 настройки → виджеты, режим правки.
 

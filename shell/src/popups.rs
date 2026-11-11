@@ -516,13 +516,7 @@ fn bt(ui: &mut Ui, st: &State, b: R) {
         for d in s.devices.iter().take(8) {
             let r = R::new(b.x, y, b.w, 30);
             ui.button(r, "", "", Tone::Ghost, d.connected, true, Act::BtDev(d.path.clone()));
-            let icon = match d.icon.as_str() {
-                i if i.contains("audio") || i.contains("headset") => "music",
-                i if i.contains("input") || i.contains("keyboard") || i.contains("mouse") => "grid",
-                i if i.contains("phone") => "bell",
-                _ => "bt",
-            };
-            ui.cv.icon(icon, r.x + 8, r.cy() - 7, 2, if d.connected { t.ember } else { t.text_dim });
+            ui.cv.icon(d.icon7(), r.x + 8, r.cy() - 7, 2, if d.connected { t.ember } else { t.text_dim });
             ui.text_in(PX, R::new(r.x + 30, r.y, r.w - 130, r.h), &d.name, if d.connected { t.text_hi } else { t.text });
             let st_txt = if s.busy == d.path { "подождите…".to_string() } else if d.connected { "подключено".to_string() } else if d.paired { "сопряжено".to_string() } else { "новое".to_string() };
             let st_txt = match d.battery {
@@ -533,7 +527,7 @@ fn bt(ui: &mut Ui, st: &State, b: R) {
             y += 34;
         }
     }
-    ui.button(R::new(b.x, b.bottom() - 28, b.w, 28), "менеджер устройств", "gear", Tone::Plain, false, true, Act::BtManager);
+    ui.button(R::new(b.x, b.bottom() - 28, b.w, 28), "все устройства", "gear", Tone::Plain, false, true, Act::BtSettings);
 }
 
 // ── профиль питания ─────────────────────────────────────────────────────────

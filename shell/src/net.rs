@@ -311,7 +311,27 @@ pub struct BtDev {
     pub icon: String,
     pub connected: bool,
     pub paired: bool,
+    /// доверенное: BlueZ пускает его без вопросов, шелл переподключает (btReconnect)
+    pub trusted: bool,
     pub battery: Option<u8>,
+}
+
+impl BtDev {
+    /// значок по классу устройства из BlueZ (Icon: audio-headset, input-mouse, phone…)
+    pub fn icon7(&self) -> &'static str {
+        match self.icon.as_str() {
+            i if i.contains("audio") || i.contains("headset") || i.contains("headphone") => "music",
+            i if i.contains("input") || i.contains("keyboard") || i.contains("mouse") || i.contains("gaming") => "grid",
+            i if i.contains("phone") => "bell",
+            _ => "bt",
+        }
+    }
+
+    /// его стоит переподключать само: наушники, колонки, клавиатуры, мыши, а не телефоны и компьютеры,
+    /// которые подключаются сами, когда им нужно
+    pub fn reconnectable(&self) -> bool {
+        self.paired && self.trusted && !self.connected && !self.icon.contains("phone") && !self.icon.contains("computer")
+    }
 }
 
 #[derive(Clone, Default, Debug)]
@@ -374,7 +394,7 @@ fn query_bt() -> BtState {
                 Some(Value::U8(x)) => Some(*x),
                 _ => None,
             });
-            s.devices.push(BtDev { path: path.to_string(), name, icon: st(d, "Icon"), connected: b(d, "Connected"), paired: b(d, "Paired"), battery });
+            s.devices.push(BtDev { path: path.to_string(), name, icon: st(d, "Icon"), connected: b(d, "Connected"), paired: b(d, "Paired"), trusted: b(d, "Trusted"), battery });
         }
     }
     s.devices.sort_by(|a, b| b.connected.cmp(&a.connected).then(b.paired.cmp(&a.paired)).then(a.name.cmp(&b.name)));
@@ -476,4 +496,50 @@ pub fn bt_scan(adapter: &str, tx: Sender<Msg>) {
         let _ = p.call_method("StopDiscovery", &());
         let _ = tx.send(Msg::Bt(query_bt()));
     });
+}
+
+/// забыть сопряжённое устройство (Adapter1.RemoveDevice): потом его можно сопрячь заново
+pub fn bt_forget(adapter: &str, path: &str, tx: Sender<Msg>, mut cur: BtState) {
+    cur.busy = path.to_string();
+    cur.msg.clear();
+    cur.op = true;
+    let _ = tx.send(Msg::Bt(cur));
+    let (a, d) = (adapter.to_string(), path.to_string());
+    std::thread::spawn(move || {
+        let mut msg = String::new();
+        if let Some(c) = SYS.get() {
+            let run = || -> Result<(), zbus::Error> {
+                let p = Proxy::new(c, "org.bluez", a.as_str(), "org.bluez.Adapter1")?;
+                let dev = zbus::zvariant::ObjectPath::try_from(d.as_str()).map_err(zbus::Error::from)?;
+                p.call_method("RemoveDevice", &(dev,)).map(|_| ())
+            };
+            if let Err(e) = run() {
+                msg = bt_err(&e);
+            }
+        }
+        let mut s = query_bt();
+        s.msg = msg;
+        s.op = true;
+        let _ = tx.send(Msg::Bt(s));
+    });
+}
+
+/// переподключить сопряжённые доверенные устройства (наушники, клавиатуры…) по одному: когда
+/// bluetooth включился. Выключенное устройство просто не ответит — это не ошибка, её не показываем
+pub fn bt_reconnect(paths: Vec<String>, tx: Sender<Msg>) {
+    if paths.is_empty() {
+        return;
+    }
+    std::thread::Builder::new()
+        .name("bt-reconnect".into())
+        .spawn(move || {
+            let Some(c) = SYS.get() else { return };
+            for p in &paths {
+                if let Ok(dev) = Proxy::new(c, "org.bluez", p.as_str(), "org.bluez.Device1") {
+                    let _ = dev.call_method("Connect", &());
+                }
+            }
+            let _ = tx.send(Msg::Bt(query_bt()));
+        })
+        .ok();
 }

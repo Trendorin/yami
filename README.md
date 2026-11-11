@@ -45,8 +45,9 @@ Everything it does and its flags: [Installation](#installation).
 - **Complete desktop shell.** Bar, app launcher with clipboard history, power menu, lock screen
   (PAM), notification server with history and do-not-disturb, OSD, system tray (StatusNotifierItem
   with DBusMenu), calendar, sound/music/network/Bluetooth/system popups, a power profile switch
-  (power-profiles-daemon) and its own **polkit password window** instead of a Qt/GTK agent.
-- **Desktop widgets.** Clock, calendar, weather, the output of your own script, music card with an
+  (power-profiles-daemon), Bluetooth devices paired, connected and forgotten right in settings, and its
+  own **polkit password window** instead of a Qt/GTK agent.
+- **Desktop widgets.** Clock, calendar, weather, Bluetooth devices with their battery, the output of your own script, music card with an
   audio-reactive equalizer, and graphs
   for CPU, RAM, temperature and rx/tx network traffic in five styles (bars, line, blocks, wave,
   dots) and four animations. Drag them into place in edit mode, hide or resize them. Widgets
