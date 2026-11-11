@@ -130,7 +130,8 @@ impl App {
                 if self.st.popup_is("control") {
                     self.dirty(&SKind::Popup);
                 }
-                if show && self.st.set.osd_bright {
+                // в панели управления ползунок и так на виду — OSD поверх лишний
+                if show && self.st.set.osd_bright && !self.st.popup_is("control") {
                     self.show_osd("bright");
                 }
             }

@@ -84,7 +84,7 @@ fn uptime() -> String {
 /// вертикальный ползунок: клетки снизу вверх, значок и процент под ними; off — погашен
 fn vslider(ui: &mut Ui, r: R, icon: &str, v: f32, off: bool, act: Act) {
     let t = ui.t;
-    let hov = !off && ui.hover(r);
+    let hov = act != Act::Block && ui.hover(r);
     ui.cv.pxbox(r, &BoxStyle::new(t.surface, if hov { t.red } else { t.border }));
     let track = R::new(r.x + 12, r.y + 10, r.w - 24, r.h - 62);
     let cells = 12;
@@ -97,7 +97,8 @@ fn vslider(ui: &mut Ui, r: R, icon: &str, v: f32, off: bool, act: Act) {
     ui.cv.icon(icon, r.x + r.w / 2 - 7, r.bottom() - 46, 2, if off { t.text_faint } else { t.red });
     let pct = if off { "—".to_string() } else { format!("{}%", (v * 100.0).round()) };
     ui.text_center(PX, R::new(r.x, r.bottom() - 26, r.w, 20), &pct, if off { t.text_faint } else { t.text });
-    if !off {
+    // без звука ползунок тянуть можно; без подсветки (Act::Block) — нечего
+    if act != Act::Block {
         ui.zone(R::new(r.x, track.y - 4, r.w, track.h + 8), act, Cur::Pointer);
     }
 }
@@ -146,7 +147,7 @@ pub fn draw(ui: &mut Ui, st: &State, b: R) {
     let sx = card.right() + 12;
     let a = &st.audio;
     vslider(ui, R::new(sx, b.y, sw, top_h), if a.muted { "mute" } else { "speaker" }, a.volume as f32, a.muted, Act::CtlVol);
-    vslider(ui, R::new(sx + sw + GAP, b.y, sw, top_h), "sun", st.bright.unwrap_or(0.0), st.bright.is_none(), Act::CtlBright);
+    vslider(ui, R::new(sx + sw + GAP, b.y, sw, top_h), "sun", st.bright.unwrap_or(0.0), st.bright.is_none(), if st.bright.is_some() { Act::CtlBright } else { Act::Block });
     // плитки: квадраты по центру ряда, одни значки
     for (i, (k, _, icon)) in tiles.into_iter().enumerate() {
         let rr = at(i);
