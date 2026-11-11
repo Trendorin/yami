@@ -2,7 +2,7 @@
 
 English · [Русский](SECURITY.ru.md)
 
-What yami trusts, what it exposes, and what was checked (audits of 2026-11-03, 2026-11-04 and 2026-11-07).
+What yami trusts, what it exposes, and what was checked (audits of 2026-11-03, 2026-11-04, 2026-11-07 and 2026-11-09).
 
 ## Reporting a vulnerability
 
@@ -28,7 +28,7 @@ Please do not post it in public issues: send a [private report on GitHub](https:
 | album covers | the player (MPRIS `artUrl`) | `curl -q` (no user curlrc), http(s) only, https after redirects, ≤ 3 redirects, ≤ 16 MB, 8 s; `mediaArtNet` off keeps the shell offline |
 | lyrics | the player (MPRIS `xesam:asText`, `xesam:url`), lrclib.net | the player's text and a `.lrc`/`.txt` next to a local track are read as text (regular files, ≤ 256 KB); lrclib.net gets artist, title and length over `curl -q`, https only, 8 s, ≤ 2 MB, parsed as JSON and shown as text; asked only while the music popup shows lyrics; `lyricsNet` off keeps it offline |
 | weather | open-meteo.com | only the city (or the coordinates) from `weatherCity` and the units go out, over `curl -q`, https only (redirects too), 10 s, ≤ 1 MB; the answer is parsed as JSON and shown as numbers and text; asked only while the `weather` module or widget is shown, and not at all with `weatherCity` empty |
-| file manager | removable media | a `.trashinfo` on a removable disk cannot point outside that disk (`..` is refused); archives go through `bsdtar`, which refuses absolute paths and `..` (file names to compress follow `--`, never read as options); FileManager1 opens at most 16 folders per call |
+| file manager | removable media | a trash folder on a removable disk counts only when it and its `files` are real folders of your own, never links: a disk whose trash points at the home folder is neither shown nor emptied; a `.trashinfo` there cannot point outside that disk (`..` and absolute paths elsewhere are refused); archives go through `bsdtar`, which refuses absolute paths and `..` (file names to compress follow `--`, never read as options); FileManager1 opens at most 16 folders per call |
 | automount (`automount`) | whoever plugs a device in | only volumes udisks/gvfs mark for automounting (removable disks, phones, cameras; never internal partitions), mounted by them with their own options (`nosuid`, `nodev`); nothing is mounted while the screen is locked (the yami shell's mark, or logind's `LockedHint` for other lockers): the drives plugged then wait for the unlock; encrypted drives only ask for the password in yami-agents, which hands it to `udisksctl` over a pipe and never stores it |
 | image viewer | files you open | animations are capped at 600 frames and 1 GB of decoded frames |
 | wallpaper picker | pictures in the wallpaper folder | only regular, not hidden png/jpg/webp files, at most 500 per folder; decoded in a background thread of the shell with the same limits as yami-files (nothing over 40 Mpx, a 256 MB decode cap), thumbnails cached in `~/.cache/yami/thumbs`; only the rows on screen stay in memory and everything is freed when it closes |
@@ -39,7 +39,7 @@ Please do not post it in public issues: send a [private report on GitHub](https:
 | inline reply | the notifying app | the text goes back only as `NotificationReplied` to that notification; the field is wiped after sending, nothing is stored or copied |
 | `yami theme import` | a file or an https link from anyone | a link is fetched with `curl -q`, https only (redirects too), ≤ 3 redirects, ≤ 64 MB, 30 s, into a fresh 0700 folder, and must be a theme (`kind: theme`), never a full file; only look keys (palette, effects, fonts, bar, widgets, dock look, gaps, cursor) and the wallpaper picture (saved as a plain file under `~/.local/share/yami/wallpapers`, name stripped of any path); never keybindings, commands, scripts or the update source. Before any import everything it may replace is copied to `~/.local/state/yami/before-import-*.json` (the same format, the last five kept; `yami import FILE --yes` puts it back) |
 | `yami import` | your own backup | as above plus every other setting; custom keybindings, `niri/user.kdl` and bar scripts are listed and written only with `--yes`; paths must be plain and relative inside `~/.config` (`..` and absolute paths refused); `updateRepo` and `updateVerify` are never imported |
-| `yami report` | you, for an issue | nothing is sent; lines with password, token, secret or key names are blanked, the home path, user and host name replaced; the archive is meant to be read before it is attached |
+| `yami report` | you, for an issue | nothing is sent; lines with password, token, secret or key names are blanked, the home path, user and host name replaced, where you live (night light, weather), your servers and device names hidden; the archive is meant to be read before it is attached |
 | shell-owned processes | the user's settings | wlsunset (night light) is started with fixed arguments; it and the music, sound and visualizer helpers (playerctl, pactl, parec) carry `PR_SET_PDEATHSIG`, so none outlives the shell or a restart |
 
 ## Installer
@@ -49,7 +49,9 @@ Please do not post it in public issues: send a [private report on GitHub](https:
   options or initramfs, no capability on a binary (yami-niri's realtime priority is the user's
   call, `yami-niri.sh status` says how).
 - Modules: each one is fetched at the tag named in `modules.lock`, and its signature is checked
-  against `keys/allowed_signers` of the installed version before anything is built.
+  against `keys/allowed_signers` of the installed version before anything is built. The tag is taken by
+  its full name and the build runs from the commit the checked tag points at, so a branch of the
+  same name cannot stand in for it.
 - Downloads: the repository itself (git over HTTPS), rustup when the distro's Rust is too old
   (`https` only, TLS 1.2+), Monocraft at a pinned version checked against its SHA-256. niri and
   smithay are fetched at pinned commits, the patches come from this repository.
@@ -64,8 +66,9 @@ Please do not post it in public issues: send a [private report on GitHub](https:
 - The updater works in its own clone (`~/.local/share/yami/src`), runs git without prompts
   (`GIT_TERMINAL_PROMPT=0`, hooks off) and with a stall timeout; tags are fetched without
   `--force`, so a tag rewritten on the server does not replace one already seen.
-- Signatures: the trusted keys come from `keys/allowed_signers` of the version that is already
-  installed (trust on first install, like the install itself). Once that file holds keys, a
+- Signatures: the trusted keys are `keys/allowed_signers` of the version that is already
+  installed, built into the program itself (trust on first install, like the install itself), so
+  they do not depend on what the updater's clone holds. Once that file holds keys, a
   release whose tag is unsigned or signed by another key is refused (`updateVerify` `auto`), so
   someone who gains push access to the repository still cannot ship an update. A signature only
   counts with a matching principal (`gpg.minTrustLevel=fully`, and «No principal matched» is

@@ -41,21 +41,50 @@ PROGS=(yami-files yami-view yami-play yami-shot yami-agents yami-greet)
 say() { printf '\e[1m── %s\e[0m\n' "$*"; }
 ver_gt() { [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" == "$1" && $1 != "$2" ]]; }
 
-# ── the sysroot: Debian 12's headers and libraries, each file checked against the signed index ──
+# ── the sysroot: Debian 12's headers and libraries, each file checked against Debian's signed index ──
+# What is linked from it ends up inside every released binary (crt1.o, libc_nonshared.a), so the chain is
+# checked from the top: Debian's signature on the index (gpgv with Debian's archive keys, the package
+# debian-archive-keyring on Arch, Fedora and Debian), the index's checksum of the package list, the list's
+# checksum of each package. Without those keys the index rests on HTTPS alone: said out loud, and the
+# sysroot remembers it (.done), so a release build repeats the warning until it is rebuilt checked.
 DEBS=(libc6 libc6-dev linux-libc-dev libgcc-12-dev libgcc-s1 libgomp1 libitm1 libatomic1 libasan8 liblsan0 libtsan2 libubsan1 libquadmath0
   libcrypt1 libcrypt-dev libxkbcommon0 libxkbcommon-dev libpam0g libpam0g-dev libaudit1 libcap-ng0)
 SYS="$CACHE/sysroot/debian-12-amd64"
+debian_keyring() {
+  local k
+  for k in /usr/share/keyrings/debian-archive-keyring.gpg /usr/share/keyrings/debian-archive-keyring.pgp; do
+    [[ -s $k ]] && { printf '%s\n' "$k"; return 0; }
+  done
+  return 1
+}
+unverified_note() {
+  printf '  \e[33mwarning:\e[0m %s\n           %s\n' "the sysroot's package index is not checked against Debian's signature (HTTPS only):" \
+    "install debian-archive-keyring (and gpgv), then remove $SYS to rebuild it checked" >&2
+}
 make_sysroot() {
-  [[ -f $SYS/.done ]] && return 0
+  if [[ -f $SYS/.done ]]; then
+    # a sysroot made before the signature was checked, or without Debian's keys
+    if ((STRICT)) && [[ "$(cat "$SYS/.done")" != verified ]]; then unverified_note; fi
+    return 0
+  fi
   command -v clang >/dev/null && command -v ld.lld >/dev/null && command -v bsdtar >/dev/null || { echo "dist: the sysroot build needs clang, lld and bsdtar" >&2; return 1; }
   say "sysroot: Debian 12"
-  local mirror=https://deb.debian.org/debian tmp idx p want f
+  local mirror=https://deb.debian.org/debian tmp idx p want f ring state=unverified
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
   curl -fsSL --proto '=https' -o "$tmp/InRelease" "$mirror/dists/bookworm/InRelease"
   curl -fsSL --proto '=https' -o "$tmp/Packages.xz" "$mirror/dists/bookworm/main/binary-amd64/Packages.xz"
-  want="$(awk '/^SHA256:/ { on = 1; next } /^[A-Z]/ { on = 0 } on && $3 == "main/binary-amd64/Packages.xz" { print $1 }' "$tmp/InRelease")"
-  [[ "$(sha256sum "$tmp/Packages.xz" | cut -d' ' -f1)" == "$want" ]] || { echo "dist: the package index does not match" >&2; return 1; }
+  # only the text Debian signed is read: gpgv writes it out, lines put around the signed block never count
+  if ring="$(debian_keyring)" && command -v gpgv >/dev/null; then
+    gpgv -q --keyring "$ring" --output "$tmp/Release" "$tmp/InRelease" 2>"$tmp/gpgv.log" ||
+      { cat "$tmp/gpgv.log" >&2; echo "dist: the signature of Debian's package index does not check out" >&2; return 1; }
+    state=verified
+  else
+    unverified_note
+    cp "$tmp/InRelease" "$tmp/Release"
+  fi
+  want="$(awk '/^SHA256:/ { on = 1; next } /^[A-Z]/ { on = 0 } on && $3 == "main/binary-amd64/Packages.xz" { print $1 }' "$tmp/Release")"
+  [[ -n $want && "$(sha256sum "$tmp/Packages.xz" | cut -d' ' -f1)" == "$want" ]] || { echo "dist: the package index does not match" >&2; return 1; }
   idx="$tmp/Packages"
   xz -dc "$tmp/Packages.xz" >"$idx"
   rm -rf -- "$SYS"
@@ -74,7 +103,7 @@ make_sysroot() {
     t="$(readlink "$l")"
     ln -sfn "$(realpath -m --relative-to="$(dirname "$l")" "$SYS$t")" "$l"
   done < <(find "$SYS" -type l -lname '/*' -print0)
-  : >"$SYS/.done"
+  printf '%s\n' "$state" >"$SYS/.done"
 }
 
 # ── build ───────────────────────────────────────────────────────────────────

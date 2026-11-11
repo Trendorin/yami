@@ -73,15 +73,22 @@ m_fetch() {
     mkdir -p "${dir%/*}"
     git clone --quiet --filter=blob:none "$YAMI_MODULES_URL/$repo.git" "$dir" >&2 || return 1
   fi
-  if ! git -C "$dir" rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+  # тег — только по полному имени, а дальше по номерам объектов: голое имя «v3.0.0» подходит и ветке
+  # (свежий клон получает ветку по умолчанию с сервера как свою), а `git checkout ИМЯ` берёт ветку
+  # раньше тега — подпись тега сошлась бы, а собрался бы чужой код из одноимённой ветки
+  local obj commit out
+  if ! obj="$(git -C "$dir" rev-parse -q --verify "refs/tags/$tag")" || ! commit="$(git -C "$dir" rev-parse -q --verify "$obj^{commit}")"; then
     echo "$repo $tag: no such version in its repository" >&2
     return 1
   fi
-  # подпись проверяется ключами из этой копии шелла: подмена модуля не пройдёт вместе с ним
-  if ! git -C "$dir" -c gpg.format=ssh -c "gpg.ssh.allowedSignersFile=$ROOT/keys/allowed_signers" verify-tag "$tag" >/dev/null 2>&1; then
+  # подпись проверяется ключами из этой копии шелла: подмена модуля не пройдёт вместе с ним. Засчитывается
+  # только подпись ключом из списка («for ИМЯ»): как в обновлениях шелла (update.rs, verify)
+  if ! out="$(LC_ALL=C git -C "$dir" -c gpg.format=ssh -c "gpg.ssh.allowedSignersFile=$ROOT/keys/allowed_signers" -c gpg.minTrustLevel=fully verify-tag "$obj" 2>&1)" ||
+    [[ $out != *'Good "git" signature for '* || $out == *'No principal matched'* ]]; then
     echo "$repo $tag: the signature does not check out" >&2
     return 1
   fi
-  git -C "$dir" checkout --quiet --detach "$tag" >&2 || return 1
+  # собирается ровно тот коммит, на который указывает проверенный тег
+  git -C "$dir" -c advice.detachedHead=false checkout --quiet --detach "$commit" >&2 || return 1
   printf '%s\n' "$dir"
 }

@@ -159,8 +159,9 @@ pub fn run(y: &Sty, args: &[&str]) -> i32 {
 }
 
 /// ключи JSON-настроек, что говорят о человеке, а не о поломке: где он живёт (ночной свет по
-/// координатам), его серверы, имена устройств, команды на клавишах (в них бывают токены)
-const PRIVATE: &[&str] = &["nightGeo", "servers", "audioNames", "customBinds", "dockPins", "updateRepo"];
+/// координатам, город погоды), его серверы, имена устройств и дисков, команды на клавишах (в них
+/// бывают токены)
+const PRIVATE: &[&str] = &["nightGeo", "weatherCity", "servers", "audioNames", "devsHidden", "customBinds", "dockPins", "updateRepo"];
 
 fn private_keys(text: &str) -> String {
     let Ok(serde_json::Value::Object(mut m)) = serde_json::from_str::<serde_json::Value>(text) else { return text.to_string() };
@@ -193,8 +194,8 @@ mod tests {
         let s = super::scrub(j, "/home/ann", "ann", "annpc", true);
         assert!(s.contains("<host> yami-shell[1]: polkit auth ok"));
         assert!(!s.contains("abc"));
-        let j = super::private_keys(r#"{"nightGeo":"55.7, 37.6","servers":["smb://nas"],"lang":"ru"}"#);
-        assert!(!j.contains("55.7") && !j.contains("nas") && j.contains("\"ru\""));
+        let j = super::private_keys(r#"{"nightGeo":"55.7, 37.6","weatherCity":"Tver","servers":["smb://nas"],"devsHidden":["uuid:1234-ABCD"],"lang":"ru"}"#);
+        assert!(!j.contains("55.7") && !j.contains("Tver") && !j.contains("nas") && !j.contains("1234-ABCD") && j.contains("\"ru\""));
         let p = super::scrub("pam: logname=ann user=ann annotation\n", "/home/ann", "ann", "annpc", true);
         assert_eq!(p, "pam: logname=<user> user=<user> annotation\n");
     }

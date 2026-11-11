@@ -105,7 +105,7 @@ pub fn install_tag(set: &Settings, want: &str) -> Result<String, String> {
     };
     let known = has_commit(&dir, &st.commit);
     let mut i = Info { latest: tag[1..].to_string(), reference: tag.clone(), target, available: true, at: now(), ..Default::default() };
-    i.sig = verify(&dir, &st, known, &set.update_verify, "verify-tag", &tag);
+    i.sig = verify(&dir, &st, known, &set.update_verify, "verify-tag", &tag_ref(&tag));
     if !i.sig_ok(&set.update_verify) {
         return Err(crate::tf!("{} — не ставлю (настройки → обновления → подписи)", "{}: not installing (settings → updates → signatures)", "{}: não será instalado (configurações → atualizações → assinaturas)", sig_text(&i.sig)));
     }

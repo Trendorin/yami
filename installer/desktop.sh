@@ -200,8 +200,10 @@ do_restart_shell() {
     "$BIN/yami-shell" msg restart >/dev/null 2>&1
     shell_up "$ino" && return 0
   fi
-  # no shell, or it did not come back: start one in niri's loop (a second copy exits by itself)
-  niri msg action spawn-sh -- "until $BIN/yami-shell; do sleep 1; done" >/dev/null || return 1
+  # no shell, or it did not come back: start one in niri's loop (a second copy exits by itself).
+  # The path goes into a line `sh` reads: quoted, so a home folder with a space or a quote still works
+  local sh_bin="${BIN//\'/\'\\\'\'}"
+  niri msg action spawn-sh -- "until '$sh_bin/yami-shell'; do sleep 1; done" >/dev/null || return 1
   shell_up || { echo "the shell did not start: run yami run in a terminal to see why"; return 1; }
 }
 shell_sock_ino() { stat -c %i "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/yami-shell.sock" 2>/dev/null || echo none; }

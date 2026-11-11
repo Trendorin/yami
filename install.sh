@@ -69,7 +69,10 @@ if [[ ! -f $ROOT/shell/Cargo.toml || ! -f $ROOT/installer/ui.sh ]]; then
   # the newest release (its ready binaries need no compiler); --main: the head of the development branch
   at=""
   [[ " $* " == *" --main "* ]] || at="$(git -C "$SRC_DIR" tag -l 'v[0-9]*' --sort=-v:refname | head -n1)"
-  git -C "$SRC_DIR" checkout --quiet --detach "${at:-origin/main}" || echo "yami: could not switch $SRC_DIR, using it as is" >&2
+  # by full name: a bare «v3.0.0» would also match a branch of that name, and checkout takes a branch first
+  ref="refs/remotes/origin/main"
+  [[ -n $at ]] && ref="refs/tags/$at"
+  git -C "$SRC_DIR" checkout --quiet --detach "$ref" || echo "yami: could not switch $SRC_DIR, using it as is" >&2
   # curl … | bash: give the interactive installer the terminal back
   if [[ ! -t 0 ]] && { : </dev/tty; } 2>/dev/null; then exec bash "$SRC_DIR/install.sh" "$@" </dev/tty; fi
   exec bash "$SRC_DIR/install.sh" "$@"

@@ -17,6 +17,30 @@ use std::process::{Command, Stdio};
 
 /// ключи подписи выпусков (формат ssh allowed_signers) в дереве репозитория
 pub const KEYS: &str = "keys/allowed_signers";
+/// те же ключи, вшитые при сборке: им установленная версия и доверяет. От клона обновлений это не
+/// зависит: его история приходит с сервера, а ключи должны быть теми, с которыми программа поставлена
+const BUILT_KEYS: &str = include_str!("../../keys/allowed_signers");
+
+/// в файле есть хоть один ключ (не пусто и не одни комментарии)
+fn has_keys(t: &str) -> bool {
+    t.lines().any(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
+}
+
+/// чем проверять выпуски: ключами этого бинаря; собран без ключей (форк, дерево до первого ключа) —
+/// теми, что даёт клон (from_clone)
+fn trusted_keys(built: &str, from_clone: impl FnOnce() -> String) -> String {
+    if has_keys(built) {
+        built.to_string()
+    } else {
+        from_clone()
+    }
+}
+
+/// тег выпуска полным именем: голое «v3.0.0» подходит и одноимённой ветке, и git выбирает между
+/// ними по-разному (rev-parse берёт тег, checkout — ветку)
+pub(crate) fn tag_ref(tag: &str) -> String {
+    format!("refs/tags/{tag}")
+}
 /// откуда ставит установщик по умолчанию; свой адрес — updateRepo
 pub const REPO: &str = "https://github.com/Trendorin/yami.git";
 const NOTE_ID: u32 = 9_400_001;
@@ -306,7 +330,8 @@ pub(crate) fn check_into(set: &Settings, i: &mut Info) -> Result<(), String> {
             None => return Ok(()),
         }
     };
-    i.target = git(&dir, &["rev-parse", &format!("{reference}^{{commit}}")])?;
+    let full = if main { "refs/remotes/origin/main".to_string() } else { tag_ref(&reference) };
+    i.target = git(&dir, &["rev-parse", &format!("{full}^{{commit}}")])?;
     i.latest = if main { i.target.chars().take(8).collect() } else { reference.trim_start_matches('v').to_string() };
     i.reference = reference;
     let known = has_commit(&dir, &st.commit);
@@ -337,8 +362,8 @@ pub(crate) fn releases(dir: &Path, st: &Stamp, known: bool, policy: &str) -> Vec
         .map(|t| Rel {
             tag: t.to_string(),
             version: t.trim_start_matches('v').to_string(),
-            sig: verify(dir, st, known, policy, "verify-tag", t),
-            date: git(dir, &["log", "-1", "--format=%ct", &format!("{t}^{{commit}}")]).ok().and_then(|d| d.parse().ok()).unwrap_or(0),
+            sig: verify(dir, st, known, policy, "verify-tag", &tag_ref(t)),
+            date: git(dir, &["log", "-1", "--format=%ct", &format!("{}^{{commit}}", tag_ref(t))]).ok().and_then(|d| d.parse().ok()).unwrap_or(0),
         })
         .collect()
 }
@@ -393,21 +418,24 @@ pub(crate) fn notes(dir: &Path, st: &Stamp, i: &Info, known: bool, main: bool) -
     git(dir, &["log", "--no-merges", "--format=%s", "-n", "12", &range]).map(|t| t.lines().map(String::from).collect()).unwrap_or_default()
 }
 
-/// подпись выпуска ключами из установленной версии (а если её коммита нет в клоне — из того,
-/// что клон ставил последним)
+/// подпись выпуска ключами установленной версии
 pub(crate) fn signature(dir: &Path, st: &Stamp, i: &Info, known: bool, main: bool, policy: &str) -> String {
-    let (what, obj) = if main { ("verify-commit", i.target.as_str()) } else { ("verify-tag", i.reference.as_str()) };
-    verify(dir, st, known, policy, what, obj)
+    let (what, obj) = if main { ("verify-commit", i.target.clone()) } else { ("verify-tag", tag_ref(&i.reference)) };
+    verify(dir, st, known, policy, what, &obj)
 }
 
-/// git verify-tag/verify-commit ключами установленной версии
+/// git verify-tag/verify-commit ключами установленной версии: теми, что вшиты в этот бинарь. Только
+/// у сборки без ключей они берутся из клона: из коммита установленной версии, а нет его там — из
+/// того, что клон ставил последним
 pub(crate) fn verify(dir: &Path, st: &Stamp, known: bool, policy: &str, what: &str, obj: &str) -> String {
     if policy == "off" {
         return "off".into();
     }
-    let base = if known { st.commit.clone() } else { "HEAD".into() };
-    let keys = git(dir, &["show", &format!("{base}:{KEYS}")]).unwrap_or_default();
-    if keys.lines().all(|l| l.trim().is_empty() || l.trim_start().starts_with('#')) {
+    let keys = trusted_keys(BUILT_KEYS, || {
+        let base = if known { st.commit.clone() } else { "HEAD".into() };
+        git(dir, &["show", &format!("{base}:{KEYS}")]).unwrap_or_default()
+    });
+    if !has_keys(&keys) {
         return "nokeys".into();
     }
     let kf = crate::config::state_dir().join("update-keys");
@@ -658,6 +686,16 @@ mod tests {
         assert!(super::install_tag(&set, "2.5.0").is_err());
         assert!(super::rollback().is_err());
         assert!(super::build_install(&super::Info::default()).is_err());
+    }
+
+    /// ключи — те, с которыми собран бинарь; клон спрашивают, только когда своих нет
+    #[test]
+    fn keys_come_from_the_build() {
+        let key = "me namespaces=\"git\" ssh-ed25519 AAAA\n";
+        assert_eq!(super::trusted_keys(key, || unreachable!("the clone is not asked while the build has keys")), key);
+        assert_eq!(super::trusted_keys("# no keys yet\n\n", || "other ssh-ed25519 BBBB\n".into()), "other ssh-ed25519 BBBB\n");
+        assert!(!super::has_keys("# only a comment\n   \n") && super::has_keys("# c\nme ssh-ed25519 AAAA\n"));
+        assert_eq!(super::tag_ref("v3.0.0"), "refs/tags/v3.0.0");
     }
 
     #[test]
