@@ -120,6 +120,7 @@ impl App {
                 let tab = self.st.modal == Some(Modal::Settings) && self.st.stab == "bt";
                 self.dirty_where(|k| matches!(k, SKind::Popup | SKind::Bar) || (widget && matches!(k, SKind::Widget(_))) || (tab && *k == SKind::Modal));
             }
+            Msg::PrepareSleep => self.prepare_sleep(),
             Msg::Pam(ok) => self.on_pam(ok),
             Msg::Prof(p) => self.on_prof(p),
             Msg::Clip(lines) => {

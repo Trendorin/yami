@@ -18,6 +18,7 @@ mod audio;
 mod bar;
 mod bartab;
 mod bttab;
+mod sleep;
 mod bundle;
 mod calc;
 mod cli;

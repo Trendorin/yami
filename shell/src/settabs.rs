@@ -322,6 +322,8 @@ pub(crate) fn tab_system(ui: &mut Ui, st: &State, b: R) {
     ui.slider(R::new(lx, y, half, 40), "заблокировать через", s.lock_after as f32 / 60.0, &mins(s.lock_after), 12, Act::SSlider("lock_after", 0.0, 60.0, 20));
     ui.slider(R::new(rx, y, half, 40), "погасить экран через", s.screen_off_after as f32 / 60.0, &mins(s.screen_off_after), 12, Act::SSlider("screen_off_after", 0.0, 60.0, 20));
     y += 52;
+    ui.toggle(R::new(lx, y, half, 40), "запирать перед сном", "крышка, suspend, таймер системы", s.lock_sleep, Act::SBool("lock_sleep"));
+    y += 46;
     // ночной свет: wlsunset; по координатам — от заката до восхода, иначе по часам
     y = title(ui, b.x, y, b.w, "ночной свет: по солнцу или по часам");
     let has = crate::doctor::which("wlsunset");

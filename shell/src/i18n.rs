@@ -944,6 +944,10 @@ const PAIRS: &[(&str, &str)] = &[
     ("внешний вид", "appearance"),
     ("рабочий стол", "desktop"),
     ("действия", "actions"),
+    // сон (sleep.rs)
+    ("запереть экран перед сном", "lock the screen before sleep"),
+    ("запирать перед сном", "lock before sleep"),
+    ("крышка, suspend, таймер системы", "lid, suspend, system timer"),
     // bluetooth (#36)
     ("адаптер", "adapter"),
     ("переподключать сопряжённые", "reconnect paired devices"),

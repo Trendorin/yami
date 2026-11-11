@@ -98,8 +98,12 @@ impl LayerShellHandler for App {
 }
 
 impl SessionLockHandler for App {
-    fn locked(&mut self, _: &Connection, _: &QueueHandle<Self>, _: SessionLock) {}
+    // niri подтвердил: экран заперт на всех мониторах — нить сна может отпускать сон
+    fn locked(&mut self, _: &Connection, _: &QueueHandle<Self>, _: SessionLock) {
+        self.sleep_locked();
+    }
     fn finished(&mut self, _: &Connection, _: &QueueHandle<Self>, _: SessionLock) {
+        self.sleep_locked();
         self.lock = None;
         self.drop_lock_surfs();
         self.st.locked = false;

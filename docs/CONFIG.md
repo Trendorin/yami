@@ -232,6 +232,7 @@ Settings → look → «pixel look» moves these keys, `iconPixel` and `cursor` 
 | `curtainStyle` | `"blur"` | what stream viewers see while the screen is hidden (Mod+Shift+H), no labels: `blur` the frozen screen blurred, `pixels` in big pixels, `wall` the wallpaper |
 | `curtainCell` | `24` | pixel size of `pixels` |
 | `lockAfter`, `screenOffAfter` | `10`, `15` | idle minutes; 0: never |
+| `lockSleep` | `true` | lock the screen before any sleep: the lid, `systemctl suspend`, the system's own timer; the shell holds a logind delay lock and lets the sleep go on once niri confirms the lock (at most 3 s) |
 | `sessionRestore` | `false` | at login, start the programs that were open last time and put their first window back on its monitor and workspace (snapshot in `~/.local/state/yami/session.json`; games stay out) |
 | `night` | `false` | night light through wlsunset |
 | `nightTemp` | `4000` | evening colour temperature, K (2500–6000) |

@@ -1116,6 +1116,9 @@ const PT_BR: &[(&str, &str)] = &[
     ("preview", "prévia"),
     ("who logs in and how", "quem entra e como"),
     ("hide a full battery", "ocultar a bateria cheia"),
+    ("lock the screen before sleep", "bloquear a tela antes de suspender"),
+    ("lock before sleep", "bloquear antes de suspender"),
+    ("lid, suspend, system timer", "tampa, suspend, timer do sistema"),
     // bluetooth (#36)
     ("adapter", "adaptador"),
     ("reconnect paired devices", "reconectar os pareados"),

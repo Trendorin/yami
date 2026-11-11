@@ -138,6 +138,8 @@ pub struct LockSurf {
 
 pub enum Msg {
     Niri(serde_json::Value),
+    /// logind: система засыпает (sleep.rs)
+    PrepareSleep,
     Ipc(String),
     Audio(audio::AudioState),
     Viz(Vec<f32>),
@@ -376,6 +378,8 @@ pub struct App {
     /// когда отдать ядру код, который больше не исполняется (yami_px::shed_code): через 30 с после
     /// старта и после закрытия настроек или выбора обоев (их код велик, а нужен изредка)
     pub(crate) shed_at: Option<Instant>,
+    /// нить сна ждёт здесь «заперто», чтобы отпустить сон (sleep.rs)
+    pub(crate) sleep_ack: Option<std::sync::mpsc::Sender<()>>,
     pub(crate) lock_state: SessionLockState,
     pub lock: Option<SessionLock>,
     pub lock_surfs: Vec<LockSurf>,
@@ -617,6 +621,7 @@ pub fn run() {
         frac_mgr,
         scratch: vec![],
         shed_at: Some(Instant::now() + Duration::from_secs(30)),
+        sleep_ack: None,
         lock_state: SessionLockState::new(&globals, &qh),
         lock: None,
         lock_surfs: vec![],
@@ -676,6 +681,7 @@ pub fn run() {
     audio::spawn(tx.clone());
     media::spawn(tx.clone());
     net::spawn_bt(tx.clone());
+    app.sleep_ack = Some(crate::sleep::spawn(tx.clone()));
     app.write_palette();
     crate::prefs::write_style(&app.st.set);
     // кто отвечает за порталы, зависит от поставленных модулей
