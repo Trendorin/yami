@@ -1,0 +1,96 @@
+-- yami-output: ~/.config/nvim/colors/yami.lua
+-- yami: the palette as a Neovim colour scheme: :colorscheme yami
+vim.cmd("highlight clear")
+vim.g.colors_name = "yami"
+vim.o.termguicolors = true
+
+local c = {
+  bg = "{{bg}}", panel = "{{panel}}", surface = "{{surface}}", surface_hi = "{{surfaceHi}}",
+  selection = "{{selection}}", border = "{{border}}",
+  text = "{{text}}", hi = "{{textHi}}", dim = "{{textDim}}", faint = "{{textFaint}}",
+  accent = "{{accent}}", bright = "{{bright}}", on_accent = "{{onAccent}}", ok = "{{ok}}", warn = "{{warn}}",
+  red = "{{color1}}", green = "{{color2}}", yellow = "{{color3}}", blue = "{{color4}}", magenta = "{{color5}}", cyan = "{{color6}}",
+}
+local ansi = {
+  "{{color0}}", "{{color1}}", "{{color2}}", "{{color3}}", "{{color4}}", "{{color5}}", "{{color6}}", "{{color7}}",
+  "{{color8}}", "{{color9}}", "{{color10}}", "{{color11}}", "{{color12}}", "{{color13}}", "{{color14}}", "{{color15}}",
+}
+for i, v in ipairs(ansi) do
+  vim.g["terminal_color_" .. (i - 1)] = v
+end
+
+local function hl(group, opts)
+  vim.api.nvim_set_hl(0, group, opts)
+end
+
+hl("Normal", { fg = c.text, bg = c.bg })
+hl("NormalFloat", { fg = c.text, bg = c.surface })
+hl("FloatBorder", { fg = c.border, bg = c.surface })
+hl("Cursor", { fg = c.bg, bg = c.accent })
+hl("CursorLine", { bg = c.panel })
+hl("CursorLineNr", { fg = c.accent, bold = true })
+hl("LineNr", { fg = c.faint })
+hl("SignColumn", { bg = c.bg })
+hl("ColorColumn", { bg = c.panel })
+hl("Visual", { bg = c.selection })
+hl("Search", { fg = c.on_accent, bg = c.accent })
+hl("IncSearch", { fg = c.bg, bg = c.warn })
+hl("MatchParen", { fg = c.hi, bg = c.selection, bold = true })
+hl("Pmenu", { fg = c.text, bg = c.surface })
+hl("PmenuSel", { fg = c.hi, bg = c.selection })
+hl("PmenuThumb", { bg = c.border })
+hl("StatusLine", { fg = c.text, bg = c.panel })
+hl("StatusLineNC", { fg = c.dim, bg = c.panel })
+hl("WinSeparator", { fg = c.border })
+hl("TabLine", { fg = c.dim, bg = c.panel })
+hl("TabLineSel", { fg = c.on_accent, bg = c.accent })
+hl("TabLineFill", { bg = c.panel })
+hl("Folded", { fg = c.dim, bg = c.panel })
+hl("NonText", { fg = c.faint })
+hl("Whitespace", { fg = c.faint })
+hl("Directory", { fg = c.blue })
+hl("Title", { fg = c.accent, bold = true })
+hl("ErrorMsg", { fg = c.red })
+hl("WarningMsg", { fg = c.warn })
+hl("MoreMsg", { fg = c.ok })
+hl("Question", { fg = c.ok })
+
+hl("Comment", { fg = c.dim, italic = true })
+hl("Constant", { fg = c.yellow })
+hl("String", { fg = c.green })
+hl("Character", { fg = c.green })
+hl("Number", { fg = c.yellow })
+hl("Boolean", { fg = c.yellow })
+hl("Identifier", { fg = c.text })
+hl("Function", { fg = c.blue })
+hl("Statement", { fg = c.magenta })
+hl("Keyword", { fg = c.magenta })
+hl("Conditional", { fg = c.accent })
+hl("Repeat", { fg = c.accent })
+hl("Operator", { fg = c.bright })
+hl("PreProc", { fg = c.cyan })
+hl("Type", { fg = c.cyan })
+hl("Special", { fg = c.bright })
+hl("Delimiter", { fg = c.dim })
+hl("Todo", { fg = c.on_accent, bg = c.accent, bold = true })
+hl("Underlined", { underline = true })
+
+hl("DiagnosticError", { fg = c.red })
+hl("DiagnosticWarn", { fg = c.warn })
+hl("DiagnosticInfo", { fg = c.blue })
+hl("DiagnosticHint", { fg = c.cyan })
+hl("DiagnosticUnderlineError", { undercurl = true, sp = c.red })
+hl("DiagnosticUnderlineWarn", { undercurl = true, sp = c.warn })
+hl("DiffAdd", { fg = c.green })
+hl("DiffDelete", { fg = c.red })
+hl("DiffChange", { fg = c.yellow })
+hl("Added", { fg = c.green })
+hl("Removed", { fg = c.red })
+hl("Changed", { fg = c.yellow })
+
+hl("@variable", { fg = c.text })
+hl("@variable.builtin", { fg = c.bright })
+hl("@keyword.return", { fg = c.accent })
+hl("@function.builtin", { fg = c.cyan })
+hl("@markup.heading", { fg = c.accent, bold = true })
+hl("@markup.link.url", { fg = c.blue, underline = true })

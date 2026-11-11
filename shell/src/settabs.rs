@@ -139,7 +139,18 @@ fn app_themes(ui: &mut Ui, st: &State, b: R, tw: i32) {
     ui.button(R::new(b.x + 230, y, 220, 28), "перекрасить сейчас", "reboot", Tone::Plain, false, true, Act::SCycle("theme_rerun"));
     y += 40;
     // что вышло у каждого шаблона в последний раз (restyle.json)
-    crate::restyle::draw(ui, st, b, y);
+    y = crate::restyle::draw(ui, st, b, y);
+    // готовые шаблоны (#31): вшиты в шелл, «добавить» кладёт копию к своим
+    y = title(ui, b.x, y + 6, b.w, "готовые шаблоны");
+    ui.wrap(PX, R::new(b.x, y, b.w, 40), "для программ, которых yami не знает: копия ляжет к твоим шаблонам, а программе нужна одна строка справа", t.text_dim, 2);
+    y += 44;
+    for (i, (file, name, hint, _)) in crate::catalog::ALL.iter().enumerate() {
+        let have = st.restyle.tpls.iter().any(|tp| tp.file == *file);
+        ui.cv.text_in(ui.f, PX, R::new(b.x, y, 110, 30), name, if have { t.text_dim } else { t.text });
+        ui.cv.text_in(ui.f, PX, R::new(b.x + 116, y, b.w - 116 - 140, 30), hint, t.text_faint);
+        ui.button(R::new(b.right() - 130, y + 2, 130, 26), if have { "добавлен" } else { "добавить" }, if have { "check" } else { "plus" }, Tone::Plain, have, !have, Act::STplAdd(i));
+        y += 32;
+    }
 }
 
 pub(crate) fn tab_widgets(ui: &mut Ui, st: &State, b: R) {

@@ -1,0 +1,14 @@
+# yami-output: ~/.config/fuzzel/yami.ini
+# yami: the palette for fuzzel; in fuzzel.ini under [main]: include=~/.config/fuzzel/yami.ini
+[colors]
+background={{bg.strip}}ff
+text={{text.strip}}ff
+prompt={{accent.strip}}ff
+placeholder={{textFaint.strip}}ff
+input={{textHi.strip}}ff
+match={{bright.strip}}ff
+selection={{selection.strip}}ff
+selection-text={{textHi.strip}}ff
+selection-match={{bright.strip}}ff
+counter={{textDim.strip}}ff
+border={{accent.strip}}ff

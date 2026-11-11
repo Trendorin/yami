@@ -960,6 +960,10 @@ const PAIRS: &[(&str, &str)] = &[
     ("никто не слушает и не смотрит", "nobody is listening or watching"),
     ("экран: ещё не выбран", "screen: not chosen yet"),
     ("программа не назвалась", "the program gave no name"),
+    // готовые шаблоны (catalog.rs)
+    ("готовые шаблоны", "ready templates"),
+    ("добавлен", "added"),
+    ("для программ, которых yami не знает: копия ляжет к твоим шаблонам, а программе нужна одна строка справа", "for apps yami does not know: a copy goes to your templates, and the app needs the one line on the right"),
     // castHide (privacy.rs)
     ("app-id через запятую", "app-ids, comma separated"),
     ("не показывать в трансляциях", "keep out of screen sharing"),

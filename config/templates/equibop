@@ -1,0 +1,53 @@
+/**
+ * @name yami
+ * @description The yami palette for Discord: follows yami's colours, wallpaper palette included
+ * @author yami
+ * yami-output: ~/.config/equibop/themes/yami.theme.css
+ * yami: the palette for equibop; turn it on in settings → themes → yami.theme.css
+ */
+.theme-dark, .theme-light, .visual-refresh {
+  --background-base-lowest: {{bg}};
+  --background-base-lower: {{bg}};
+  --background-base-low: {{panel}};
+  --background-surface-high: {{surface}};
+  --background-surface-higher: {{surfaceHi}};
+  --background-surface-highest: {{surfaceHi}};
+  --background-primary: {{bg}};
+  --background-secondary: {{panel}};
+  --background-secondary-alt: {{panel}};
+  --background-tertiary: {{codeBg}};
+  --background-floating: {{surface}};
+  --background-mod-subtle: {{surface}};
+  --background-mod-normal: {{surfaceHi}};
+  --background-mod-strong: {{selection}};
+  --background-modifier-hover: {{surface}};
+  --background-modifier-active: {{surfaceHi}};
+  --background-modifier-selected: {{selection}};
+  --channeltextarea-background: {{surface}};
+  --chat-background: {{bg}};
+  --text-default: {{text}};
+  --text-normal: {{text}};
+  --text-strong: {{textHi}};
+  --text-muted: {{textDim}};
+  --text-subtle: {{textDim}};
+  --header-primary: {{textHi}};
+  --header-secondary: {{textDim}};
+  --interactive-normal: {{textDim}};
+  --interactive-hover: {{text}};
+  --interactive-active: {{textHi}};
+  --interactive-muted: {{textFaint}};
+  --channels-default: {{textDim}};
+  --text-link: {{bright}};
+  --border-subtle: {{border}};
+  --border-normal: {{border}};
+  --border-strong: {{dim}};
+  --brand-500: {{accent}};
+  --brand-560: {{deep}};
+  --brand-experiment: {{accent}};
+  --button-filled-brand-background: {{accent}};
+  --button-filled-brand-background-hover: {{bright}};
+  --button-filled-brand-text: {{onAccent}};
+  --scrollbar-thin-thumb: {{border}};
+  --scrollbar-auto-thumb: {{border}};
+  --scrollbar-auto-track: transparent;
+}

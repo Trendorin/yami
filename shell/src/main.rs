@@ -21,6 +21,7 @@ mod bttab;
 mod sleep;
 mod camera;
 mod privacy;
+mod catalog;
 mod bundle;
 mod calc;
 mod cli;

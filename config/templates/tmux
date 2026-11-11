@@ -1,0 +1,15 @@
+# yami-output: ~/.config/tmux/yami.conf
+# yami: the palette for tmux; in tmux.conf: source-file ~/.config/tmux/yami.conf
+set -g status-style "bg={{panel}},fg={{text}}"
+set -g status-left-style "bg={{accent}},fg={{onAccent}}"
+set -g window-status-style "fg={{textDim}}"
+set -g window-status-current-style "bg={{selection}},fg={{textHi}},bold"
+set -g window-status-activity-style "fg={{warn}}"
+set -g pane-border-style "fg={{border}}"
+set -g pane-active-border-style "fg={{accent}}"
+set -g message-style "bg={{surface}},fg={{text}}"
+set -g message-command-style "bg={{surface}},fg={{accent}}"
+set -g mode-style "bg={{selection}},fg={{textHi}}"
+set -g display-panes-active-colour "{{accent}}"
+set -g display-panes-colour "{{border}}"
+set -g clock-mode-colour "{{accent}}"

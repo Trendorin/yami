@@ -36,6 +36,7 @@ const TARGETS: &[&str] = &[
     "settings:color-themes",
     "settings:color-apps",
     "settings:color-apps-scroll",
+    "settings:color-catalog",
     "settings:wall-skwd",
     "settings:widgets",
     "settings:look",
@@ -310,7 +311,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             // вкладка «цвет», раздел «темы» (#8): свои темы карточками
             st.color_page = match arg {
                 "color-themes" => 1,
-                "color-apps" | "color-apps-scroll" => 2,
+                "color-apps" | "color-apps-scroll" | "color-catalog" => 2,
                 _ => 0,
             };
             // #27: итог перекраски — свой fastfetch, своя палитра starship, шаблоны с разным итогом
@@ -326,6 +327,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                         tpl("rofi.rasi", "~/.config/rofi/yami.rasi", "unknown", &["acccent"]),
                         tpl("vesktop-a-very-long-template-name.css", "~/.config/vesktop/themes/a/very/deep/folder/with/a/long/name/yami.theme.css", "ok", &[]),
                         tpl("dunst", "~/.config/dunst/dunstrc.d/yami.conf", "off", &[]),
+                        tpl("helix", "~/.config/helix/themes/yami.toml", "ok", &[]),
                     ],
                 };
             }
@@ -372,6 +374,12 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                 st.stab = "color";
                 st.sscroll = (400, "color");
                 st.sscroll_h.set(1200);
+            }
+            if arg == "color-catalog" {
+                // самый низ: готовые шаблоны (#31), helix уже добавлен
+                st.stab = "color";
+                st.sscroll = (960, "color");
+                st.sscroll_h.set(1800);
             }
             if arg.starts_with("look") {
                 // наборы значков и курсоров этой машины (как их соберёт нить), на образце — с прокруткой к ним

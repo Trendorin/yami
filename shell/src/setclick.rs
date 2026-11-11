@@ -54,6 +54,11 @@ impl App {
                     self.templates_run(None);
                 }
             }
+            Act::STplAdd(i) => {
+                if crate::catalog::add(*i) {
+                    self.templates_run(None);
+                }
+            }
             Act::STplForce(i) => {
                 if let Some(f) = self.st.restyle.tpls.get(*i).map(|t| t.file.clone()) {
                     self.templates_run(Some(f));

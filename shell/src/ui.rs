@@ -61,6 +61,8 @@ pub enum Act {
     STplForce(usize),
     /// свой шаблон: включить или выключить (#31, templatesOff)
     STplToggle(usize),
+    /// готовый шаблон из каталога (catalog.rs) — в свои
+    STplAdd(usize),
     SSlider(&'static str, f32, f32, i32),
     SCycle(&'static str),
     /// настройки → анимации: группа (config::ANIM_GROUPS) и что в ней менять (animtab.rs)

@@ -1,0 +1,83 @@
+# yami-output: ~/.config/helix/themes/yami.toml
+# yami-reload: USR1 hx
+# yami: the palette as a helix theme; in config.toml: theme = "yami"
+
+"ui.background" = { bg = "bg" }
+"ui.text" = "text"
+"ui.text.focus" = "hi"
+"ui.cursor" = { fg = "bg", bg = "dimtext" }
+"ui.cursor.primary" = { fg = "bg", bg = "accent" }
+"ui.cursor.match" = { bg = "selection" }
+"ui.selection" = { bg = "selection" }
+"ui.cursorline.primary" = { bg = "panel" }
+"ui.linenr" = "faint"
+"ui.linenr.selected" = "accent"
+"ui.statusline" = { fg = "text", bg = "panel" }
+"ui.statusline.inactive" = { fg = "dimtext", bg = "panel" }
+"ui.statusline.normal" = { fg = "onaccent", bg = "accent", modifiers = ["bold"] }
+"ui.statusline.insert" = { fg = "bg", bg = "ok", modifiers = ["bold"] }
+"ui.statusline.select" = { fg = "bg", bg = "warn", modifiers = ["bold"] }
+"ui.popup" = { fg = "text", bg = "surface" }
+"ui.help" = { fg = "text", bg = "surface" }
+"ui.menu" = { fg = "text", bg = "surface" }
+"ui.menu.selected" = { fg = "hi", bg = "selection" }
+"ui.window" = "border"
+"ui.virtual.whitespace" = "faint"
+"ui.virtual.ruler" = { bg = "panel" }
+"ui.virtual.inlay-hint" = "faint"
+
+comment = { fg = "dimtext", modifiers = ["italic"] }
+keyword = "c5"
+"keyword.control" = "accent"
+function = "c4"
+string = "c2"
+constant = "c3"
+type = "c6"
+namespace = "c6"
+variable = "text"
+"variable.builtin" = "bright"
+operator = "bright"
+punctuation = "dimtext"
+tag = "c4"
+attribute = "c3"
+label = "accent"
+special = "bright"
+"markup.heading" = { fg = "accent", modifiers = ["bold"] }
+"markup.bold" = { modifiers = ["bold"] }
+"markup.italic" = { modifiers = ["italic"] }
+"markup.link.url" = { fg = "c4", modifiers = ["underlined"] }
+"markup.raw" = "c2"
+"diff.plus" = "c2"
+"diff.minus" = "c1"
+"diff.delta" = "c3"
+
+error = "c1"
+warning = "warn"
+info = "c4"
+hint = "c6"
+"diagnostic.error" = { underline = { color = "c1", style = "curl" } }
+"diagnostic.warning" = { underline = { color = "warn", style = "curl" } }
+"diagnostic.info" = { underline = { color = "c4", style = "curl" } }
+"diagnostic.hint" = { underline = { color = "c6", style = "curl" } }
+
+[palette]
+bg = "{{bg}}"
+panel = "{{panel}}"
+surface = "{{surface}}"
+selection = "{{selection}}"
+border = "{{border}}"
+text = "{{text}}"
+hi = "{{textHi}}"
+dimtext = "{{textDim}}"
+faint = "{{textFaint}}"
+accent = "{{accent}}"
+bright = "{{bright}}"
+onaccent = "{{onAccent}}"
+ok = "{{ok}}"
+warn = "{{warn}}"
+c1 = "{{color1}}"
+c2 = "{{color2}}"
+c3 = "{{color3}}"
+c4 = "{{color4}}"
+c5 = "{{color5}}"
+c6 = "{{color6}}"

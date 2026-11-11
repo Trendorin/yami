@@ -153,6 +153,11 @@ templates folder (the shell looks every 5 s). It is written only under `~/.confi
 names a colour the palette does not have (a typo would break the app's config); files ending in
 `.md` are skipped.
 
+Ready templates come with the shell for Ghostty, Alacritty, WezTerm, Helix, Neovim, zathura, tmux,
+fuzzel, Vesktop and Equibop (settings → color → apps → «ready templates»): «add» puts a copy among
+your templates, and the app needs one line of its own config that the list shows (`theme = yami`,
+`include yami`…). Each writes only its own file next to the app's config.
+
 Settings → color → apps lists what came out of each template: written, changed by hand (an
 «overwrite» button renders it over your edit and keeps that as `*.bak-yami`), an unknown colour, no
 `yami-output` line or a target outside those folders. In a terminal, `yami templates` renders them
