@@ -234,7 +234,7 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
         } else {
             let (when, what, good) = describe(&p.last);
             let ww = ui.cv.text_in(ui.f, PX, R::new(b.x, y, 160, 20), &when, t.text_faint);
-            ui.cv.text_in(ui.f, PX, R::new(b.x + ww + 12, y, b.w - ww - 12, 20), &(ui.tr)(&what).to_string(), if good { t.text_dim } else { t.ember });
+            ui.cv.text_in(ui.f, PX, R::new(b.x + ww + 12, y, b.w - ww - 12, 20), (ui.tr)(&what), if good { t.text_dim } else { t.ember });
         }
         y += 22;
         if !p.look {

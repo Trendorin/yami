@@ -8,8 +8,13 @@ use crate::gfx::{BoxStyle, R};
 use crate::settings::*;
 use crate::ui::{Act, Cur, Tone, Ui};
 
-pub(crate) fn side_name(i: usize) -> &'static str {
-    ["слева", "по центру", "справа"][i]
+/// имя группы модулей: у бокового бара левая — сверху, правая — снизу
+pub(crate) fn side_name(i: usize, vert: bool) -> &'static str {
+    if vert {
+        ["сверху", "по центру", "снизу"][i]
+    } else {
+        ["слева", "по центру", "справа"][i]
+    }
 }
 
 /// перетаскивание модулей бара во вкладке «бар»
@@ -107,7 +112,7 @@ pub(crate) fn tab_bar(ui: &mut Ui, st: &State, b: R) {
     let mut areas = [R::new(0, 0, 0, 0); 3];
     let mut hit = vec![];
     for (si, list) in sides.iter().enumerate() {
-        ui.text_in(PX, R::new(b.x, y + 4, 76, 20), side_name(si), t.red);
+        ui.text_in(PX, R::new(b.x, y + 4, 76, 20), side_name(si, crate::bar::vert(&st.set)), t.red);
         // без перетаскиваемой фишки
         let items: Vec<(usize, &String)> = list.iter().enumerate().filter(|(i, _)| drag.and_then(|d| d.from) != Some((si, *i))).collect();
         let ws: Vec<i32> = items.iter().map(|(_, m)| chip_w(ui, m)).collect();
