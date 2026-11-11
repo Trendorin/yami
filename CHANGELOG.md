@@ -9,6 +9,7 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+- The lock screen comes back by itself when the shell restarts or crashes while the screen is locked (an update, `yami restart`): before, niri kept the session locked with nothing to type the password into.
 - The first-run setup opens with a small yami desktop that assembles itself out of palette cells (shown whole when animations are off) and ends with a summary of what was chosen; the last step greets you with a burst of sparks.
 - Thumbnails (yami-files and the wallpaper picker share them) are written to a temporary file first, so a half-written picture can no longer be served from the cache when two programs make the same one or a write is cut off; leftovers go with the daily tidy.
 - Ready templates (#31): the palette for Ghostty, Alacritty, WezTerm, Helix, Neovim, zathura, tmux, fuzzel, Vesktop and Equibop comes with the shell; settings → color → apps → «ready templates» adds one to your templates and shows the one line the app needs. Nothing is downloaded.

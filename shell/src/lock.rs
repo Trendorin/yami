@@ -56,15 +56,25 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32, main: bool) {
     ui.zone(fr, Act::LockField, Cur::Text);
 }
 
-/// метка «экран заперт» для других программ сеанса: yami-agents не подключает под ней чужие флешки
+/// метка «экран заперт» для других программ сеанса: yami-agents не подключает под ней чужие флешки.
+/// Внутри — сокет niri (в нём pid niri): по нему шелл после перезапуска узнаёт свой же замок
 pub fn flag(on: bool) {
     let Some(d) = std::env::var_os("XDG_RUNTIME_DIR") else { return };
     let p = std::path::PathBuf::from(d).join("yami-locked");
     if on {
-        let _ = std::fs::write(p, b"");
+        let _ = std::fs::write(p, std::env::var("NIRI_SOCKET").unwrap_or_default());
     } else {
         let _ = std::fs::remove_file(p);
     }
+}
+
+/// шелл перезапустился (обновление, msg restart) или упал, пока экран был заперт: niri держит сеанс
+/// запертым, но поверхностей замка больше нет, и отпереть нечем. Метка того же niri — запереть снова
+pub fn was_locked() -> bool {
+    let Some(d) = std::env::var_os("XDG_RUNTIME_DIR") else { return false };
+    let Ok(s) = std::fs::read_to_string(std::path::PathBuf::from(d).join("yami-locked")) else { return false };
+    // пустая — от шелла до 3.0: тогда верим ей (обновление под замком тоже должно запереть снова)
+    s.is_empty() || s == std::env::var("NIRI_SOCKET").unwrap_or_default()
 }
 
 impl App {

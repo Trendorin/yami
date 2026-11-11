@@ -724,6 +724,10 @@ pub fn run() {
     let _ = queue.roundtrip(&mut app);
     let _ = queue.roundtrip(&mut app);
     WaylandSource::new(conn.clone(), queue).insert(handle.clone()).expect("wayland source");
+    // перезапуск или падение под замком: сеанс у niri заперт, а замка нет — запираем снова, до первого кадра
+    if crate::lock::was_locked() {
+        app.lock_now();
+    }
     app.flush();
     loop {
         if ev.dispatch(Some(Duration::from_secs(5)), &mut app).is_err() {
