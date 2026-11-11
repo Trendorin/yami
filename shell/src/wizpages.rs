@@ -174,6 +174,8 @@ pub fn hello(ui: &mut Ui, st: &State, b: R) {
     let t = ui.t;
     let s = &st.set;
     let mut y = b.y + 6;
+    hero(ui, st, R::new(b.x + 2, y, b.w - 4, 136));
+    y += 150;
     let cur = if s.lang.is_empty() {
         if yami_px::i18n::pt_br() {
             "pt-BR"
@@ -195,16 +197,16 @@ pub fn hello(ui: &mut Ui, st: &State, b: R) {
         ui.cv.text_in(ui.f, PX, R::new(r.x + 14, r.y, r.w - 24, r.h), name, if on { t.text_hi } else { t.text });
         ui.zone(r, Act::WLang(code), Cur::Pointer);
     }
-    y += 82;
-    y = title(ui, b.x, y, b.w, "что будет дальше");
-    let half = (b.w - 12) / 2;
-    let rows = [("drop", "вид", "стиль, цвет, обои, анимации"), ("window", "рабочий стол", "бар, док, окна, виджеты"), ("keys", "управление", "клавиши и подключение к niri"), ("gear", "система", "программы и службы")];
+    y += 74;
+    // что впереди: четыре части мастера, по клетке на каждую
+    let q = (b.w - 3 * 10) / 4;
+    let rows = [("drop", "вид", "стиль, цвет, обои"), ("window", "рабочий стол", "бар, док, окна"), ("keys", "управление", "клавиши, niri"), ("gear", "система", "программы, службы")];
     for (i, (icon, name, what)) in rows.into_iter().enumerate() {
-        let r = R::new(b.x + (i as i32 % 2) * (half + 12), y + (i as i32 / 2) * 72, half, 62);
+        let r = R::new(b.x + i as i32 * (q + 10), y, q, 74);
         ui.cv.pxbox(r, &BoxStyle::new(t.surface, t.border));
-        ui.cv.icon(icon, r.x + 14, r.y + 20, 3, t.red);
-        ui.text_in(PX, R::new(r.x + 50, r.y + 11, r.w - 60, 20), name, t.text_hi);
-        ui.text_in(PX, R::new(r.x + 50, r.y + 31, r.w - 60, 20), what, t.text_faint);
+        ui.cv.icon(icon, r.x + 12, r.y + 12, 2, t.red);
+        ui.text_in(PX, R::new(r.x + 32, r.y + 6, r.w - 38, 20), name, t.text_hi);
+        ui.wrap(PX, R::new(r.x + 12, r.y + 30, r.w - 18, 40), what, t.text_faint, 2);
     }
 }
 
@@ -586,7 +588,9 @@ pub fn services(ui: &mut Ui, st: &State, b: R) {
 
 pub fn done(ui: &mut Ui, st: &State, b: R) {
     let t = ui.t;
-    let y = title(ui, b.x, b.y + 6, b.w, "главные клавиши");
+    let y = title(ui, b.x, b.y + 6, b.w, "что выбрано");
+    let y = summary(ui, st, b, y);
+    let y = title(ui, b.x, y, b.w, "главные клавиши");
     let y = keys_grid(ui, st, b, y, &["launcher", "settings", "terminal", "files", "clipboard", "shot", "walls", "lock", "overview", "hotkeys", "close", "power"]);
     ui.wrap(PX, R::new(b.x, y + 6, b.w, 40), "все клавиши — в настройках → клавиши; их подсказка в niri — Mod+Shift+/", t.text_faint, 2);
 }
@@ -642,4 +646,168 @@ pub fn set(app: &mut App, k: &str) {
         _ => return,
     }
     app.settings_changed();
+}
+
+// ── сцена первого шага ──────────────────────────────────────────────────────
+
+/// клетка сцены, px
+const CELL: i32 = 4;
+
+/// рабочий стол yami в миниатюре, клетками палитры: обои, бар, два окна, док. Что в клетке (cx, cy)
+/// сетки cols×rows; true — передний план (падает на место), false — обои (проявляются)
+fn scene_cell(t: &crate::theme::Theme, cols: i32, rows: i32, cx: i32, cy: i32) -> (crate::gfx::C, bool) {
+    let h = (cx as u64).wrapping_mul(0x9e37_79b9) ^ (cy as u64).wrapping_mul(0x85eb_ca6b);
+    let h = h ^ (h >> 13);
+    // док внизу посередине: значки клетками 2×2
+    let (dx0, dx1) = (cols / 2 - 16, cols / 2 + 16);
+    if cy >= rows - 4 && cy < rows - 1 && cx >= dx0 && cx < dx1 {
+        let ix = (cx - dx0 - 2).rem_euclid(6);
+        let icon = cy == rows - 3 && cx > dx0 + 1 && cx < dx1 - 2 && ix < 2;
+        let k = (cx - dx0 - 2) / 6;
+        let c = [t.red, t.glow, t.ember, t.text_dim, t.ok][k.clamp(0, 4) as usize];
+        return (if icon { c } else { t.panel }, true);
+    }
+    // окно справа (плавающее, поверх): график столбиками
+    let (bx0, bx1, by0, by1) = (cols * 52 / 100, cols * 94 / 100, 7, rows - 7);
+    if cx >= bx0 && cx < bx1 && cy >= by0 && cy < by1 {
+        if cx == bx0 || cx == bx1 - 1 || cy == by0 || cy == by1 - 1 {
+            return (t.border, true);
+        }
+        if cy == by0 + 1 {
+            return (if cx == bx0 + 2 { t.red } else if cx > bx1 - 6 && cx % 2 == 0 { t.text_faint } else { t.surface_hi }, true);
+        }
+        let col = cx - bx0 - 3;
+        let bar = (((col as u64).wrapping_mul(2_654_435_761) >> 7) % 9) as i32 + 2;
+        let top = by1 - 3 - bar;
+        if col >= 0 && cx < bx1 - 3 && col % 3 != 2 && cy >= top && cy < by1 - 2 {
+            return (if cy == top { t.glow } else { t.red.lerp(t.surface, 0.25) }, true);
+        }
+        return (t.surface, true);
+    }
+    // окно слева: заголовок, строки текста
+    let (ax0, ax1, ay0, ay1) = (cols * 6 / 100, cols * 56 / 100, 5, rows - 5);
+    if cx >= ax0 && cx < ax1 && cy >= ay0 && cy < ay1 {
+        if cx == ax0 || cx == ax1 - 1 || cy == ay0 || cy == ay1 - 1 {
+            return (t.border, true);
+        }
+        if cy == ay0 + 1 {
+            return (if cx == ax0 + 2 { t.red } else { t.surface_hi }, true);
+        }
+        let line = cy - ay0 - 3;
+        if line >= 0 && line % 2 == 0 && line < 14 {
+            let len = 8 + (((line as u64).wrapping_mul(0x2545_f491) >> 5) % 22) as i32;
+            if cx > ax0 + 2 && cx < ax0 + 3 + len {
+                return (if line == 0 { t.red } else { t.text_faint }, true);
+            }
+        }
+        return (t.surface, true);
+    }
+    // бар: меню, столы, часы
+    if cy < 3 {
+        let lit = cy == 1 && ((2..5).contains(&cx) || cx == 7 || cx == 10 || cx == 13 || (cols - 11..cols - 3).contains(&cx) || (cx > cols - 22 && cx < cols - 13 && cx % 3 == 0));
+        let c = if !lit {
+            t.panel
+        } else if cx < 5 || cx == 7 {
+            t.red
+        } else {
+            t.text_dim
+        };
+        return (c, true);
+    }
+    // обои: от фона к тону акцента, Байер 4×4; редкие звёзды наверху
+    const BAYER: [u8; 16] = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    let level = ((cy - 3) * 17 / (rows - 3).max(1)) as u8;
+    let lower = BAYER[((cy & 3) * 4 + (cx & 3)) as usize] < level;
+    if !lower && cy < rows / 2 && h % 71 == 0 {
+        return (t.text_faint, false);
+    }
+    (if lower { t.red.lerp(t.bg, 0.72) } else { t.bg.lerp(t.panel, 0.6) }, false)
+}
+
+/// сцена: обои проявляются вразброс, остальное падает на место волной слева направо (~2 с), потом
+/// стоит и кадров не просит. Без анимаций — сразу целиком
+fn hero(ui: &mut Ui, st: &State, r: R) {
+    let t = ui.t;
+    let (cols, rows) = (r.w / CELL, r.h / CELL);
+    let speed = 230.0 / st.set.anim_ms("windows").max(1.0);
+    let el = match &st.welcome {
+        Some(w) if st.set.anim() => w.since.elapsed().as_secs_f32() * speed,
+        _ => 99.0,
+    };
+    let fr = R::new(r.x, r.y, cols * CELL, rows * CELL);
+    ui.cv.pxbox(R::new(fr.x - 2, fr.y - 2, fr.w + 4, fr.h + 4), &BoxStyle::new(t.bg, t.border).shadow(2));
+    ui.cv.push_clip(fr);
+    let mut moving = false;
+    for cy in 0..rows {
+        // приземлившиеся клетки строки — отрезками одного цвета
+        let mut run: Option<(i32, crate::gfx::C)> = None;
+        for cx in 0..=cols {
+            let mut here = None;
+            if cx < cols {
+                let (c, front) = scene_cell(&t, cols, rows, cx, cy);
+                let jit = (((cx as u64 * 31 + cy as u64 * 17) * 2_654_435_761) >> 9) % 100;
+                let d = if front { 0.45 + cx as f32 / cols as f32 * 0.8 + jit as f32 / 100.0 * 0.3 } else { jit as f32 / 100.0 * 0.55 };
+                let k = ((el - d) / if front { 0.35 } else { 0.12 }).clamp(0.0, 1.0);
+                if k <= 0.0 {
+                    moving = true;
+                } else if k < 1.0 {
+                    moving = true;
+                    let e = 1.0 - (1.0 - k).powi(3);
+                    let drop = if front { (6 + (jit % 9) as i32) as f32 * (1.0 - e) } else { 0.0 };
+                    let y = fr.y + cy * CELL - (drop * CELL as f32).round() as i32;
+                    ui.cv.fill(R::new(fr.x + cx * CELL, y, CELL, CELL), c.alpha(if front { 1.0 } else { k }));
+                } else {
+                    here = Some(c);
+                }
+            }
+            match (run, here) {
+                (Some((_, rc)), Some(c)) if rc == c => {}
+                _ => {
+                    if let Some((x0, rc)) = run {
+                        ui.cv.fill(R::new(fr.x + x0 * CELL, fr.y + cy * CELL, (cx - x0) * CELL, CELL), rc);
+                    }
+                    run = here.map(|c| (cx, c));
+                }
+            }
+        }
+    }
+    ui.cv.pop_clip();
+    if moving {
+        ui.anim = true;
+    }
+}
+
+/// итог мастера: что выбрано, коротко, плашками
+fn summary(ui: &mut Ui, st: &State, b: R, y: i32) -> i32 {
+    let t = ui.t;
+    let s = &st.set;
+    let pal = PRESETS.iter().find(|p| p.id == s.palette).map(|p| crate::i18n::tr(p.name).to_string()).unwrap_or_else(|| s.accent.clone());
+    let wall = if s.wallpaper.is_empty() { crate::i18n::tr("пиксельные").to_string() } else { std::path::Path::new(&s.wallpaper).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default() };
+    let side = |v: &str| crate::i18n::tr(match v { "bottom" => "снизу", "left" => "слева", "right" => "справа", _ => "сверху" }).to_string();
+    let dock = if s.dock { side(&s.dock_side) } else { crate::i18n::tr("нет").to_string() };
+    let mods = st.welcome.as_ref().map(|w| w.mods.iter().filter(|m| m.have).count()).unwrap_or(0);
+    let rows: [(&str, &str, String); 7] = [
+        ("eye", "стиль", crate::i18n::tr(if s.preset == "plain" { "нейтральный" } else { "пиксельный" }).to_string()),
+        ("moon", "тема", crate::i18n::tr(if s.light { "светлая" } else { "тёмная" }).to_string()),
+        ("drop", "палитра", pal),
+        ("image", "обои", wall),
+        ("menu", "бар", side(&s.bar_pos)),
+        ("grid", "док", dock),
+        ("folder", "программы", mods.to_string()),
+    ];
+    let (mut x, mut y) = (b.x, y);
+    for (icon, what, val) in rows {
+        let w = 34 + ui.w(PX, what) + 8 + ui.f.width(PX, &val).min(150);
+        if x + w > b.right() {
+            x = b.x;
+            y += 32;
+        }
+        let r = R::new(x, y, w, 26);
+        ui.cv.pxbox(r, &BoxStyle::new(t.surface, t.border));
+        ui.cv.icon(icon, r.x + 8, r.y + 6, 2, t.red);
+        let lw = ui.text_in(PX, R::new(r.x + 26, r.y, r.w - 30, r.h), what, t.text_faint);
+        ui.cv.text_in(ui.f, PX, R::new(r.x + 34 + lw, r.y, r.w - 38 - lw, r.h), &val, t.text_hi);
+        x += w + 8;
+    }
+    y + 36
 }

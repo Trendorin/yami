@@ -258,6 +258,10 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     ui.text_in(PX24, R::new(x, 58, COL - 80, 30), cur.title, t.text_hi);
     // начало и конец — с иероглифом, как на экране блокировки
     if matches!(cur.id, "hello" | "done") {
+        // конец: искры от иероглифа, один раз
+        if cur.id == "done" && st.set.anim() {
+            burst(ui, (x + COL - 34, 68), wz.since.elapsed().as_secs_f32());
+        }
         ui.text(font::jp(64), x + COL - 66, 36, "闇", t.red.fade(0.75));
     }
     if wz.more.is_none() {
@@ -315,6 +319,25 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     ui.button(R::new(x + COL - 144, by, 144, 30), label, icon, Tone::Primary, false, true, Act::WNext);
     if wz.ask {
         leave_sheet(ui, fr);
+    }
+}
+
+/// искры клетками от иероглифа на последнем шаге: разлетаются и гаснут за ~1.2 с, дальше кадров не просят
+fn burst(ui: &mut Ui, (cx, cy): (i32, i32), el: f32) {
+    let k = (el / 1.2).min(1.0);
+    if k >= 1.0 {
+        return;
+    }
+    ui.anim = true;
+    let t = ui.t;
+    let e = 1.0 - (1.0 - k).powi(3);
+    for i in 0..28usize {
+        let a = i as f32 * std::f32::consts::TAU / 28.0 + (i * 7 % 5) as f32 * 0.09;
+        let dist = 18.0 + (26 + (i * 13 % 23)) as f32 * 1.6 * e;
+        let (x, y) = (cx + (a.cos() * dist) as i32, cy + (a.sin() * dist * 0.8) as i32);
+        // клетки по сетке 2 px: пиксели целые
+        let sz = if k < 0.6 { 4 } else { 2 };
+        ui.cv.fill(R::new(x & !1, y & !1, sz, sz), [t.red, t.glow, t.ember][i % 3].alpha(1.0 - k));
     }
 }
 

@@ -960,6 +960,12 @@ const PAIRS: &[(&str, &str)] = &[
     ("никто не слушает и не смотрит", "nobody is listening or watching"),
     ("экран: ещё не выбран", "screen: not chosen yet"),
     ("программа не назвалась", "the program gave no name"),
+    // первая настройка: сцена и итог (wizpages.rs)
+    ("стиль, цвет, обои", "style, colour, wallpaper"),
+    ("бар, док, окна", "bar, dock, windows"),
+    ("клавиши, niri", "keys, niri"),
+    ("программы, службы", "apps, services"),
+    ("что выбрано", "what you chose"),
     // готовые шаблоны (catalog.rs)
     ("готовые шаблоны", "ready templates"),
     ("добавлен", "added"),
