@@ -347,17 +347,18 @@ impl App {
         let anchor = self.dock_anchor();
         let vert = vertical(&self.st);
         // сверху — под баром (он может плавать с отступом), снизу — над нижним баром
-        let top_m = if self.st.set.dock_side == "top" { self.bar_bottom(&out) } else { 0 };
-        let bot_m = if self.st.set.dock_side == "bottom" { self.bar_reserve_bottom(&out) } else { 0 };
-        // отступ от края: док с исключённой зоной niri ставит уже под баром, без неё — от края экрана
+        // место бара с той же стороны, что и док (бар может быть у любого края и плавать с отступом)
+        let (bt, br, bb, bl) = self.bar_reserve(&out);
+        // отступ от края: док с исключённой зоной niri ставит уже за баром, без неё — от края экрана
         let side = self.st.set.dock_side.clone();
         let margin_of = |excl: i32| {
             let m = MARGIN;
+            let bar = |r: i32| if excl > 0 { 0 } else { r };
             match side.as_str() {
-                "top" => (m + if excl > 0 { 0 } else { top_m }, 0, 0, 0),
-                "left" => (0, 0, 0, m),
-                "right" => (0, m, 0, 0),
-                _ => (0, 0, m + if excl > 0 { 0 } else { bot_m }, 0),
+                "top" => (m + bar(bt), 0, 0, 0),
+                "left" => (0, 0, 0, m + bar(bl)),
+                "right" => (0, m + bar(br), 0, 0),
+                _ => (0, 0, m + bar(bb), 0),
             }
         };
         // на другом мониторе — пересоздать
@@ -409,7 +410,14 @@ impl App {
             }
             if self.find(&SKind::DockEdge).is_empty() {
                 let (ew, eh) = if vert { (2, h) } else { (w, 2) };
-                self.mk(SKind::DockEdge, &out, Layer::Top, "yami-dock-edge", anchor, (ew, eh), (top_m, 0, bot_m, 0), -1, KeyboardInteractivity::None);
+                // полоска — у края бара, если он с той же стороны
+                let edge_m = match self.st.set.dock_side.as_str() {
+                    "top" => (bt, 0, 0, 0),
+                    "left" => (0, 0, 0, bl),
+                    "right" => (0, br, 0, 0),
+                    _ => (0, 0, bb, 0),
+                };
+                self.mk(SKind::DockEdge, &out, Layer::Top, "yami-dock-edge", anchor, (ew, eh), edge_m, -1, KeyboardInteractivity::None);
             }
         }
     }
@@ -503,13 +511,12 @@ impl App {
     fn dock_origin(&self, sid: u32) -> (String, i32, i32, R) {
         let Some(s) = self.surfs.get(&sid) else { return (self.focus_out(), 0, 0, R::default()) };
         let (ow, oh) = self.output_size(&s.output);
-        let top_m = if self.st.set.dock_side == "top" { self.bar_bottom(&s.output) } else { 0 };
-        let bot_m = self.bar_reserve_bottom(&s.output);
+        let (bt, br, bb, bl) = self.bar_reserve(&s.output);
         let (x, y) = match self.st.set.dock_side.as_str() {
-            "top" => ((ow - s.w) / 2, MARGIN + top_m),
-            "left" => (MARGIN, (oh - s.h) / 2),
-            "right" => (ow - MARGIN - s.w, (oh - s.h) / 2),
-            _ => ((ow - s.w) / 2, oh - MARGIN - s.h - bot_m),
+            "top" => ((ow - s.w) / 2, MARGIN + bt),
+            "left" => (MARGIN + bl, (oh - s.h) / 2),
+            "right" => (ow - MARGIN - s.w - br, (oh - s.h) / 2),
+            _ => ((ow - s.w) / 2, oh - MARGIN - s.h - bb),
         };
         (s.output.clone(), x, y, panel(&self.st, s.w, s.h))
     }

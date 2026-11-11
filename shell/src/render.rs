@@ -124,7 +124,7 @@ impl App {
             let (w, h) = (s.w, s.h - rise);
             match &s.kind {
                 SKind::Wall => crate::wall::draw(&mut ui, st, w, h),
-                SKind::Bar => crate::bar::draw(&mut ui, st, &s.output, w),
+                SKind::Bar => crate::bar::draw(&mut ui, st, &s.output, w, h),
                 SKind::Dim => {
                     // затемнение цветом фона темы, а не чёрным: стол остаётся виден
                     let a = if matches!(st.modal, Some(crate::app::Modal::Settings | crate::app::Modal::Walls)) { st.set.dim * 0.7 } else { st.set.dim };

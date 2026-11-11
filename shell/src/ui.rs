@@ -65,6 +65,8 @@ pub enum Act {
     STplAdd(usize),
     SSlider(&'static str, f32, f32, i32),
     SCycle(&'static str),
+    /// место на схеме экрана: бар (bar_pos), карточки уведомлений (notif_pos), OSD (osd_pos) — сразу значение
+    SPlace(&'static str, &'static str),
     /// настройки → анимации: группа (config::ANIM_GROUPS) и что в ней менять (animtab.rs)
     SAnim(u8, u8),
     /// число в пикселях (config::NUMS): на шаг вниз (-1) или вверх (+1); колесо — тоже
@@ -142,6 +144,8 @@ pub enum Act {
     BtForget(String),
     /// настройки → bluetooth: все устройства (#36)
     BtSettings,
+    /// закрыть всплывашку и открыть вкладку настроек (панель управления → «настроить бар»)
+    OpenTab(&'static str),
     /// остановить трансляцию PipeWire (сеанс niri)
     CastStop(u64),
     /// щелчком по окну спрятать его программу из трансляций (или вернуть)

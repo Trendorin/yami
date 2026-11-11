@@ -241,6 +241,26 @@ impl App {
                 let k: &str = k;
                 return self.font_cycle(k);
             }
+            Act::SPlace(k, v) => {
+                match *k {
+                    "bar_pos" => s.bar_pos = v.to_string(),
+                    "notif_pos" => s.notif_pos = v.to_string(),
+                    "osd_pos" => s.osd_pos = v.to_string(),
+                    _ => return true,
+                }
+                self.settings_changed();
+                match *k {
+                    "notif_pos" => {
+                        self.renew_notif(SKind::Notifs);
+                        self.notif_preview();
+                    }
+                    "osd_pos" => {
+                        self.renew_notif(SKind::Osd);
+                        self.show_osd("volume");
+                    }
+                    _ => {}
+                }
+            }
             Act::SCycle(k) => match *k {
                 "cpu_style" => {
                     s.cpu_style = cycle(&[("gauge", ""), ("graph", ""), ("number", "")], &s.cpu_style).into();
@@ -307,7 +327,7 @@ impl App {
                     self.settings_changed();
                 }
                 "bar_pos" => {
-                    s.bar_pos = if s.bar_pos == "bottom" { "top" } else { "bottom" }.into();
+                    s.bar_pos = cycle(crate::bar::EDGES, &s.bar_pos).into();
                     self.settings_changed();
                 }
                 "bar_sep" => {

@@ -141,7 +141,9 @@ impl App {
     }
 
     // ── всплывашки бара ─────────────────────────────────────────────────────
-    pub fn open_popup(&mut self, kind: &'static str, out: &str, ax: i32) {
+    /// всплывашка бара; at — точка на мониторе у модуля, который её открыл (x — середина у
+    /// верхнего и нижнего бара, y — у бокового)
+    pub fn open_popup(&mut self, kind: &'static str, out: &str, at: (i32, i32)) {
         let same = self.st.popup_is(kind);
         self.close_popup();
         self.close_menu();
@@ -149,7 +151,7 @@ impl App {
             return;
         }
         self.close_modal();
-        self.st.popup = Some(Popup { kind });
+        self.st.popup = Some(Popup { kind, at: (out.to_string(), at.0, at.1) });
         self.lyrics_want();
         // модули бара рисуют, открыта ли их всплывашка (стрелка трея, календарь)
         self.dirty(&SKind::Bar);
@@ -162,36 +164,46 @@ impl App {
         }
         self.viz_sync();
         let (w, h) = popups::size(kind, &self.st);
-        let (ow, _) = self.output_size(out);
-        let x = (ax - w / 2).clamp(6, (ow - w - 6).max(6));
         self.mk_catcher(out);
-        // видимый верх — на 6 px ниже бара (где бы он ни был); содержимое всплывашки внутри
-        // поверхности опущено на высоту подъёма (12), поэтому сама поверхность — выше.
-        // Бар снизу — всплывашка над ним: низ содержимого и есть низ поверхности
-        let low = self.bar_reserve_bottom(out);
-        let (anchor, margin) = if low > 0 {
-            (Anchor::BOTTOM | Anchor::LEFT, (0, 0, low + 6, x))
-        } else {
-            (Anchor::TOP | Anchor::LEFT, ((self.bar_bottom(out) + 6 - 12).max(0), 0, 0, x))
-        };
-        let id = self.mk(SKind::Popup, out, Layer::Top, "yami-popup", anchor, (w, h + 12), margin, -1, KeyboardInteractivity::OnDemand);
-        if low > 0 {
-            // верх поверхности на мониторе: от него меню трея во всплывашке ищет свою строку
-            let (_, oh) = self.output_size(out);
-            if let Some(s) = self.surfs.get_mut(&id) {
-                s.margin = (x, oh - low - 6 - h - 12);
-                s.applied = s.margin;
-            }
+        let (x, top) = self.popup_place(out, at, w, h);
+        let id = self.mk(SKind::Popup, out, Layer::Top, "yami-popup", Anchor::TOP | Anchor::LEFT, (w, h + 12), (top, 0, 0, x), -1, KeyboardInteractivity::OnDemand);
+        if let Some(s) = self.surfs.get_mut(&id) {
+            s.margin = (x, top);
+            s.applied = s.margin;
         }
+    }
+
+    /// левый верхний угол поверхности всплывашки w×h. Видимый край — в 6 px от бара (где бы он ни
+    /// был); содержимое внутри поверхности опущено на высоту подъёма (12), поэтому сама поверхность
+    /// выше на неё. Прибита к левому верхнему углу: от него меню трея ищет свою строку, а выросшая
+    /// всплывашка (список сетей) встаёт заново, не уходя под нижний бар
+    fn popup_place(&self, out: &str, at: (i32, i32), w: i32, h: i32) -> (i32, i32) {
+        let (ow, oh) = self.output_size(out);
+        let (bt, br, bb, bl) = self.bar_reserve(out);
+        let (x, y) = if bl > 0 || br > 0 {
+            // боковой бар: рядом с ним, по высоте — напротив модуля
+            let x = if bl > 0 { bl + 6 } else { ow - br - 6 - w };
+            (x.max(0), (at.1 - h / 2).clamp(6, (oh - h - 6).max(6)))
+        } else if bb > 0 {
+            ((at.0 - w / 2).clamp(6, (ow - w - 6).max(6)), (oh - bb - 6 - h).max(0))
+        } else {
+            ((at.0 - w / 2).clamp(6, (ow - w - 6).max(6)), bt + 6)
+        };
+        (x, (y - 12).max(0))
     }
 
     pub fn resize_popup(&mut self) {
         let Some(p) = &self.st.popup else { return };
         let (w, h) = popups::size(p.kind, &self.st);
+        let (out, ax, ay) = p.at.clone();
+        let (x, top) = self.popup_place(&out, (ax, ay), w, h);
         for s in self.surfs.values_mut() {
-            if s.kind == SKind::Popup && !s.closing && (s.w != w || s.h != h + 12) {
+            if s.kind == SKind::Popup && !s.closing && (s.w != w || s.h != h + 12 || s.margin != (x, top)) {
                 s.layer.set_size(w as u32, (h + 12) as u32);
+                s.layer.set_margin(top, 0, 0, x);
                 s.layer.commit();
+                s.margin = (x, top);
+                s.applied = s.margin;
             }
         }
     }
@@ -215,11 +227,8 @@ impl App {
             // ловит всё, кроме самого бара: бар живой, а поля вокруг плавающего — нет
             let (w, h) = self.output_size(out);
             let mut rs = vec![R::new(0, 0, w, h)];
-            if !self.st.bar_hidden && self.bar_on(out) {
-                let (m, side, _) = crate::bar::geo(&self.st.set, w);
-                let top = if crate::bar::low(&self.st.set) { h - m - BAR_H } else { m };
-                let bot = top + BAR_H;
-                rs = vec![R::new(0, 0, w, top), R::new(0, top, side, BAR_H), R::new(w - side, top, side, BAR_H), R::new(0, bot, w, h - bot)];
+            if let Some(b) = self.bar_rect(out) {
+                rs = vec![R::new(0, 0, w, b.y), R::new(0, b.y, b.x, b.h), R::new(b.right(), b.y, w - b.right(), b.h), R::new(0, b.bottom(), w, h - b.bottom())];
                 rs.retain(|r| r.w > 0 && r.h > 0);
             }
             if let Some(s) = self.surfs.get_mut(&id) {
@@ -234,9 +243,10 @@ impl App {
         let out = m.output.clone();
         let (w, h) = menu::size(&m, &mut self.res.fonts);
         let (ow, oh) = self.output_size(&out);
-        let x = m.x.clamp(4, (ow - w - 8).max(4));
-        // нижний бар не закрываем: меню из него встаёт над ним
-        let y = m.y.clamp(4, (oh - h - 8 - self.bar_reserve_bottom(&out)).max(4));
+        // бар не закрываем, у какого бы края он ни был: меню из него встаёт рядом
+        let (bt, br, bb, bl) = self.bar_reserve(&out);
+        let x = m.x.clamp(4 + bl, (ow - w - 8 - br).max(4 + bl));
+        let y = m.y.clamp(4.max(bt - 4), (oh - h - 8 - bb).max(4));
         self.st.menu = Some(m);
         self.mk_catcher(&out);
         self.mk(SKind::Menu, &out, Layer::Overlay, "yami-menu", Anchor::TOP | Anchor::LEFT, (w, h + 4), (y, 0, 0, x), -1, KeyboardInteractivity::OnDemand);

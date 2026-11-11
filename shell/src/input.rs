@@ -258,9 +258,10 @@ impl App {
                     } else {
                         use crate::widgets::{visible, RISE};
                         let v = visible(nx, ny, ww, wh);
-                        let bars = [self.bar_bottom(&out), oh - self.bar_reserve_bottom(&out)];
+                        let (bt, br, bb, bl) = self.bar_reserve(&out);
+                        let (bars, bars_x) = ([bt, oh - bb], [bl, ow - br]);
                         let others: Vec<crate::gfx::R> = self.surfs.iter().filter(|(k, s)| **k != sid && matches!(s.kind, SKind::Widget(_)) && !s.closing && s.output == out).map(|(_, s)| visible(s.margin.0, s.margin.1, s.w, s.h)).collect();
-                        let (vx, vy, cross) = crate::widgets::snap(v.x, v.y, v.w, v.h, ow, oh, &bars, &others);
+                        let (vx, vy, cross) = crate::widgets::snap(v.x, v.y, v.w, v.h, ow, oh, &bars, &bars_x, &others);
                         (vx, vy - RISE, cross)
                     };
                     let (x0, x1, y0, y1) = self.widget_bounds(&out, ww, wh);

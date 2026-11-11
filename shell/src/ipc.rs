@@ -150,11 +150,11 @@ impl crate::app::App {
             "profile" => self.prof_step(1),
             c if c.starts_with("popup ") => {
                 let kind = crate::popups::KINDS.iter().copied().find(|k| *k == &c[6..]).unwrap_or("sys");
-                // из терминала или хоткея: под правым краем бара
+                // из терминала или хоткея: у правого (бокового — у нижнего) конца бара
                 let out = self.focus_out();
-                let (ow, _) = self.output_size(&out);
-                let side = crate::bar::geo(&self.st.set, ow).1;
-                self.open_popup(kind, &out, ow - side - 260);
+                let (ow, oh) = self.output_size(&out);
+                let side = crate::bar::geo(&self.st.set, if crate::bar::vert(&self.st.set) { oh } else { ow }).1;
+                self.open_popup(kind, &out, (ow - side - 260, oh - side - 260));
             }
             // свои обои: путь; без пути — пиксельные из палитры
             c if c == "wallpaper" || c.starts_with("wallpaper ") => self.set_wall(&c["wallpaper".len()..]),

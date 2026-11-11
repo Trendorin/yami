@@ -39,6 +39,26 @@ pub fn bar(ui: &mut Ui, st: &State, x: i32, h: i32, measure: bool) -> i32 {
     w
 }
 
+/// то же в боковом баре: значки столбиком в полосе шириной w от x
+pub fn vbar(ui: &mut Ui, st: &State, x: i32, w: i32, y: i32, measure: bool) -> i32 {
+    let (m, c, s) = lit(st);
+    let icons: Vec<&str> = [(m, "mic"), (c, "camera"), (s, "screen")].into_iter().filter(|p| p.0).map(|p| p.1).collect();
+    if icons.is_empty() {
+        return 0;
+    }
+    let h = icons.len() as i32 * 18 - 4;
+    if !measure {
+        let t = ui.t;
+        let r = R::new(x, y - 2, w, h + 4);
+        let c = if ui.hover(r) { t.text_hi } else { t.warn };
+        for (i, ic) in icons.iter().enumerate() {
+            ui.cv.icon(ic, x + w / 2 - 7, y + i as i32 * 18, 2, c);
+        }
+        ui.zone(r, Act::Popup("privacy"), Cur::Pointer);
+    }
+    h
+}
+
 pub fn popup_h(st: &State) -> i32 {
     let s = &st.set;
     let casts = if s.privacy_screen { st.niri.casts.len().clamp(1, 6) as i32 * 44 } else { 0 };

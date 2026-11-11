@@ -57,18 +57,44 @@ fn art_style(ui: &mut Ui, r: R, style: Style) {
     ui.cv.style = was;
 }
 
-fn art_bar(ui: &mut Ui, r: R, shape: u8) {
+/// бар формы shape у края edge (bar_pos): полоса, плашка, плавающий; окно — в оставшемся месте
+fn art_bar(ui: &mut Ui, r: R, shape: u8, edge: &str) {
     let t = ui.t;
     ui.cv.fill(r, t.bg);
-    let bar = match shape {
-        0 => R::new(r.x, r.y, r.w, 10),
-        1 => R::new(r.x + r.w / 6, r.y, r.w * 2 / 3, 10),
-        _ => R::new(r.x + 6, r.y + 5, r.w - 12, 10),
+    let vert = matches!(edge, "left" | "right");
+    // вдоль края: от, длина; поперёк: отступ от края
+    let len = if vert { r.h } else { r.w };
+    let (from, along, off) = match shape {
+        0 => (0, len, 0),
+        1 => (len / 6, len * 2 / 3, 0),
+        _ => (6, len - 12, 5),
+    };
+    let bar = match edge {
+        "bottom" => R::new(r.x + from, r.bottom() - off - 10, along, 10),
+        "left" => R::new(r.x + off, r.y + from, 10, along),
+        "right" => R::new(r.right() - off - 10, r.y + from, 10, along),
+        _ => R::new(r.x + from, r.y + off, along, 10),
     };
     ui.cv.fill(bar, t.surface_hi);
-    ui.cv.fill(R::new(bar.x + 4, bar.y + 3, 12, 4), t.red);
-    ui.cv.fill(R::new(bar.right() - 16, bar.y + 3, 12, 4), t.text_faint);
-    ui.cv.fill(R::new(r.x + r.w / 2 - 22, r.y + 26, 44, r.h - 34), t.surface);
+    if vert {
+        ui.cv.fill(R::new(bar.x + 3, bar.y + 4, 4, 12), t.red);
+        ui.cv.fill(R::new(bar.x + 3, bar.bottom() - 16, 4, 12), t.text_faint);
+    } else {
+        ui.cv.fill(R::new(bar.x + 4, bar.y + 3, 12, 4), t.red);
+        ui.cv.fill(R::new(bar.right() - 16, bar.y + 3, 12, 4), t.text_faint);
+    }
+    // окно — посередине свободного места
+    let (top, bot) = match edge {
+        "bottom" => (r.y + 8, r.bottom() - 26),
+        "top" => (r.y + 26, r.bottom() - 8),
+        _ => (r.y + 10, r.bottom() - 10),
+    };
+    let cx = match edge {
+        "left" => r.x + 18 + (r.w - 18) / 2,
+        "right" => r.x + (r.w - 18) / 2,
+        _ => r.x + r.w / 2,
+    };
+    ui.cv.fill(R::new(cx - 22, top, 44, bot - top), t.surface);
 }
 
 /// сколько всего на баре: фишки разной ширины
@@ -298,14 +324,15 @@ pub fn bar(ui: &mut Ui, st: &State, b: R) {
     let col = |i: i32| b.x + i * (cw + 12);
     let strip = crate::bar::strip(s);
     let mut y = b.y;
-    pick(ui, R::new(col(0), y, cw, 160), "полоса", "во всю ширину", strip, Act::WSet("bar_strip"), |ui, r| art_bar(ui, r, 0));
-    pick(ui, R::new(col(1), y, cw, 160), "плашка", "уже экрана, у края", !strip && !s.bar_float, Act::WSet("bar_panel"), |ui, r| art_bar(ui, r, 1));
-    pick(ui, R::new(col(2), y, cw, 160), "плавает", "с отступом и тенью", s.bar_float, Act::WSet("bar_float"), |ui, r| art_bar(ui, r, 2));
+    pick(ui, R::new(col(0), y, cw, 160), "полоса", "во всю ширину", strip, Act::WSet("bar_strip"), |ui, r| art_bar(ui, r, 0, &s.bar_pos));
+    pick(ui, R::new(col(1), y, cw, 160), "плашка", "уже экрана, у края", !strip && !s.bar_float, Act::WSet("bar_panel"), |ui, r| art_bar(ui, r, 1, &s.bar_pos));
+    pick(ui, R::new(col(2), y, cw, 160), "плавает", "с отступом и тенью", s.bar_float, Act::WSet("bar_float"), |ui, r| art_bar(ui, r, 2, &s.bar_pos));
     y += 174;
-    let half = (b.w - 12) / 2;
-    let low = crate::bar::low(s);
-    ui.button(R::new(b.x, y, half, 36), "сверху", "", Tone::Plain, !low, true, Act::WSet("bar_top"));
-    ui.button(R::new(b.x + half + 12, y, half, 36), "снизу", "", Tone::Plain, low, true, Act::WSet("bar_bottom"));
+    // край экрана: четыре кнопки со стрелкой в его сторону
+    let qw = (b.w - 36) / 4;
+    for (i, ((k, name), icon)) in crate::bar::EDGES.iter().zip(["up", "down", "left", "right"]).enumerate() {
+        ui.button(R::new(b.x + i as i32 * (qw + 12), y, qw, 36), name, icon, Tone::Plain, s.bar_pos == *k, true, Act::SPlace("bar_pos", k));
+    }
     y += 50;
     let same = |l: &[&str], c: &[&str], r: &[&str]| s.bar_left == l && s.bar_center == c && s.bar_right == r;
     pick(ui, R::new(col(0), y, cw, 118), "всё", "", same(MODS_FULL.0, MODS_FULL.1, MODS_FULL.2), Act::WSet("mods_full"), |ui, r| art_mods(ui, r, 12));
@@ -629,8 +656,6 @@ pub fn set(app: &mut App, k: &str) {
             s.bar_float = true;
             s.bar_width_pc = 100;
         }
-        "bar_top" => s.bar_pos = "top".into(),
-        "bar_bottom" => s.bar_pos = "bottom".into(),
         "mods_full" => mods(s, MODS_FULL),
         "mods_std" => mods(s, MODS_STD),
         "mods_min" => mods(s, MODS_MIN),

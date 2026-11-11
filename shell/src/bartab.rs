@@ -186,26 +186,36 @@ pub(crate) fn tab_bar(ui: &mut Ui, st: &State, b: R) {
 fn tab_bar_look(ui: &mut Ui, st: &State, b: R) {
     let t = ui.t;
     let s = &st.set;
-    // форма: полоса во всю ширину, плашка уже экрана, плавающая с отступом от краёв
-    let mut y = title(ui, b.x, b.y, b.w - 2 * 86 - 12, "форма бара");
+    // где и какой: слева схема экрана (край — щелчком прямо по ней), справа форма
+    let mut y = title(ui, b.x, b.y, b.w - 2 * 86 - 12, "где бар и какой");
     let cw = (b.w - 24) / 3;
     let col = |i: i32| b.x + i * (cw + 12);
-    ui.toggle(R::new(col(0), y, cw, 40), "плавает", "отступ от краёв, тень", s.bar_float, Act::SBool("bar_float"));
-    num_btn(ui, R::new(col(1), y + 6, cw, 26), "ширина, %", s.num("bar_width_pc"), "bar_width_pc");
-    num_btn(ui, R::new(col(2), y + 6, cw, 26), "отступ", s.num("bar_margin"), "bar_margin");
-    y += 46;
-    let align = if s.bar_center_align == "after-left" { "за левыми" } else { "по центру" };
-    opt_btn(ui, R::new(col(0), y, cw, 26), "модули середины", align, Act::SCycle("bar_center_align"));
-    let pos = if crate::bar::low(s) { "снизу" } else { "сверху" };
-    opt_btn(ui, R::new(col(1), y, cw, 26), "край экрана", pos, Act::SCycle("bar_pos"));
+    let mw = cw + 12 + cw / 2;
+    let mh = crate::screenmap::draw(ui, st, R::new(b.x + 4, y + 4, mw - 8, 200), crate::screenmap::Pick::Bar);
+    let rx = b.x + mw + 12;
+    let rw = b.right() - rx;
+    let edge = crate::widgets::name_of(crate::bar::EDGES, &s.bar_pos);
+    opt_btn(ui, R::new(rx, y + 4, rw, 26), "край экрана", edge, Act::SCycle("bar_pos"));
+    ui.toggle(R::new(rx, y + 38, rw, 40), "плавает", "отступ от краёв, тень", s.bar_float, Act::SBool("bar_float"));
+    let len = if crate::bar::vert(s) { "высота, %" } else { "ширина, %" };
+    num_btn(ui, R::new(rx, y + 84, rw, 26), len, s.num("bar_width_pc"), "bar_width_pc");
+    num_btn(ui, R::new(rx, y + 116, rw, 26), "отступ от краёв", s.num("bar_margin"), "bar_margin");
+    let align = if s.bar_center_align != "after-left" { "по центру" } else if crate::bar::vert(s) { "под верхними" } else { "за левыми" };
+    opt_btn(ui, R::new(rx, y + 148, rw, 26), "модули середины", align, Act::SCycle("bar_center_align"));
     let shape = if crate::bar::strip(s) {
-        "полоса во всю ширину"
+        if crate::bar::vert(s) { "столбец во всю высоту" } else { "полоса во всю ширину" }
     } else if s.bar_float {
         "плашка с отступом"
     } else {
         "плашка у края"
     };
-    ui.text_in(PX, R::new(col(2) + 4, y, cw - 4, 26), shape, t.text_faint);
+    ui.text_in(PX, R::new(rx + 4, y + 180, rw - 4, 20), shape, t.text_faint);
+    let mut bot = y + 200;
+    if crate::bar::vert(s) {
+        bot += ui.wrap(PX, R::new(rx + 4, y + 200, rw - 4, 40), "сбоку: левые модули сверху, правые снизу", t.text_faint, 2);
+    }
+    ui.wrap(PX, R::new(b.x + 4, y + mh + 4, mw - 8, 40), "щёлкни край на схеме — бар переедет туда", t.text_faint, 2);
+    y = bot.max(y + mh + 24) + 10;
     y += 40;
     y = title(ui, b.x, y, b.w, "отступы и разделители");
     let style = match s.bar_sep.as_str() {
@@ -229,7 +239,8 @@ fn tab_bar_look(ui: &mut Ui, st: &State, b: R) {
     opt_btn(ui, R::new(col(1), y, cw, 26), "цвет", color, Act::SCycle("bar_sep_color"));
     num_btn(ui, R::new(col(2), y, cw, 26), "ширина", s.num("bar_sep_w"), "bar_sep_w");
     y += 32;
-    for (i, (k, label)) in [("bar_pad_l", "край слева"), ("bar_pad_r", "край справа"), ("bar_gap", "промежуток")].into_iter().enumerate() {
+    let (pl, pr) = if crate::bar::vert(s) { ("край сверху", "край снизу") } else { ("край слева", "край справа") };
+    for (i, (k, label)) in [("bar_pad_l", pl), ("bar_pad_r", pr), ("bar_gap", "промежуток")].into_iter().enumerate() {
         num_btn(ui, R::new(col(i as i32), y, cw, 26), label, s.num(k), k);
     }
     y += 32;
@@ -275,60 +286,6 @@ fn tab_bar_look(ui: &mut Ui, st: &State, b: R) {
     }
     y += crate::control::TILES.len().div_ceil(3) as i32 * 32;
     ui.text_in(PX, R::new(b.x, y, b.w, 20), &crate::tf!("в ряду до {} плиток", "up to {} tiles in the row", "até {} blocos na fileira", crate::control::MAX), t.text_faint);
-    y += 34;
-    y = title(ui, b.x, y, b.w, "как выглядит");
-    shape_preview(ui, st, R::new(b.x, y, b.w, (b.bottom() - y).clamp(40, 96)));
-}
-
-/// схема края экрана 1920 px с баром (верх или низ): бар (полоса, плашка или плавающий), его
-/// модули и окна рядом — всё в масштабе, тем же расчётом, что у настоящего бара (bar::geo)
-fn shape_preview(ui: &mut Ui, st: &State, r: R) {
-    let t = ui.t;
-    let s = &st.set;
-    ui.cv.pxbox(r, &BoxStyle::new(t.code_bg, t.border));
-    let inner = r.inset(3);
-    ui.cv.push_clip(inner);
-    ui.cv.fill(inner, t.bg);
-    let k = inner.w as f32 / 1920.0;
-    let sc = |v: i32| (v as f32 * k).round() as i32;
-    let (top, side, _) = crate::bar::geo(s, 1920);
-    let strip = crate::bar::strip(s);
-    let bh = sc(crate::app::BAR_H).max(8);
-    let low = crate::bar::low(s);
-    let by = if low { inner.bottom() - sc(top) - bh } else { inner.y + sc(top) };
-    let bar = R::new(inner.x + sc(side), by, sc(1920 - 2 * side - if strip { 0 } else { crate::bar::SHADE }), bh);
-    // окна под баром (над нижним) — с отступами из «окон»
-    let gap = sc(s.num("win_top")).max(2);
-    let (wy, wb) = if low { (inner.y - 4, bar.y - gap) } else { (bar.bottom() + gap, inner.bottom() + 4) };
-    let (wl, wg) = (sc(s.num("win_left")).max(1), sc(s.num("win_gap")).max(1));
-    let ww = (inner.w - 2 * wl - wg) / 2;
-    for i in 0..2 {
-        let wr = R::new(inner.x + wl + i * (ww + wg), wy, ww, wb - wy);
-        ui.cv.fill(wr, t.surface);
-        ui.cv.fill(R::new(wr.x, wr.y, wr.w, 1), if i == 0 { t.red } else { t.border });
-    }
-    if strip {
-        ui.cv.fill(bar, t.panel);
-        ui.cv.fill(R::new(bar.x, if low { bar.y } else { bar.bottom() - 1 }, bar.w, 1), t.border);
-    } else {
-        ui.cv.pxbox(bar, &BoxStyle::new(t.panel, t.border).shadow(1));
-    }
-    // модули: слева — акцентные клетки, справа — тусклые, в середине — часы или окна
-    let cy = bar.y + bar.h / 2 - 1;
-    for i in 0..3 {
-        ui.cv.fill(R::new(bar.x + 4 + i * 6, cy - 1, 4, 4), if i == 0 { t.red } else { t.dim });
-    }
-    for i in 0..4 {
-        ui.cv.fill(R::new(bar.right() - 8 - i * 6, cy - 1, 4, 4), t.text_faint);
-    }
-    // середина — часы или окна (#28: окна — обычный модуль, стоят там же, где остальные)
-    if !s.bar_center.is_empty() {
-        let win = s.bar_center.iter().any(|m| m == "tasks");
-        let cw = if win { (bar.w / 6).max(18) } else { 18 };
-        let cx = if s.bar_center_align == "after-left" { bar.x + 26 } else { bar.x + bar.w / 2 - cw / 2 };
-        ui.cv.fill(R::new(cx, cy - 1, cw, 4), if win { t.text_dim } else { t.text });
-    }
-    ui.cv.pop_clip();
 }
 
 impl App {

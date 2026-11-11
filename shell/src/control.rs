@@ -1,14 +1,15 @@
 // Панель управления (из yami-lite): ПКМ по пустому месту бара или `yami msg control`. Слева — часы и
 // дата на обоях под вуалью, время работы системы (щелчок — выбор обоев); справа — два вертикальных
 // ползунка клетками: громкость и яркость (подсветка ноутбука, bright.rs; без неё ползунок погашен).
-// Внизу — плитки на выбор (controlTiles, до MAX штук): каждая — уже существующее действие шелла
-// (Wi-Fi, bluetooth, не беспокоить, ночной свет…), своё здесь только рисование.
+// Под ними — что играет (если играет), плитки на выбор (controlTiles, до MAX штук): каждая — уже
+// существующее действие шелла (Wi-Fi, bluetooth, не беспокоить, ночной свет…), своё здесь только
+// рисование. Внизу — бар: его край одним щелчком и «настроить» (настройки → бар → вид).
 
 use crate::app::{App, SKind, State};
 use crate::clock::{local_now, RU_DAY_FULL, RU_MON};
 use crate::font::{self, PX};
 use crate::gfx::{BoxStyle, R};
-use crate::ui::{Act, Cur, Ui};
+use crate::ui::{Act, Cur, Tone, Ui};
 
 /// плитки: ключ, подпись (подсказка при наведении), значок
 pub const TILES: &[(&str, &str, &str)] = &[
@@ -26,7 +27,16 @@ pub const TILES: &[(&str, &str, &str)] = &[
 ];
 /// плиток в ряду — сколько квадратов влезает
 pub const MAX: usize = 6;
-pub const SIZE: (i32, i32) = (480, 300);
+/// высота часов с ползунками, строки музыки и строки бара внизу
+const TOP_H: i32 = 150;
+const MEDIA_H: i32 = 46;
+const FOOT_H: i32 = 26;
+
+/// размер всплывашки: строка музыки — только пока что-то играет или стоит на паузе
+pub fn size(st: &State) -> (i32, i32) {
+    let media = if st.media.title.is_empty() { 0 } else { MEDIA_H + 10 };
+    (480, 6 + 24 + TOP_H + 12 + media + 66 + 14 + FOOT_H + 2)
+}
 
 /// плитка горит
 fn lit(st: &State, k: &str) -> bool {
@@ -107,7 +117,7 @@ pub fn draw(ui: &mut Ui, st: &State, b: R) {
     let t = ui.t;
     const GAP: i32 = 10;
     let side = (b.w - (MAX as i32 - 1) * GAP) / MAX as i32;
-    let top_h = b.h - side - 12;
+    let top_h = TOP_H;
     let sw = 60;
     // часы на обоях: щелчок — выбор обоев
     let card = R::new(b.x, b.y, b.w - 2 * sw - GAP - 12, top_h);
@@ -136,9 +146,15 @@ pub fn draw(ui: &mut Ui, st: &State, b: R) {
     // низ карточки: время работы, а под мышью на плитке — её название (у плиток одни значки)
     let tiles: Vec<&(&str, &str, &str)> = st.set.control_tiles.iter().filter_map(|k| TILES.iter().find(|x| x.0 == k)).take(MAX).collect();
     let n = tiles.len() as i32;
+    let mut y = b.y + top_h + 12;
+    // что играет: обложка, трек, три кнопки
+    if !st.media.title.is_empty() {
+        media_row(ui, st, R::new(b.x, y, b.w, MEDIA_H));
+        y += MEDIA_H + 10;
+    }
     let x0 = b.x + (b.w - n * side - (n - 1).max(0) * GAP) / 2;
-    let ty = b.bottom() - side;
-    let at = |i: usize| R::new(x0 + i as i32 * (side + GAP), ty, side, side);
+    let tile_y = y;
+    let at = |i: usize| R::new(x0 + i as i32 * (side + GAP), tile_y, side, side);
     match (0..tiles.len()).find(|i| ui.hover(at(*i))) {
         Some(i) => ui.text_in(PX, R::new(lx, card.bottom() - 30, card.w - 32, 18), tiles[i].1, t.text),
         None => ui.cv.text_in(ui.f, PX, R::new(lx, card.bottom() - 30, card.w - 32, 18), &uptime(), t.text_dim.lerp(t.text, 0.5)),
@@ -157,6 +173,74 @@ pub fn draw(ui: &mut Ui, st: &State, b: R) {
         ui.cv.icon(icon_of(st, k, icon), rr.x + (rr.w - 28) / 2, rr.y + (rr.h - 28) / 2, 4, if on { t.on_accent } else { t.text });
         ui.zone(rr, act_of(st, k), Cur::Pointer);
     }
+    y += side + 14;
+    bar_row(ui, st, R::new(b.x, y, b.w, FOOT_H));
+}
+
+/// строка музыки: обложка (или эквалайзер), исполнитель и трек, назад · играть · дальше
+fn media_row(ui: &mut Ui, st: &State, r: R) {
+    let t = ui.t;
+    let m = &st.media;
+    ui.cv.pxbox(r, &BoxStyle::new(t.surface, t.border));
+    let a = R::new(r.x + 4, r.y + 4, r.h - 8, r.h - 8);
+    match st.art.get(&m.art).cloned().flatten() {
+        Some(img) => {
+            ui.cv.image_scaled(&img, a, 1.0);
+            ui.cv.outline(a, t.border, 1);
+        }
+        None => {
+            ui.cv.fill(a, t.code_bg);
+            for i in 0..5 {
+                let v = st.viz.get(i * 4 + 2).copied().unwrap_or(0.0);
+                let hh = if m.playing() { (3.0 + v * 22.0).round() as i32 } else { 3 };
+                ui.cv.fill(R::new(a.x + 6 + i as i32 * 5, a.bottom() - 6 - hh, 3, hh), t.red);
+            }
+        }
+    }
+    let bw = 26;
+    let tx = a.right() + 10;
+    let tw = r.right() - tx - 3 * (bw + 4) - 8;
+    let text = R::new(tx, r.y + 4, tw, r.h - 8);
+    let hov = ui.hover(text);
+    ui.cv.text_in(ui.f, PX, R::new(tx, r.y + 5, tw, 18), &m.title, if hov { t.text_hi } else { t.text });
+    let sub = if m.artist.is_empty() { crate::i18n::tr(if m.playing() { "играет" } else { "пауза" }).to_string() } else { m.artist.clone() };
+    ui.cv.text_in(ui.f, PX, R::new(tx, r.y + 23, tw, 18), &sub, t.text_dim);
+    // щелчок по треку — вся всплывашка музыки
+    ui.zone(text, Act::Popup("media"), Cur::Pointer);
+    let mut bx = r.right() - 3 * (bw + 4) - 4;
+    for (icon, act) in [("prev", Act::MediaPrev), (if m.playing() { "pause" } else { "play" }, Act::MediaPlay), ("next", Act::MediaNext)] {
+        let br = R::new(bx, r.y + (r.h - bw) / 2, bw, bw);
+        let main = matches!(act, Act::MediaPlay);
+        let h = ui.hover(br);
+        ui.cv.pxbox(br, &BoxStyle::new(if main { t.red } else if h { t.surface_hi } else { t.panel }, if h { t.ember } else { t.border }).bevel(true));
+        ui.cv.icon(icon, br.x + 6, br.y + 6, 2, if main { t.on_accent } else { t.text });
+        ui.zone(br, act, Cur::Pointer);
+        bx += bw + 4;
+    }
+}
+
+/// строка бара: край экрана четырьмя стрелками и «настроить» — настройки → бар → вид
+fn bar_row(ui: &mut Ui, st: &State, r: R) {
+    let t = ui.t;
+    ui.cv.fill(R::new(r.x, r.y - 7, r.w, 1), t.border.fade(0.6));
+    let lw = ui.w(PX, "бар") + 10;
+    ui.text_in(PX, R::new(r.x, r.y, lw, r.h), "бар", t.text_faint);
+    let mut x = r.x + lw;
+    for ((k, name), icon) in crate::bar::EDGES.iter().zip(["up", "down", "left", "right"]) {
+        let br = R::new(x, r.y, 30, r.h);
+        let on = st.set.bar_pos == *k;
+        let h = ui.hover(br);
+        ui.cv.pxbox(br, &BoxStyle::new(if on { t.red } else if h { t.surface_hi } else { t.surface }, if on { t.ember } else if h { t.red } else { t.border }));
+        ui.cv.icon(icon, br.x + 8, br.y + (br.h - 14) / 2, 2, if on { t.on_accent } else { t.text });
+        ui.zone(br, if on { Act::Block } else { Act::SPlace("bar_pos", k) }, Cur::Pointer);
+        if h {
+            ui.text_in(PX, R::new(r.x + lw + 4 * 34 + 4, r.y, 120, r.h), name, t.text_dim);
+        }
+        x += 34;
+    }
+    let label = "настроить бар";
+    let bw = ui.w(PX, label) + 44;
+    ui.button(R::new(r.right() - bw, r.y, bw, r.h), label, "gear", Tone::Ghost, false, true, Act::OpenTab("bar"));
 }
 
 impl App {
@@ -178,11 +262,11 @@ impl App {
     }
 
     /// ПКМ по пустому месту бара, `msg control`: открыть панель (открыта — закрыть)
-    pub fn toggle_control(&mut self, out: &str, ax: i32) {
+    pub fn toggle_control(&mut self, out: &str, at: (i32, i32)) {
         if self.st.popup_is("control") {
             self.close_popup();
         } else {
-            self.open_popup("control", out, ax);
+            self.open_popup("control", out, at);
         }
     }
 }

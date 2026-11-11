@@ -218,6 +218,8 @@ pub struct Res {
 
 pub struct Popup {
     pub kind: &'static str,
+    /// откуда открыта: монитор и точка у модуля бара (panels.rs `popup_place`)
+    pub at: (String, i32, i32),
 }
 
 pub struct State {

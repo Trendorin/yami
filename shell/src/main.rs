@@ -79,6 +79,7 @@ mod session;
 mod setclick;
 mod settabs;
 mod skwd;
+mod screenmap;
 mod settings;
 mod shot;
 mod shotcfg;

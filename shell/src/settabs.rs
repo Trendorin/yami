@@ -432,7 +432,11 @@ pub(crate) fn tab_notif(ui: &mut Ui, st: &State, b: R) {
     opt_btn(ui, R::new(lx, y, half, 26), "на экране сразу", &s.notif_max.to_string(), Act::SCycle("notif_max"));
     opt_btn(ui, R::new(rx, y, half, 26), "в истории", &s.notif_history.to_string(), Act::SCycle("notif_history"));
     y += 40;
-    y = title(ui, b.x, y, b.w, "где на экране");
+    y = title(ui, b.x, y, b.w, "где на экране — щёлкни место на схеме");
+    // две схемы экрана: углы карточек и места OSD; бар — у своего края, туда не встают
+    let mh = crate::screenmap::draw(ui, st, R::new(lx + 6, y + 4, half - 12, 160), crate::screenmap::Pick::Notif);
+    crate::screenmap::draw(ui, st, R::new(rx + 6, y + 4, half - 12, 160), crate::screenmap::Pick::Osd);
+    y += mh + 8;
     opt_btn(ui, R::new(lx, y, half, 26), "карточки", crate::widgets::name_of(crate::notif::POS, &s.notif_pos), Act::SCycle("notif_pos"));
     opt_btn(ui, R::new(rx, y, half, 26), "громкость и яркость", crate::widgets::name_of(crate::notif::OSD_POS, &s.osd_pos), Act::SCycle("osd_pos"));
     y += 32;

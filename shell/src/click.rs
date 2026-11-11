@@ -19,6 +19,21 @@ impl App {
         (out, mx + zone.x + zone.w / 2, my + zone.bottom())
     }
 
+    /// куда ставить меню у элемента бара (окно стола, значок трея): под ним у верхнего, над нижним
+    /// (open_menu прижмёт), сбоку — у бокового; ax, ay — из anchor
+    fn bar_menu_at(&self, out: &str, zone: R, ax: i32, ay: i32) -> (i32, i32) {
+        let (_, br, _, bl) = self.bar_reserve(out);
+        if bl > 0 {
+            (bl + 4, ay - zone.h)
+        } else if br > 0 {
+            (i32::MAX / 2, ay - zone.h)
+        } else if crate::bar::low(&self.st.set) {
+            (ax - 20, ay)
+        } else {
+            (ax - 20, self.bar_bottom(out) + 2)
+        }
+    }
+
     pub fn on_click(&mut self, a: Act, button: u32, sid: u32, zone: R, double: bool) {
         let kind = self.surf_kind(sid);
         // клик мимо всплывашки/меню
@@ -64,7 +79,10 @@ impl App {
                 }
             }
             Act::Task(id) => match button {
-                RMB => self.open_window_menu(id, &out, ax - 20, ay + 2),
+                RMB => {
+                    let (x, y) = if kind == Some(SKind::Bar) { self.bar_menu_at(&out, zone, ax, ay) } else { (ax - 20, ay + 2) };
+                    self.open_window_menu(id, &out, x, y)
+                }
                 MMB => self.st.niri.close_window(id),
                 _ => self.st.niri.toggle_minimize(id),
             },
@@ -73,7 +91,12 @@ impl App {
                 let (bus, path, menu, is_menu) = (it.bus.clone(), it.path.clone(), it.menu.clone(), it.is_menu);
                 // меню программы: под значком в баре или под её строкой во всплывашке трея
                 let in_popup = kind == Some(SKind::Popup);
-                self.tray_anchor = Some(if in_popup { (out.clone(), ax - zone.w / 2 + 8, ay + 2) } else { (out.clone(), ax - 20, if crate::bar::low(&self.st.set) { ay } else { self.bar_bottom(&out) + 2 }) });
+                self.tray_anchor = Some(if in_popup {
+                    (out.clone(), ax - zone.w / 2 + 8, ay + 2)
+                } else {
+                    let (x, y) = self.bar_menu_at(&out, zone, ax, ay);
+                    (out.clone(), x, y)
+                });
                 if button == RMB || (button == LMB && is_menu) {
                     if !menu.is_empty() {
                         crate::dbus::tray_menu(&svc, &bus, &menu, self.tx.clone());
@@ -103,7 +126,7 @@ impl App {
                 }
                 ("sys", RMB) => self.open_sysmon(),
                 ("profile", RMB) => self.prof_step(1),
-                _ => self.open_popup(k, &out, ax),
+                _ => self.open_popup(k, &out, (ax, ay - zone.h / 2)),
             },
             // ── лаунчер и питание ───────────────────────────────────────────
             Act::LRun(i) => {
@@ -127,7 +150,15 @@ impl App {
             }
             Act::VolSlider | Act::MicSlider | Act::AppVol(_) | Act::CtlVol | Act::CtlBright => {}
             Act::BarBg => match button {
-                RMB => self.toggle_control(&out, ax),
+                RMB => {
+                    // у бокового бара панель встаёт напротив щелчка, а не у начала бара
+                    let at = match self.ptr {
+                        // зона фона — весь бар: точка щелчка = её угол + место мыши в ней
+                        Some((p, x, y)) if p == sid => (ax - zone.w / 2 - zone.x + x as i32, ay - zone.bottom() + y as i32),
+                        _ => (ax, ay - zone.h / 2),
+                    };
+                    self.toggle_control(&out, at)
+                }
                 _ => self.close_popup(),
             },
             Act::LockNow => {
@@ -170,6 +201,13 @@ impl App {
             Act::BtForget(path) => net::bt_forget(&self.st.bt.adapter.clone(), &path, self.tx.clone(), self.st.bt.clone()),
             Act::CastStop(id) => self.st.niri.act(serde_json::json!({"StopCast": {"session_id": id}})),
             Act::CastPick => self.cast_pick(),
+            Act::OpenTab(tab) => {
+                self.close_popup();
+                if tab == "bar" {
+                    self.st.bar_ed.look = true;
+                }
+                self.open_settings_tab(tab);
+            }
             Act::BtSettings => {
                 self.close_popup();
                 self.open_settings_tab("bt");

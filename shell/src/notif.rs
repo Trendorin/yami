@@ -394,6 +394,11 @@ impl App {
         }
     }
 
+    /// карточка-пример, когда место уведомлений меняют в настройках: видно, куда они встанут
+    pub fn notif_preview(&mut self) {
+        self.toast_note("уведомления — здесь", "так встанут новые карточки");
+    }
+
     /// своя карточка в обход D-Bus: короткое сообщение от самого шелла
     pub fn toast_note(&mut self, summary: &str, body: &str) {
         let n = crate::dbus::Incoming { id: 9_000_000 + (self.st.started.elapsed().as_millis() % 1_000_000) as u32, app: "yami".into(), icon: String::new(), summary: crate::i18n::tr(summary).into(), body: crate::i18n::tr(body).into(), actions: vec![], urgency: 1, image: None, timeout: -1 };
@@ -417,7 +422,17 @@ impl App {
 /// места карточек уведомлений (notifPos) и OSD (osdPos) по кругу в настройках: значение, подпись
 pub const POS: &[(&str, &str)] =
     &[("top-right", "справа сверху"), ("top-left", "слева сверху"), ("top", "сверху по центру"), ("bottom-right", "справа снизу"), ("bottom-left", "слева снизу"), ("bottom", "снизу по центру")];
-pub const OSD_POS: &[(&str, &str)] = &[("bottom", "снизу"), ("top", "сверху"), ("center", "по центру")];
+pub const OSD_POS: &[(&str, &str)] = &[
+    ("bottom", "снизу"),
+    ("top", "сверху"),
+    ("center", "по центру"),
+    ("top-left", "слева сверху"),
+    ("top-right", "справа сверху"),
+    ("left", "слева"),
+    ("right", "справа"),
+    ("bottom-left", "слева снизу"),
+    ("bottom-right", "справа снизу"),
+];
 
 impl App {
     /// OSD громкости, яркости, раскладки, таймера снимка (osdPos)
@@ -429,12 +444,28 @@ impl App {
         self.st.osd = Some((kind, Instant::now()));
         if fresh || self.find(&SKind::Osd).is_empty() {
             let out = self.focus_out();
-            // osdPos: снизу над доком, сверху под баром, по центру экрана
-            let (anchor, margin) = match self.st.set.osd_pos.as_str() {
-                "top" => (Anchor::TOP, (self.bar_bottom(&out) + self.st.set.num("osd_offset"), 0, 0, 0)),
-                "center" => (Anchor::empty(), (0, 0, 0, 0)),
-                _ => (Anchor::BOTTOM, (0, 0, self.bar_reserve_bottom(&out) + self.st.set.num("osd_offset"), 0)),
-            };
+            // osdPos: у края или в углу, отступ — от бара, если он с той стороны; по центру экрана — без отступа.
+            // Исключённые зоны OSD не видит (-1): место бара прибавляем сами
+            let (bt, br, bb, bl) = self.bar_reserve(&out);
+            let o = self.st.set.num("osd_offset");
+            let p = self.st.set.osd_pos.clone();
+            let mut anchor = Anchor::empty();
+            let (mut mt, mut mr, mut mb, mut ml) = (0, 0, 0, 0);
+            if p.starts_with("top") {
+                anchor |= Anchor::TOP;
+                mt = bt + o;
+            } else if p.starts_with("bottom") {
+                anchor |= Anchor::BOTTOM;
+                mb = bb + o;
+            }
+            if p.ends_with("left") {
+                anchor |= Anchor::LEFT;
+                ml = bl + 12;
+            } else if p.ends_with("right") {
+                anchor |= Anchor::RIGHT;
+                mr = br + 12;
+            }
+            let margin = (mt, mr, mb, ml);
             let id = self.mk(SKind::Osd, &out, Layer::Overlay, "yami-osd", anchor, (308, 64 + 8), margin, -1, KeyboardInteractivity::None);
             if let Some(s) = self.surfs.get(&id) {
                 if let Ok(r) = smithay_client_toolkit::compositor::Region::new(&self.compositor) {

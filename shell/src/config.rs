@@ -783,7 +783,7 @@ impl Settings {
         if self.bar_center_align != "after-left" {
             self.bar_center_align = "center".into();
         }
-        if self.bar_pos != "bottom" {
+        if !crate::bar::EDGES.iter().any(|(k, _)| *k == self.bar_pos) {
             self.bar_pos = "top".into();
         }
         if self.temp_style != "compact" {

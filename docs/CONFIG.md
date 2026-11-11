@@ -197,7 +197,7 @@ Settings → look → «pixel look» moves these keys, `iconPixel` and `cursor` 
 | `trayMode` | `"icons"` | `icons`: every tray icon on the bar; `arrow`: one arrow that opens them as a list (clicks work as on the bar; a dot when an app asks for attention). A network applet (`nm-applet` and the like) is left out while the bar has `net` |
 | `trayPixel` | `false` | tray icons (on the bar and in the arrow's list) redrawn in pixel cells like the dock and the launcher with `iconPixel`: own colours, or palette tones with `iconTint` (#19) |
 | `batHideFull` | `false` | the `bat` module hides while the laptop is on power and not charging: full, or held at a charge limit (#21) |
-| `controlTiles` | `["wifi", "bt", "dnd", "night", "mic", "theme"]` | the tiles of the control panel (right-click an empty spot on the bar, `yami msg popup control`), in order, up to 6: `wifi` `bt` `dnd` `night` `mic` `mute` `theme` `curtain` `settings` `lock` `power`. The panel also has the clock on the wallpaper (click: the wallpaper picker) and upright volume and brightness sliders |
+| `controlTiles` | `["wifi", "bt", "dnd", "night", "mic", "theme"]` | the tiles of the control panel (right-click an empty spot on the bar, `yami msg popup control`), in order, up to 6: `wifi` `bt` `dnd` `night` `mic` `mute` `theme` `curtain` `settings` `lock` `power`. The panel also has the clock on the wallpaper (click: the wallpaper picker), upright volume and brightness sliders, what is playing (with back, play and next) and a bar row: the screen edge in one click and «bar settings» |
 | `privacyMic`, `privacyCam`, `privacyScreen` | `true` | what the `privacy` module watches: the microphone (PulseAudio/PipeWire recordings that are not of a sound output), the camera (who holds `/dev/video*`), screen sharing (niri's casts; the shell's own screenshots do not count); watched only while the module is on the bar |
 | `mediaViz` | `"bars"` | the equalizer of the `media` module and the music popup: `bars` `line` `blocks` `wave` `dots`, or `off` (no equalizer, and no audio capture for it) |
 | `mediaView` | `"cover"` | what the music popup shows (the button in its header switches it): `cover` (cover, buttons, equalizer), `both` (cover and lyrics), `lyrics`, `minimal` (title and buttons) |
@@ -207,14 +207,14 @@ Settings → look → «pixel look» moves these keys, `iconPixel` and `cursor` 
 | `barSep` | `"dots"` | separator look: `dots` `line` `blocks` `gap` |
 | `barSepW`, `barSepColor` | `10`, `"border"` | separator width, px (2–32); colour `border` `accent` `dim` |
 | `barGap` | `8` | gap between modules, px (0–32) |
-| `barPadL`, `barPadR` | `6`, `6` | from the left and right edge of the bar to the outermost modules, px (0–64) |
+| `barPadL`, `barPadR` | `6`, `6` | from the left and right edge of the bar to the outermost modules, px (0–64); on a side bar, from the top and the bottom |
 | `barMid` | `12` | from the side modules to the window list (and the centre modules), px (0–64) |
 | `barFloat` | `false` | the bar as a separate panel: `barMargin` from the screen edges, a border all round, a hard shadow; windows keep clear of it |
-| `barWidthPc` | `100` | bar width, % of the monitor (30–100); below 100 the panel is centred (`barFloat` off: it hangs from the top edge) |
+| `barWidthPc` | `100` | bar length, % of the monitor (30–100): its width, or its height on a side bar; below 100 the panel is centred (`barFloat` off: it hangs from its edge) |
 | `barMargin` | `6` | gap between a floating bar and the screen edges, px (0–32) |
 | `barOutputs` | `[]` | the screens with a bar, by niri name (`["eDP-1"]`; `niri msg outputs`); empty: every screen. When none of them is connected (a laptop away from its monitor) every screen gets one. Settings → screens → «bar on this screen» |
 | `barCenterAlign` | `"center"` | `barCenter` modules: `center` at the middle of the bar (a long left group only pushes them as far as needed), `after-left` right after the left group (the windows of `tasks` sat there before 2.7) |
-| `barPos` | `"top"` | screen edge with the bar: `top` or `bottom`; popups, tray menus and the OSD open above a bottom bar, a bottom dock stands above it |
+| `barPos` | `"top"` | screen edge with the bar: `top`, `bottom`, `left` or `right` (settings → bar → look: click an edge on the screen map). A side bar is a column: the left modules on top, the centre ones in the middle, the right ones at the bottom, each drawn narrow (the clock as hours over minutes, numbers without units, icons instead of labels, windows as icons). Popups, tray and window menus, the OSD, the dock and widgets keep clear of the bar at any edge |
 
 ### Windows, dock, screenshots, system
 
@@ -292,8 +292,8 @@ the screen-share picker and automount belong to [yami-agents](#yami-agents).
 | `agentNotif` | `true` | the notification server (`org.freedesktop.Notifications`) |
 | `agentTray` | `true` | the tray (`org.kde.StatusNotifierWatcher`, at most 64 items) |
 | `notifMax`, `notifHistory` | `4`, `50` | cards on screen at once; how many the history keeps |
-| `notifPos` | `"top-right"` | where the cards appear: `top-right`, `top-left`, `top`, `bottom-right`, `bottom-left`, `bottom` (settings → notifications); they keep clear of the bar and the dock |
-| `osdPos` | `"bottom"` | the volume and brightness OSD: `bottom`, `top` (under the bar) or `center` |
+| `notifPos` | `"top-right"` | where the cards appear: `top-right`, `top-left`, `top`, `bottom-right`, `bottom-left`, `bottom` (settings → notifications: click a spot on the screen map, a sample card shows there); they keep clear of the bar and the dock |
+| `osdPos` | `"bottom"` | the volume and brightness OSD: `bottom`, `top`, `center`, `left`, `right` or a corner (`top-left`, `top-right`, `bottom-left`, `bottom-right`); it keeps clear of the bar |
 | `osdBright` | `true` | show the OSD when the laptop backlight changes (keys, `brightnessctl`, the firmware); a desktop monitor has no backlight and nothing runs for it |
 | `notifOffset`, `osdOffset` | `10`, `64` | distance of the notification cards and of the OSD from their screen edge, px (0–400); next to the bar it is counted from the bar |
 | `notifImages` | `true` | pictures in cards (icons and previews; at most 1024², files ≤ 16 MB) |

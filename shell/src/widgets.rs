@@ -736,10 +736,11 @@ fn snap_axis(pos: i32, size: i32, origin: i32, guides: &[(i32, bool)]) -> (i32, 
 /// посередине, кромки баров (bars — горизонтальные линии), стороны других виджетов — встык и
 /// вровень; дальше — сетка. Третье — к какой линии креста прилипло (её подсветить)
 #[allow(clippy::too_many_arguments)]
-pub fn snap(x: i32, y: i32, w: i32, h: i32, ow: i32, oh: i32, bars: &[i32], others: &[R]) -> (i32, i32, (bool, bool)) {
+pub fn snap(x: i32, y: i32, w: i32, h: i32, ow: i32, oh: i32, bars: &[i32], bars_x: &[i32], others: &[R]) -> (i32, i32, (bool, bool)) {
     let mut gx = vec![(0, false), (ow, false), (ow / 2, true)];
     let mut gy = vec![(0, false), (oh, false), (oh / 2, true)];
     gy.extend(bars.iter().filter(|b| **b > 0 && **b < oh).map(|b| (*b, false)));
+    gx.extend(bars_x.iter().filter(|b| **b > 0 && **b < ow).map(|b| (*b, false)));
     for o in others {
         gx.extend([(o.x, false), (o.right(), false)]);
         gy.extend([(o.y, false), (o.bottom(), false)]);
@@ -872,9 +873,9 @@ impl App {
     /// монитора (запас под всплытие может уйти под верхний бар; выше края — нет: y < 0 значит «ещё не ставили»)
     pub fn widget_bounds(&self, out: &str, ww: i32, wh: i32) -> (i32, i32, i32, i32) {
         let (ow, oh) = self.output_size(out);
-        let top = (self.bar_bottom(out) - RISE).max(0);
-        let low = self.bar_reserve_bottom(out);
-        (0, (ow - ww + SHADOW).max(0), top, (oh - low - wh + SHADOW).max(top))
+        let (bt, br, bb, bl) = self.bar_reserve(out);
+        let top = (bt - RISE).max(0);
+        (bl, (ow - br - ww + SHADOW).max(bl), top, (oh - bb - wh + SHADOW).max(top))
     }
 
     pub fn set_editing(&mut self, on: bool) {
@@ -925,21 +926,23 @@ mod tests {
     fn widgets_stick_to_edges_neighbours_cross_and_grid() {
         let (ow, oh) = (1920, 1080);
         // у левого края — к краю; правым краем — к правому краю монитора
-        assert_eq!(snap(9, 300, 200, 100, ow, oh, &[], &[]).0, 0);
-        assert_eq!(snap(1715, 300, 200, 100, ow, oh, &[], &[]).0, 1720);
+        assert_eq!(snap(9, 300, 200, 100, ow, oh, &[], &[], &[]).0, 0);
+        assert_eq!(snap(1715, 300, 200, 100, ow, oh, &[], &[], &[]).0, 1720);
         // серединой к кресту — и он горит
-        let (x, _, cross) = snap(855, 300, 200, 100, ow, oh, &[], &[]);
+        let (x, _, cross) = snap(855, 300, 200, 100, ow, oh, &[], &[], &[]);
         assert_eq!((x, cross.0), (860, true));
         // встык справа к соседу и вровень с его верхом
         let n = R::new(400, 300, 200, 100);
-        assert_eq!(snap(607, 500, 100, 100, ow, oh, &[], &[n]).0, 600);
-        assert_eq!(snap(700, 306, 100, 100, ow, oh, &[], &[n]).1, 300);
+        assert_eq!(snap(607, 500, 100, 100, ow, oh, &[], &[], &[n]).0, 600);
+        assert_eq!(snap(700, 306, 100, 100, ow, oh, &[], &[], &[n]).1, 300);
         // к нижней кромке бара сверху
-        assert_eq!(snap(300, 40, 100, 100, ow, oh, &[36], &[]).1, 36);
+        assert_eq!(snap(300, 40, 100, 100, ow, oh, &[36], &[], &[]).1, 36);
+        // к кромке бокового бара слева
+        assert_eq!(snap(41, 300, 100, 100, ow, oh, &[], &[36], &[]).0, 36);
         // в стороне от всего — линия сетки (от середины: 960 + клетки), далеко от неё — как есть
-        assert_eq!(snap(990, 701, 100, 100, ow, oh, &[], &[]).0, 992);
-        assert_eq!(snap(1010, 701, 100, 100, ow, oh, &[], &[]).0, 1010);
-        assert_eq!(snap(300, 703, 100, 100, ow, oh, &[], &[]).1, 700);
+        assert_eq!(snap(990, 701, 100, 100, ow, oh, &[], &[], &[]).0, 992);
+        assert_eq!(snap(1010, 701, 100, 100, ow, oh, &[], &[], &[]).0, 1010);
+        assert_eq!(snap(300, 703, 100, 100, ow, oh, &[], &[], &[]).1, 700);
     }
 
     #[test]

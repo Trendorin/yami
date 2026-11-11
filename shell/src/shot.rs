@@ -30,6 +30,10 @@ const TARGETS: &[&str] = &[
     "bar:tasks-right",
     "bar:tasks-crowd",
     "bar:privacy",
+    "bar:left",
+    "bar:right",
+    "bar:left-float",
+    "bar:right-full",
     "settings:color",
     "settings:bar",
     "settings:bar-look",
@@ -69,6 +73,7 @@ const TARGETS: &[&str] = &[
     "popup:bt",
     "popup:privacy",
     "popup:control",
+    "popup:control-media",
     "popup:sys",
     "popup:profile",
     "popup:tray",
@@ -274,6 +279,25 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                     st.niri.wins.push(Win { id: i, app_id: "kitty".into(), title: format!("~/src/project-{i}"), ws: Some(1), ..Default::default() });
                 }
             }
+        } else if arg.starts_with("left") || arg.starts_with("right") {
+            // боковой бар: столбец модулей; -float — плашка 70 % высоты, -full — все узкие виды разом
+            st.set.bar_pos = if arg.starts_with("left") { "left" } else { "right" }.into();
+            st.set.bar_float = arg.ends_with("float");
+            st.set.bar_width_pc = if arg.ends_with("float") { 70 } else { 100 };
+            st.media.title = "Midnight City".into();
+            if arg.ends_with("full") {
+                st.set.clock_seconds = true;
+                st.set.cpu_style = "graph".into();
+                st.set.bar_left = v(&["launcher", "sep", "workspaces", "sep", "tasks"]);
+                st.set.bar_center = v(&["clock", "sep", "media"]);
+                st.set.bar_right = v(&["privacy", "tray", "sep", "kb", "cpu", "ram", "temp", "netspeed", "sep", "weather", "night", "notif", "vol", "net", "sep", "settings", "power"]);
+                mock_privacy(st);
+                mock_weather(st, true);
+            } else if arg.ends_with("float") {
+                st.set.bar_left = v(&["launcher", "sep", "workspaces"]);
+                st.set.bar_center = v(&["tasks"]);
+                st.set.bar_right = v(&["tray", "sep", "cpu", "vol", "net", "sep", "clock", "sep", "power"]);
+            }
         } else if arg == "privacy" {
             // индикатор приватности: микрофон, камера и показ экрана заняты разом
             st.set.bar_width_pc = 100;
@@ -314,6 +338,11 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
     }
     let (w, h) = match kind {
         // бар как на мониторе 1920: с отступом и тенью, если он плашкой
+        "bar" if crate::bar::vert(&st.set) => {
+            // боковой — столбец монитора 1080 в высоту и полоска стола рядом
+            let (m, _, th) = crate::bar::geo(&st.set, 1080);
+            (m + th + 6, 1080)
+        }
         "bar" => {
             let (top, _, sh) = crate::bar::geo(&st.set, 1920);
             (1920, (top + sh + 6).max(BAR_H))
@@ -517,7 +546,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             if arg == "privacy" {
                 mock_privacy(st);
             }
-            if arg == "control" {
+            if arg.starts_with("control") {
                 mock_net(st, true);
                 mock_bt(st);
                 st.audio.volume = 0.62;
@@ -541,7 +570,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                     ..Default::default()
                 };
             }
-            if arg.starts_with("media") || arg == "sound" {
+            if arg.starts_with("media") || arg == "sound" || arg == "control-media" {
                 // играет: эквалайзер виден; за миг снимка позиция не сдвинется (во всплывашке звука
                 // плеер виден, только когда модуля media в баре нет: --defaults)
                 let at = std::time::Instant::now();
@@ -569,9 +598,9 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                 let (lines, synced) = crate::lyrics::parse(if v == "none" { "" } else { &text });
                 st.lyrics = crate::lyrics::Lyrics { key: crate::lyrics::key(&st.media), lines, synced, done: true, shown: None };
             }
-            let arg = if arg.starts_with("media") { "media" } else { arg };
+            let arg = if arg.starts_with("media") { "media" } else if arg.starts_with("control") { "control" } else { arg };
             let k = crate::popups::KINDS.iter().copied().find(|k| *k == arg).unwrap_or(if arg == "wifi" { "net" } else { "cal" });
-            st.popup = Some(Popup { kind: k });
+            st.popup = Some(Popup { kind: k, at: (String::new(), 0, 0) });
             crate::popups::size(k, st)
         }
         "menu" => {
@@ -681,12 +710,22 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
         let st = &*st;
         match kind {
             "bar" => {
-                crate::wall::draw(&mut ui, st, w, h);
+                // боковой — столбец уже обоев: под ним просто стол, без кандзи обоев
+                if !crate::bar::vert(&st.set) {
+                    crate::wall::draw(&mut ui, st, w, h);
+                }
                 yami_px::gfx::text_layer();
-                let (top, side, _) = crate::bar::geo(&st.set, w);
-                ui.cv.ox = side;
-                ui.cv.oy = top;
-                crate::bar::draw(&mut ui, st, "", w - 2 * side);
+                if crate::bar::vert(&st.set) {
+                    let (m, side, th) = crate::bar::geo(&st.set, h);
+                    ui.cv.ox = if st.set.bar_pos == "right" { w - m - th } else { m };
+                    ui.cv.oy = side;
+                    crate::bar::draw(&mut ui, st, "", th, h - 2 * side);
+                } else {
+                    let (top, side, sh) = crate::bar::geo(&st.set, w);
+                    ui.cv.ox = side;
+                    ui.cv.oy = top;
+                    crate::bar::draw(&mut ui, st, "", w - 2 * side, sh);
+                }
                 ui.cv.ox = 0;
                 ui.cv.oy = 0;
             }
