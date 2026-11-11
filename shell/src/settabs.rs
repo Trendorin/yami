@@ -354,12 +354,8 @@ pub(crate) fn tab_system(ui: &mut Ui, st: &State, b: R) {
     }
     y += 40;
     y = title(ui, b.x, y, b.w, "язык и вход");
-    let lang = match s.lang.as_str() {
-        "ru" => "Русский", // i18n-ok: name of the language
-        "en" => "English",
-        "pt-BR" => "Português (Brasil)",
-        _ => "авто",
-    };
+    // название языка — на нём самом (не переводится: opt_btn пропускает его через таблицу как есть)
+    let lang = if s.lang.is_empty() { "авто" } else { yami_px::i18n::name(&s.lang) };
     opt_btn(ui, R::new(lx, y, half, 26), "язык", lang, Act::SCycle("lang"));
     ui.toggle(R::new(rx, y, half, 26), "вернуть программы при входе", "", s.session_restore, Act::SBool("session_restore"));
     y += 40;

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
-pub use yami_px::i18n::{en, pt_br, set, translated};
+pub use yami_px::i18n::{code, pt_br, set, translated};
 
 /// `shot`: собирать надписи, которые остались без перевода
 static AUDIT: AtomicBool = AtomicBool::new(false);
@@ -20,7 +20,12 @@ pub fn tr(s: &str) -> &str {
     }
     let english = table().get(s).copied().unwrap_or(s);
     let out = select(s, english);
-    let missing = out.chars().any(|c| matches!(c, 'а'..='я' | 'А'..='Я' | 'ё' | 'Ё')) || (pt_br() && table().contains_key(s) && !pt_table().contains_key(english));
+    // без перевода: русская надпись не из таблицы; у португальского — ещё и нет строки в его таблице
+    // (остальные языки переводятся по частям: без строки — английская)
+    let known = table().contains_key(s);
+    // названия языков (Русский, Українська) не переводятся нарочно
+    let name = yami_px::i18n::LANGS.iter().any(|l| l.1 == s);
+    let missing = (!known && !name && s.chars().any(|c| matches!(c, 'а'..='я' | 'А'..='Я' | 'ё' | 'Ё'))) || (pt_br() && known && !lang_table().is_some_and(|t| t.contains_key(english)));
     if AUDIT.load(Ordering::Relaxed) && missing {
         if let Ok(mut m) = MISSED.lock() {
             if !m.iter().any(|x| x == out) {
@@ -31,15 +36,12 @@ pub fn tr(s: &str) -> &str {
     out
 }
 
-/// пара прямо в коде (клавиши, doctor): русская и английская, португальская — по английской
+/// пара прямо в коде (клавиши, doctor): русская и английская, остальные языки — по английской
 pub fn select<'a>(ru: &'a str, en: &'a str) -> &'a str {
-    if pt_br() {
-        pt_table().get(en).copied().unwrap_or(en)
-    } else if translated() {
-        en
-    } else {
-        ru
+    if !translated() {
+        return ru;
     }
+    lang_table().and_then(|t| t.get(en).copied()).unwrap_or(en)
 }
 
 pub fn audit(on: bool) {
@@ -52,14 +54,14 @@ pub fn take_missed() -> Vec<String> {
 }
 
 /// строка с подстановками: русский, английский и португальский шаблоны рядом (литералы: Rust
-/// проверяет аргументы при сборке)
+/// проверяет аргументы при сборке); остальные языки — по английскому шаблону и таблице языка (localize)
 #[macro_export]
 macro_rules! tf {
     ($ru:literal, $en:literal, $pt:literal $(, $a:expr)* $(,)?) => {
         if $crate::i18n::pt_br() {
             format!($pt $(, $a)*)
-        } else if $crate::i18n::en() {
-            format!($en $(, $a)*)
+        } else if $crate::i18n::translated() {
+            $crate::i18n::localize($en, format!($en $(, $a)*))
         } else {
             format!($ru $(, $a)*)
         }
@@ -71,12 +73,36 @@ fn table() -> &'static HashMap<&'static str, &'static str> {
     T.get_or_init(|| PAIRS.iter().copied().collect())
 }
 
-fn pt_table() -> &'static HashMap<&'static str, &'static str> {
-    static T: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
-    T.get_or_init(|| PT_BR.iter().copied().collect())
+/// таблица текущего языка от английского (португальский и остальные); у русского и английского её нет
+fn lang_table() -> Option<&'static HashMap<&'static str, &'static str>> {
+    static T: [OnceLock<HashMap<&'static str, &'static str>>; 6] = [const { OnceLock::new() }; 6];
+    let (i, rows): (usize, &'static [(&'static str, &'static str)]) = match code() {
+        "pt-BR" => (0, PT_BR),
+        "es" => (1, ES),
+        "de" => (2, DE),
+        "fr" => (3, FR),
+        "uk" => (4, UK),
+        "pl" => (5, PL),
+        _ => return None,
+    };
+    Some(T[i].get_or_init(|| rows.iter().copied().collect()))
+}
+
+/// строка tf! на языке без своего шаблона в коде: out собрана по английскому шаблону en, значения
+/// переезжают в шаблон языка (yami_px::i18n::refill); нет строки в таблице — остаётся английская
+pub fn localize(en: &str, out: String) -> String {
+    match lang_table().and_then(|t| t.get(en)) {
+        Some(to) => yami_px::i18n::refill(en, &out, to).unwrap_or(out),
+        None => out,
+    }
 }
 
 include!("i18n_pt_br.rs");
+include!("i18n_es.rs");
+include!("i18n_de.rs");
+include!("i18n_fr.rs");
+include!("i18n_uk.rs");
+include!("i18n_pl.rs");
 
 const PAIRS: &[(&str, &str)] = &[
     ("enter — подтвердить", "enter — confirm"),

@@ -3,6 +3,8 @@
 //
 //   yami-dev check-docs [-v]            английские и русские документы — один текст
 //   yami-dev check-i18n [ПАПКА …]       у каждой русской строки есть перевод
+//   yami-dev i18n-todo КОД [ПАПКА]       непереведённые строки языка, по номерам
+//   yami-dev i18n-add КОД ФАЙЛ [ПАПКА]   вписать переводы «номер<TAB>текст» в таблицу языка
 //   yami-dev readme-art [#акцент]       картинки README
 //   yami-dev changelog ВЕРСИЯ           «Unreleased» становится выпуском
 //   yami-dev shots …                    помощники tools/readme-shots.sh
@@ -32,11 +34,13 @@ fn main() {
     std::process::exit(match args.first().map(String::as_str) {
         Some("check-docs") => docs::run(rest),
         Some("check-i18n") => i18n::run(rest),
+        Some("i18n-todo") => i18n::todo(rest),
+        Some("i18n-add") => i18n::add(rest),
         Some("readme-art") => art::run(rest),
         Some("changelog") => docs::changelog(rest),
         Some("shots") => shots::run(rest),
         _ => {
-            eprintln!("yami-dev: check-docs [-v] | check-i18n [DIR…] | readme-art [#accent] | changelog VERSION | shots …");
+            eprintln!("yami-dev: check-docs [-v] | check-i18n [DIR…] | i18n-todo CODE [DIR] | i18n-add CODE FILE [DIR] | readme-art [#accent] | changelog VERSION | shots …");
             2
         }
     });

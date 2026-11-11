@@ -107,7 +107,7 @@ fn shot(args: &[String]) -> i32 {
         look.lang = lang.clone();
     }
     i18n::set(&look.lang);
-    i18n::audit(lang == "en" || yami_px::i18n::normalize(&lang) == "pt-BR");
+    i18n::audit(!matches!(yami_px::i18n::normalize(&lang), "" | "ru"));
     let _ = std::fs::create_dir_all(&out);
     let mut fonts = font::Fonts::with(look.font("agents"));
     let mut ic = icons::Icons::new("");

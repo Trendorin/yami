@@ -105,7 +105,7 @@ impl Widget {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
-    /// язык интерфейса: "" — по языку системы, "ru", "en", "pt-BR"
+    /// язык интерфейса: "" — по языку системы, иначе код из yami_px::i18n::LANGS ("ru", "en", "pt-BR", "de"…)
     pub lang: String,
     // цвет: пресет или свой акцент (#rrggbb, пусто — пресет)
     pub palette: String,

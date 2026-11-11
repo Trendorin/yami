@@ -230,7 +230,7 @@ impl Cx {
         }
         let lang = st.get("lang").and_then(|l| l.as_str()).unwrap_or("").trim().replace('_', "-").to_lowercase();
         let tag = lang.split('.').next().unwrap_or("").split('@').next().unwrap_or("").split('-').next().unwrap_or("").to_string();
-        st.insert("lang".into(), match tag.as_str() { "ru" => "ru", "en" => "en", "pt" => "pt-BR", _ => "" }.into());
+        st.insert("lang".into(), yami_px::i18n::normalize(&tag).into());
         for (k, lo, hi, dflt) in [("cursorSize", 16, 96, 24), ("fontSize", 0, 64, 0), ("fontPt", 0, 48, 0), ("wallPixel", 1, 64, 1)] {
             let v = lenient_int(st.get(k).or(Some(&Value::from(dflt)))).map_or(dflt, |n| n.clamp(lo, hi));
             st.insert(k.into(), v.into());

@@ -176,28 +176,19 @@ pub fn hello(ui: &mut Ui, st: &State, b: R) {
     let mut y = b.y + 6;
     hero(ui, st, R::new(b.x + 2, y, b.w - 4, 136));
     y += 150;
-    let cur = if s.lang.is_empty() {
-        if yami_px::i18n::pt_br() {
-            "pt-BR"
-        } else if yami_px::i18n::translated() {
-            "en"
-        } else {
-            "ru"
-        }
-    } else {
-        s.lang.as_str()
-    };
+    let cur = if s.lang.is_empty() { yami_px::i18n::code() } else { s.lang.as_str() };
     y = title(ui, b.x, y, b.w, "язык");
-    let bw = (b.w - 24) / 3;
-    // названия языков — на своём языке, не переводятся
-    for (i, (code, name)) in [("ru", "Русский"), ("en", "English"), ("pt-BR", "Português (Brasil)")].into_iter().enumerate() { // i18n-ok
-        let r = R::new(b.x + i as i32 * (bw + 12), y, bw, 60);
+    // названия языков — на своём языке, не переводятся; по четыре в ряд
+    let bw = (b.w - 3 * 10) / 4;
+    for (i, (code, name)) in yami_px::i18n::LANGS.iter().copied().enumerate() {
+        let (col, row) = (i as i32 % 4, i as i32 / 4);
+        let r = R::new(b.x + col * (bw + 10), y + row * 38, bw, 30);
         let (on, hov) = (cur == code, ui.hover(r));
         ui.cv.pxbox(r, &BoxStyle::new(if on { t.surface_hi } else { t.surface }, if on { t.red } else if hov { t.ember } else { t.border }).shadow(2));
         ui.cv.text_in(ui.f, PX, R::new(r.x + 14, r.y, r.w - 24, r.h), name, if on { t.text_hi } else { t.text });
         ui.zone(r, Act::WLang(code), Cur::Pointer);
     }
-    y += 74;
+    y += 38 * ((yami_px::i18n::LANGS.len() as i32 + 3) / 4) + 6;
     // что впереди: четыре части мастера, по клетке на каждую
     let q = (b.w - 3 * 10) / 4;
     let rows = [("drop", "вид", "стиль, цвет, обои"), ("window", "рабочий стол", "бар, док, окна"), ("keys", "управление", "клавиши, niri"), ("gear", "система", "программы, службы")];

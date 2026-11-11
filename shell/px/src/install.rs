@@ -9,10 +9,11 @@ use std::path::{Path, PathBuf};
 /// текст на трёх языках: русский, английский, бразильский португальский
 pub type Tr = [&'static str; 3];
 
+// установка модуля — русский, английский, португальский; остальные языки — по-английски
 fn tr(t: &Tr) -> &'static str {
     if i18n::pt_br() {
         t[2]
-    } else if i18n::en() {
+    } else if i18n::translated() {
         t[1]
     } else {
         t[0]
@@ -200,11 +201,12 @@ fn install(spec: &Spec, o: &Opts) -> i32 {
         let lang = match (&o.lang, ask) {
             (Some(l), _) => l.clone(),
             (None, false) => String::new(),
-            (None, true) => ask_pick(
-                tr(&["Язык:", "Language:", "Idioma:"]),
-                &[("", ["как в системе", "same as the system", "o mesmo do sistema"]), ("ru", ["русский", "Russian", "russo"]), ("en", ["английский", "English", "inglês"]), ("pt-BR", ["португальский (Бразилия)", "Portuguese (Brazil)", "português (Brasil)"])],
-            )
-            .to_string(),
+            (None, true) => {
+                // названия языков — на них самих
+                let mut items: Vec<(&'static str, Tr)> = vec![("", ["как в системе", "same as the system", "o mesmo do sistema"])];
+                items.extend(i18n::LANGS.iter().map(|(c, n)| (*c, [*n; 3])));
+                ask_pick(tr(&["Язык:", "Language:", "Idioma:"]), &items).to_string()
+            }
         };
         i18n::set(&lang);
         let look = match (&o.look, ask) {
@@ -343,7 +345,7 @@ mod tests {
     fn options() {
         assert_eq!(parse(&s(&["--yes", "--all", "--look", "yami", "--lang", "pt_BR.UTF-8"])).unwrap(), Opts { yes: true, all: true, look: Some("yami".into()), lang: Some("pt-BR".into()) });
         assert!(parse(&s(&["--look", "shiny"])).is_err());
-        assert!(parse(&s(&["--lang", "de"])).is_err());
+        assert!(parse(&s(&["--lang", "ja"])).is_err());
         assert!(parse(&s(&["--force"])).is_err());
     }
 
