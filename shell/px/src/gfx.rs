@@ -164,7 +164,7 @@ pub fn fit_report() -> Vec<String> {
     let vis: Vec<(R, &Laid)> = laid.iter().map(|l| (l.r.inter(&l.clip), l)).filter(|(r, _)| r.w > 0 && r.h > 0).collect();
     let mut out = vec![];
     for (_, l) in &vis {
-        if l.cut && l.s.contains("~/") {
+        if l.cut && (l.s.contains("~/") || l.s.starts_with('/')) {
             // длинный путь и должен сокращаться многоточием
         } else if l.cut {
             out.push(format!("cut «{}» (fits {} of {})", l.s, l.fit, l.s.chars().count()));
@@ -172,12 +172,15 @@ pub fn fit_report() -> Vec<String> {
             out.push(format!("past the edge «{}»", l.s));
         }
     }
+    // наложение считается по буквам, не по строке: у строки сверху и снизу поля, две строки подряд
+    // (имя и подпись под ним) задевают друг друга только ими
+    let ink = |r: &R| R::new(r.x, r.y + r.h / 4, r.w, r.h - r.h / 4 * 2);
     for (i, (ra, a)) in vis.iter().enumerate() {
         for (rb, b) in &vis[i + 1..] {
             if a.buf != b.buf || a.layer != b.layer || a.s == b.s {
                 continue;
             }
-            let o = ra.inter(rb);
+            let o = ink(ra).inter(&ink(rb));
             if o.w >= 2 && o.h >= 3 {
                 out.push(format!("overlap «{}» × «{}»", a.s, b.s));
             }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every module next to this repository, the way check.sh checks the shell: no warnings, unit tests,
-# i18n, every state rendered in both looks and three languages, scripts parse.
+# i18n, every state rendered in both looks and every language, scripts parse.
 # Usage: tools/check-modules.sh [yami-files …]    the modules live in YAMI_MODULES_DIR (../yami-modules)
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -40,14 +40,15 @@ for m in "${list[@]}"; do
   "$DEV" check-i18n "$d/src" >/dev/null && ok "i18n" || { "$DEV" check-i18n "$d/src" | head; bad "i18n"; }
   exe="$d/target/release/$m"
   for look in plain yami; do
-    for lang in en ru pt-BR; do
-      if YAMI_STYLE="$TMP/$look.json" "$exe" shot --lang "$lang" -o "$TMP/$m-$look-$lang" >"$TMP/shot.log" 2>&1; then :; else
+    for lang in en ru pt-BR es de fr uk pl; do
+      # --fit: a text cut by an ellipsis or running into another fails too
+      if YAMI_STYLE="$TMP/$look.json" "$exe" shot --fit --lang "$lang" -o "$TMP/$m-$look-$lang" >"$TMP/shot.log" 2>&1; then :; else
         tail -5 "$TMP/shot.log"
         bad "shot: $look, $lang"
       fi
     done
   done
-  ok "renders: plain and yami, en ru pt-BR"
+  ok "renders: plain and yami, every language, every text fits"
   if [[ $m != yami-greet ]]; then
     h="$TMP/home-$m"
     mkdir -p "$h"
