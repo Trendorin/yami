@@ -34,6 +34,9 @@ pub fn migrate() {
     let y = yami_dir();
     mv(&cfg.join("yami-shell.json"), &y.join("shell.json"));
     mv(&y.join("modules"), &scripts_dir());
+    // сборка темы SDDM: экран входа — yami-greet с 2.6 (yami-cursor не трогать: это рабочая папка
+    // установщика, installer/login.sh)
+    let _ = std::fs::remove_dir_all(yami_px::paths::cache_dir().join("yami/sddm-yami"));
     let n = cfg.join("niri");
     if !OLD_NIRI.iter().any(|(o, _)| n.join(o).exists()) && !n.join("yami-local.kdl").exists() && !n.join(".yami").exists() {
         return;
