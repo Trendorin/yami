@@ -4,20 +4,46 @@
 # Sourced by install.sh; defines only (install.sh calls paint and ui_traps).
 # shellcheck shell=bash
 
-# t "русский" "english" "português": the text in the chosen language (no Portuguese: the English)
+# t "русский" "english" "português" [VALUE…]: the text in the chosen language, each {} replaced by the next
+# VALUE. Spanish, German, French, Ukrainian and Polish come from the table installer/lang/CODE.sh keyed by
+# the English text (lang_load); a line missing there, or a missing Portuguese one, shows in English
+declare -gA TR=()
 t() {
+  local s v
   case $L in
-    ru) printf '%s' "$1" ;;
-    pt-BR) printf '%s' "${3:-$2}" ;;
-    *) printf '%s' "$2" ;;
+    ru) s=$1 ;;
+    en) s=$2 ;;
+    pt-BR) s=${3:-$2} ;;
+    *) s=$2; [[ -n $2 && -n ${TR[$2]:-} ]] && s=${TR[$2]} ;;
   esac
+  shift $(($# < 3 ? $# : 3))
+  for v in "$@"; do s=${s/"{}"/"$v"}; done
+  printf '%s' "$s"
 }
-# ru, en, pt-BR from a flag or a locale (ru_RU.UTF-8, pt_BR, pt); nothing for the rest
+# the table of the chosen language (after L is set or changed); ru, en and pt-BR live in the t calls
+lang_load() {
+  TR=()
+  case $L in
+    # shellcheck source=/dev/null
+    es | de | fr | uk | pl) [[ -f $ROOT/installer/lang/$L.sh ]] && . "$ROOT/installer/lang/$L.sh" ;;
+  esac
+  return 0
+}
+# the l key on the first screen: every language in turn
+lang_next() {
+  case $1 in ru) echo en ;; en) echo pt-BR ;; pt-BR) echo es ;; es) echo de ;; de) echo fr ;; fr) echo uk ;; uk) echo pl ;; *) echo ru ;; esac
+}
+# the installer's language from a flag or a locale (ru_RU.UTF-8, pt_BR, pt, de_AT…); nothing for the rest
 lang_code() {
   case "${1,,}" in
     ru | ru[-_.@]*) printf '%s' ru ;;
     en | en[-_.@]*) printf '%s' en ;;
     pt | pt[-_.@]*) printf '%s' pt-BR ;;
+    es | es[-_.@]*) printf '%s' es ;;
+    de | de[-_.@]*) printf '%s' de ;;
+    fr | fr[-_.@]*) printf '%s' fr ;;
+    uk | uk[-_.@]*) printf '%s' uk ;;
+    pl | pl[-_.@]*) printf '%s' pl ;;
   esac
 }
 
@@ -157,12 +183,12 @@ welcome() {
     welcome_rows "$(t "система" "system" "sistema")" "$OS_NAME · $MEM_GB $(t "ГБ" "GB" "GB") · $THREADS $(t "потоков" "threads" "núcleos")"
     if ((SUDO)); then welcome_rows "$(t "пароль" "password" "senha")" "$(t "спрошу один раз, для пакетов" "asked once, for the packages" "pedida uma vez, para os pacotes")"; fi
     welcome_rows "$(t "место" "location" "local")" "~/.local/bin, ~/.config/niri ($(t "прежнее сохраню рядом" "what was there is kept next to it" "o que existia fica ao lado"))"
-    welcome_rows "$(t "время" "time" "tempo")" "$(t "примерно $(time_guess) минут" "about $(time_guess) minutes" "cerca de $(time_guess) minutos")"
+    welcome_rows "$(t "время" "time" "tempo")" "$(t "примерно {} минут" "about {} minutes" "cerca de {} minutos" "$(time_guess)")"
     have="$(disk_free)" gb="$(disk_need)"
     if [[ -n $have ]] && ((have < gb)); then
-      welcome_rows "$(t "диск" "disk" "disco")" "$WARN$(t "свободно $have ГБ, а нужно около $gb ГБ — сборка может не влезть" "$have GB free, about $gb GB are needed: the build may not fit" "$have GB livres, são necessários cerca de $gb GB: a compilação pode não caber")$R"
+      welcome_rows "$(t "диск" "disk" "disco")" "$WARN$(t "свободно {} ГБ, а нужно около {} ГБ — сборка может не влезть" "{} GB free, about {} GB are needed: the build may not fit" "{} GB livres, são necessários cerca de {} GB: a compilação pode não caber" "$have" "$gb")$R"
     else
-      welcome_rows "$(t "диск" "disk" "disco")" "$(t "нужно около $gb ГБ, свободно $have ГБ" "about $gb GB needed, $have GB free" "cerca de $gb GB necessários, $have GB livres")"
+      welcome_rows "$(t "диск" "disk" "disco")" "$(t "нужно около {} ГБ, свободно {} ГБ" "about {} GB needed, {} GB free" "cerca de {} GB necessários, {} GB livres" "$gb" "$have")"
     fi
     ((net)) || welcome_rows "$(t "сеть" "network" "rede")" "$WARN$(t "GitHub не отвечает: проверь интернет и нажми enter" "GitHub does not answer: check the internet and press enter" "o GitHub não responde: verifique a internet e pressione enter")$R"
     if ((COUNT)) && [[ ! -e $STATE/counted && -z ${DO_NOT_TRACK:-} && -z ${YAMI_NO_COUNT:-} ]]; then
@@ -177,7 +203,7 @@ welcome() {
         if ((!net)) && ! net_check && ((tries++ == 0)); then continue; fi
         printf '\n'
         return 0 ;;
-      l | "д") case $L in ru) L=en ;; en) L=pt-BR ;; *) L=ru ;; esac ;;
+      l | "д") L="$(lang_next "$L")"; lang_load ;;
       q | "й" | esc | eof) bye ;;
     esac
   done

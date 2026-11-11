@@ -97,7 +97,7 @@ font_desc() {
   esac
 }
 
-look_name() { case $L in ru) printf '%s' "${LOOK_RU[$1]}" ;; pt-BR) printf '%s' "${LOOK_PT[$1]}" ;; *) printf '%s' "${LOOK_EN[$1]}" ;; esac; }
+look_name() { t "${LOOK_RU[$1]}" "${LOOK_EN[$1]}" "${LOOK_PT[$1]}"; }
 look_desc() {
   case ${LOOK_ID[$1]} in
     matte) t "тёмный графит, панели почти сплошные — как задумано" "dark graphite, nearly solid panels: the original look" "grafite escuro, painéis quase sólidos: a aparência original" ;;
@@ -107,5 +107,5 @@ look_desc() {
   esac
 }
 
-pal_name() { case $L in ru) printf '%s' "${PAL_RU[$1]}" ;; pt-BR) printf '%s' "${PAL_PT[$1]}" ;; *) printf '%s' "${PAL_EN[$1]}" ;; esac; }
+pal_name() { t "${PAL_RU[$1]}" "${PAL_EN[$1]}" "${PAL_PT[$1]}"; }
 

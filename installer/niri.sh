@@ -5,7 +5,7 @@
 # shellcheck shell=bash
 
 plan_niri() {
-  on core && add "$(t "niri $NIRI_MIN+ из исходников, если пакет старее" "niri $NIRI_MIN+ from source if the package is older" "niri $NIRI_MIN+ compilado se o pacote for mais antigo")" do_niri_source
+  on core && add "$(t "niri {}+ из исходников, если пакет старее" "niri {}+ from source if the package is older" "niri {}+ compilado se o pacote for mais antigo" "$NIRI_MIN")" do_niri_source
   return 0
 }
 # after the steps: yami-niri is built last (minutes of output, nothing waits on it)
@@ -102,7 +102,7 @@ fork_tidy() {
   local src="${YAMI_NIRI_SRC:-$CACHE/niri-src}" sz
   [[ $ROOT == "${XDG_DATA_HOME:-$HOME/.local/share}/yami/src" ]] && niri_src_plain "$src" || return 0
   sz="$(du -sh "$src" 2>/dev/null | cut -f1)"
-  rm -rf -- "$src" && note "$(t "исходники yami-niri удалены (${sz:-?}): бинарник стоит, следующая сборка скачает их заново (--keep-build — оставить)" "yami-niri sources removed (${sz:-?}): the binary stays, the next build fetches them again (--keep-build keeps them)" "código-fonte do yami-niri removido (${sz:-?}): o binário permanece; a próxima compilação baixa novamente (--keep-build preserva)")"
+  rm -rf -- "$src" && note "$(t "исходники yami-niri удалены ({}): бинарник стоит, следующая сборка скачает их заново (--keep-build — оставить)" "yami-niri sources removed ({}): the binary stays, the next build fetches them again (--keep-build keeps them)" "código-fonte do yami-niri removido ({}): o binário permanece; a próxima compilação baixa novamente (--keep-build preserva)" "${sz:-?}")"
 }
 
 # yami-niri: build (5–25 min, the output stays on the terminal), then the sources go

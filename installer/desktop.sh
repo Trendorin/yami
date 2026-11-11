@@ -18,7 +18,7 @@ plan_desktop() {
   fi
   add "$(t "шрифты: Tiny5, DotGothic16, Terminess" "fonts: Tiny5, DotGothic16, Terminess" "fontes: Tiny5, DotGothic16 e Terminess")" do_fonts
   add "$(t "niri: конфиг" "niri: config" "niri: configuração")" do_niri_config
-  add "$(t "палитра «$(pal_name "$pal")»: шелл, обои и выбранные программы" "palette «$(pal_name "$pal")»: the shell, wallpaper and the chosen programs" "paleta «$(pal_name "$pal")»: o shell, o papel de parede e os programas escolhidos")" do_dotfiles
+  add "$(t "палитра «{}»: шелл, обои и выбранные программы" "palette «{}»: the shell, wallpaper and the chosen programs" "paleta «{}»: o shell, o papel de parede e os programas escolhidos" "$(pal_name "$pal")")" do_dotfiles
   on look && add "$(t "тема программ: Qt, KDE, GTK" "app theme: Qt, KDE, GTK" "tema dos aplicativos: Qt, KDE e GTK")" do_look
   return 0
 }

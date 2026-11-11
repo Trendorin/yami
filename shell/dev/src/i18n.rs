@@ -168,6 +168,14 @@ pub fn run(args: &[String]) -> i32 {
     }
     let (p, langs) = coverage(&dirs);
     problems.extend(p);
+    // установщик — вместе с шеллом (без аргументов), у модулей его нет
+    let langs = if args.is_empty() {
+        let (p, inst) = installer();
+        problems.extend(p);
+        [langs, inst].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("; ")
+    } else {
+        langs
+    };
     for p in &problems {
         println!("{p}");
     }
@@ -329,4 +337,68 @@ fn coverage(dirs: &[PathBuf]) -> (Vec<String>, String) {
         }
     }
     (problems, line.join(", "))
+}
+
+/// установщик: английские строки t "рус" "eng" ["port"] (подстановки — только {} и значения после шаблонов)
+/// и названия из массивов *_EN=(…) против таблиц installer/lang/<код>.sh; тоже по частям, считается процент
+fn installer() -> (Vec<String>, String) {
+    let root = crate::root();
+    let call = Regex::new(&format!(r"(?:^|[\s(;|&])t {S} {S}")).unwrap();
+    let arr = Regex::new(r"^[A-Z]+_EN=\(([^)]*)\)").unwrap();
+    let row = Regex::new(&format!(r"^  \[{S}\]={S}$")).unwrap();
+    let mut files = vec![root.join("install.sh")];
+    files.extend(std::fs::read_dir(root.join("installer")).map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "sh")).collect::<Vec<_>>()).unwrap_or_default());
+    let (mut problems, mut need) = (vec![], BTreeSet::new());
+    for f in &files {
+        let name = f.strip_prefix(&root).unwrap_or(f).display().to_string();
+        for (i, line) in std::fs::read_to_string(f).unwrap_or_default().lines().enumerate() {
+            if line.trim_start().starts_with('#') {
+                continue;
+            }
+            for m in call.captures_iter(line) {
+                if m[2].starts_with("${") && m[2].contains("_EN[") {
+                    // название из массива *_EN — строки массива учтены ниже
+                } else if m[2].contains('$') {
+                    problems.push(format!("{name}:{}: «{}»: a variable inside the text, use {{}} and pass the value after the three texts", i + 1, &m[2]));
+                } else {
+                    need.insert(m[2].to_string());
+                }
+            }
+            if let Some(m) = arr.captures(line) {
+                need.extend(m[1].split_whitespace().map(String::from));
+            }
+        }
+    }
+    let mut line = vec![];
+    for code in PARTIAL {
+        let file = format!("installer/lang/{code}.sh");
+        let Ok(text) = std::fs::read_to_string(root.join(&file)) else { continue };
+        let mut have: HashSet<String> = HashSet::new();
+        for l in text.lines().filter(|l| !l.starts_with('#') && *l != "TR=(" && *l != ")") {
+            let Some(m) = row.captures(l) else {
+                problems.push(format!("{file}: not a table row: {l}"));
+                continue;
+            };
+            let (en, tr) = (&m[1], &m[2]);
+            if !need.contains(en) {
+                problems.push(format!("{file}: «{en}» is no longer a line of the installer"));
+            }
+            if !have.insert(en.to_string()) {
+                problems.push(format!("{file}: duplicate key «{en}»"));
+            }
+            if en.matches("{}").count() != tr.matches("{}").count() {
+                problems.push(format!("{file}: {{}} differ for «{en}»"));
+            }
+            if tr.contains(['$', '`']) {
+                problems.push(format!("{file}: «{tr}» would expand in bash"));
+            }
+            if *code != "uk" && CYR.is_match(tr) {
+                problems.push(format!("{file}: «{en}» is Cyrillic: «{tr}»"));
+            }
+        }
+        if !need.is_empty() {
+            line.push(format!("{code} {}%", need.iter().filter(|e| have.contains(*e)).count() * 100 / need.len()));
+        }
+    }
+    (problems, if line.is_empty() { String::new() } else { format!("installer {}", line.join(", ")) })
 }

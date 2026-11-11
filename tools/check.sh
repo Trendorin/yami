@@ -77,11 +77,11 @@ cargo test --release --locked --workspace --quiet --manifest-path "$ROOT/shell/C
 cargo test --release --locked -p yami-shell --features package-managed --quiet --manifest-path "$ROOT/shell/Cargo.toml" package_manager_owns_updates >"$TMP/managed.log" 2>&1 && ok "cargo test (package-managed)" || { tail -20 "$TMP/managed.log"; bad "cargo test --features package-managed"; }
 
 step "scripts"
-for f in "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh "$ROOT"/packaging/*.sh; do
+for f in "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/installer/lang/*.sh "$ROOT"/tools/*.sh "$ROOT"/packaging/*.sh; do
   bash -n "$f" || bad "syntax: ${f#"$ROOT"/}"
 done
 if command -v shellcheck >/dev/null; then
-  shellcheck -S error -x "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/tools/*.sh "$ROOT"/packaging/*.sh || bad "shellcheck"
+  shellcheck -S error -x "$ROOT"/install.sh "$ROOT"/installer/*.sh "$ROOT"/installer/lang/*.sh "$ROOT"/tools/*.sh "$ROOT"/packaging/*.sh || bad "shellcheck"
 fi
 ok "scripts parsed"
 
@@ -117,7 +117,7 @@ if ((!FAST)); then
   step "installer dry run (throwaway HOME)"
   mkdir -p "$TMP/home"
   # a first install, the same with root (the plan only: --dry-run never asks for it), an update
-  for args in "--no-sudo" "" "--update" "--full" "--apply files\ shot\ agents" "--lang pt-BR --no-sudo"; do
+  for args in "--no-sudo" "" "--update" "--full" "--apply files\ shot\ agents" "--lang pt-BR --no-sudo" "--lang de --full"; do
     eval "argv=($args)"
     if HOME="$TMP/home" NIRI_SOCKET='' XDG_CONFIG_HOME='' XDG_CACHE_HOME='' XDG_STATE_HOME='' XDG_DATA_HOME='' \
       timeout 60 "$ROOT/install.sh" --yes --dry-run --no-anim --lang en "${argv[@]}" >"$TMP/dry.log" 2>&1; then

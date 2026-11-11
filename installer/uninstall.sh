@@ -51,7 +51,7 @@ uninstall() {
   if niri_src_plain "$src"; then
     rm -rf -- "$src"
   elif [[ -d $src ]]; then
-    note "$(t "в $src твоя работа над патчами — оставил" "your patch work is in $src: kept" "seus patches estão em $src: preservados")"
+    note "$(t "в {} твоя работа над патчами — оставил" "your patch work is in {}: kept" "seus patches estão em {}: preservados" "$src")"
   fi
   rm -f "$CFG/qt6ct/qss/yami.qss" "$CFG/qt6ct/colors/yami.conf"
   # GTK: our yami.css and its import line; a gtk.css yami wrote whole before 3.0 goes too

@@ -16,7 +16,7 @@
 #   ./install.sh --update         rebuild from this tree, keep every setting, no sudo (`yami update`)
 #   ./install.sh --apply "files view …"   install exactly these modules (what the first-run setup runs)
 #
-# Choices: --lang en|ru|pt-BR  --palette blood|ash|sakura|amber|venom|ice|dusk  --theme dark|light
+# Choices: --lang en|ru|pt-BR|es|de|fr|uk|pl  --palette blood|ash|sakura|amber|venom|ice|dusk  --theme dark|light
 #   --look matte|glass|light|solid  --font sans|pixel  --fetch mini|full
 #   --restyle LIST (all, none, or: gtk qt cursor kitty fastfetch btop firefox mangohud foot cava starship)
 # Modules (with --full or --apply): files view play shot login games fork (the services, yami-agents, come with the shell)
@@ -173,7 +173,7 @@ mkdir -p "$CACHE"
 L=""
 if [[ -n $LANG_OPT ]]; then
   L="$(lang_code "$LANG_OPT")"
-  [[ -n $L ]] || { echo "--lang: en, ru or pt-BR" >&2; exit 2; }
+  [[ -n $L ]] || { echo "--lang: en, ru, pt-BR, es, de, fr, uk or pl" >&2; exit 2; }
 elif ((UPDATE)) && [[ -f $SET_JSON ]]; then
   L="$(lang_code "$(json_field "$SET_JSON" lang 2>/dev/null)")"
 fi
@@ -184,6 +184,7 @@ if [[ -z $L ]]; then
 else
   LANG_ASK=0
 fi
+lang_load
 # ${#s} must count characters, not bytes
 case "$(locale charmap 2>/dev/null)" in UTF-8) ;; *) export LC_ALL=C.UTF-8 ;; esac
 

@@ -83,10 +83,10 @@ login_offer() {
       sed -i '/^login /d' "$f"
       grep -q '^pkgs ' "$f" || rm -f "$f"
     else
-      note "$(t "потом: настройки → обновления, или $(greet_script)" "later: settings → updates, or $(greet_script)" "depois: configurações → atualizações, ou $(greet_script)")"
+      note "$(t "потом: настройки → обновления, или {}" "later: settings → updates, or {}" "depois: configurações → atualizações, ou {}" "$(greet_script)")"
     fi
   else
-    note "$msg: $(t "настройки → обновления, одна кнопка (или $(greet_script), нужен sudo)" "settings → updates, one button (or $(greet_script), needs sudo)" "configurações → atualizações, um botão (ou $(greet_script), requer sudo)")"
+    note "$msg: $(t "настройки → обновления, одна кнопка (или {}, нужен sudo)" "settings → updates, one button (or {}, needs sudo)" "configurações → atualizações, um botão (ou {}, requer sudo)" "$(greet_script)")"
   fi
 }
 
@@ -135,10 +135,10 @@ uninstall_login() {
   say "$(t "экран входа yami убран" "the yami login screen is removed" "a tela de login do yami foi removida")"
   if [[ -n $dm ]] && ((SYSTEMD)); then
     if $SU systemctl enable -f "$dm.service"; then
-      say "$(t "менеджер входа: снова $dm со следующей загрузки" "login manager: $dm again from the next boot" "gerenciador de login: $dm novamente a partir da próxima inicialização")"
+      say "$(t "менеджер входа: снова {} со следующей загрузки" "login manager: {} again from the next boot" "gerenciador de login: {} novamente a partir da próxima inicialização" "$dm")"
       rm -f "$STATE/login-dm"
     else
-      warn "$(t "не включился $dm: sudo systemctl enable -f $dm.service" "$dm did not enable: sudo systemctl enable -f $dm.service" "$dm não foi ativado: sudo systemctl enable -f $dm.service")"
+      warn "$(t "не включился {}: sudo systemctl enable -f {}.service" "{} did not enable: sudo systemctl enable -f {}.service" "{} não foi ativado: sudo systemctl enable -f {}.service" "$dm" "$dm")"
     fi
   elif ((SYSTEMD)) && [[ $now == greetd ]]; then
     # installed before the replaced manager was written down: name the ones on this system
