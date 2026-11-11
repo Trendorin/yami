@@ -232,7 +232,7 @@ pub fn style(ui: &mut Ui, st: &State, b: R) {
     let cw = (b.w - 16) / 2;
     let plain = s.preset == "plain";
     pick(ui, R::new(b.x, b.y, cw, 258), "пиксельный", "целые пиксели, ступенчатые углы", !plain, Act::WPlain(false), |ui, r| art_style(ui, r, Style::PIXEL));
-    pick(ui, R::new(b.x + cw + 16, b.y, cw, 258), "нейтральный", "скругления, мягкие тени, обычные шрифты", plain, Act::WPlain(true), |ui, r| art_style(ui, r, Style::PLAIN));
+    pick(ui, R::new(b.x + cw + 16, b.y, cw, 258), "нейтральный", "скругления, тени, обычные шрифты", plain, Act::WPlain(true), |ui, r| art_style(ui, r, Style::PLAIN));
     let y = b.y + 274;
     card(ui, R::new(b.x, y, cw, 84), "moon", "тёмная", "светлый текст на тёмном", !s.light, Act::SCycle("theme_dark"));
     card(ui, R::new(b.x + cw + 16, y, cw, 84), "sun", "светлая", "тёмный текст на светлом", s.light, Act::SCycle("theme_light"));
@@ -294,7 +294,7 @@ pub fn look(ui: &mut Ui, st: &State, b: R) {
     ui.toggle(R::new(b.x, y, half, 40), "размытие под панелями", "стекло за шторками бара и меню", s.blur_shell, Act::SBool("blur_shell"));
     ui.toggle(R::new(b.x + half + 20, y, half, 40), "размытие под терминалами", "окна терминала видны насквозь", s.blur_term, Act::SBool("blur_term"));
     y += 50;
-    ui.toggle(R::new(b.x, y, half, 40), "лёгкий режим", "слабый ПК, виртуалка: без размытия и анимаций", s.lite, Act::SBool("lite"));
+    ui.toggle(R::new(b.x, y, half, 40), "лёгкий режим", "без размытия и анимаций", s.lite, Act::SBool("lite"));
     ui.toggle(R::new(b.x + half + 20, y, half, 40), "строки развёртки", "панели как на старом мониторе", s.scanlines, Act::SBool("scanlines"));
 }
 
@@ -596,7 +596,7 @@ pub fn services(ui: &mut Ui, st: &State, b: R) {
     y += 50;
     if st.mods_here.agents {
         let ag = crate::agents::AgentsCfg::load();
-        ui.toggle(R::new(b.x, y, w, 40), "подключать флешки и телефоны сами", "флешки, диски, телефоны, камеры", ag.automount, Act::SBool("automount"));
+        ui.toggle(R::new(b.x, y, w, 40), "подключать флешки и телефоны сами", "флешки, телефоны, камеры", ag.automount, Act::SBool("automount"));
         y += 50;
     }
     ui.toggle(R::new(b.x, y, w, 40), "обложки из интернета", "выкл — только то, что отдаёт плеер", s.media_art_net, Act::SBool("media_art_net"));

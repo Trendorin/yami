@@ -21,7 +21,7 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
         return;
     }
     ui.toggle(R::new(b.x, y, half, 40), "bluetooth", if s.powered { "включён" } else { "выключен" }, s.powered, Act::BtPower(!s.powered));
-    ui.toggle(R::new(x2, y, half, 40), "переподключать сопряжённые", "наушники, мыши — когда он включается", st.set.bt_reconnect, Act::SBool("bt_reconnect"));
+    ui.toggle(R::new(x2, y, half, 40), "переподключать сопряжённые", "наушники и мыши сразу", st.set.bt_reconnect, Act::SBool("bt_reconnect"));
     y += 46;
     if !s.msg.is_empty() {
         ui.text_in(PX, R::new(b.x, y, b.w, 20), &crate::tf!("не вышло: {}", "failed: {}", "falhou: {}", s.msg), t.warn);

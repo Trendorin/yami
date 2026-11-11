@@ -54,12 +54,12 @@ fi
 # the shell in Brazilian Portuguese: nothing left in Russian or English from the catalogs
 "$BIN" shot --lang pt-BR -o "$TMP/pt" --defaults | grep untranslated
 [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-shell shot --lang pt-BR" || bad "yami-shell shot --lang pt-BR"
-# the newer languages (a missing line shows in English): every text fits its place, nothing cut
+# every language (a missing line shows in English): every text fits its place, nothing cut
 fit=0
-for lang in es de fr uk pl; do
+for lang in ru en pt-BR es de fr uk pl; do
   "$BIN" shot --defaults --fit --lang "$lang" -o "$TMP/$lang" >"$TMP/fit.log" 2>&1 || { grep -E "layout:|untranslated" "$TMP/fit.log" | head -10; fit=1; }
 done
-((fit)) && bad "yami-shell shot --fit (shorten the translation or give the text room)" || ok "yami-shell shot --fit: es de fr uk pl, every text fits"
+((fit)) && bad "yami-shell shot --fit (shorten the translation or give the text room)" || ok "yami-shell shot --fit: all eight languages, every text fits"
 # the services' windows (yami-agents): both looks, three languages, nothing left untranslated
 AG="$ROOT/shell/target/release/yami-agents"
 printf '{"preset":"plain"}\n' >"$TMP/plain.json"

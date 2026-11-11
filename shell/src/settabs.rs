@@ -28,7 +28,7 @@ pub(crate) fn tab_color(ui: &mut Ui, st: &State, b: R) {
         2 => return app_themes(ui, st, b, tw),
         _ => {}
     }
-    let mut y = title(ui, b.x, b.y, tw, "палитра — весь райс перекрашивается сразу");
+    let mut y = title(ui, b.x, b.y, tw, "палитра — красит весь райс");
     let cw = (b.w - 6 * 8) / 7;
     for (i, p) in PRESETS.iter().enumerate() {
         let r = R::new(b.x + i as i32 * (cw + 8), y, cw, 64);
@@ -242,7 +242,7 @@ pub(crate) fn tab_widgets(ui: &mut Ui, st: &State, b: R) {
     y += 44;
     // для всех виджетов без подложки: читаемы на любых обоях
     y = title(ui, px, y, pw, "без подложки");
-    ui.toggle(R::new(px, y, pw, 40), "в тон обоям", "на светлом месте — тёмный текст, у букв тень", s.widget_contrast, Act::SBool("widget_contrast"));
+    ui.toggle(R::new(px, y, pw, 40), "в тон обоям", "на светлом — тёмный текст с тенью", s.widget_contrast, Act::SBool("widget_contrast"));
 }
 
 /// пиксельность одним ползунком: 0 — гладко, 1 — мягче, 2 — только yami, 3 — всё пиксельное (по умолчанию)
@@ -278,7 +278,7 @@ pub(crate) fn tab_look(ui: &mut Ui, st: &State, b: R) {
     y = title(ui, b.x, y, b.w, "пиксельность и нагрузка");
     let lvl = pixel_level(s);
     ui.slider(R::new(b.x, y, half, 40), "пиксельность", lvl as f32 / 3.0, PIXEL_LEVELS[lvl], 4, Act::SSlider("pixel_level", 0.0, 3.0, 3));
-    ui.toggle(R::new(b.x + half + 20, y, half, 40), "лёгкий режим", "слабый ПК, виртуалка: без размытия и анимаций", s.lite, Act::SBool("lite"));
+    ui.toggle(R::new(b.x + half + 20, y, half, 40), "лёгкий режим", "без размытия и анимаций", s.lite, Act::SBool("lite"));
     y += 48;
     // размытие рисует niri (ext-background-effect), каждый кадр
     ui.toggle(R::new(b.x, y, half, 26), "размытие под панелями", "", s.blur_shell, Act::SBool("blur_shell"));
@@ -525,7 +525,7 @@ pub(crate) fn tab_windows(ui: &mut Ui, st: &State, b: R) {
     ui.text_in(PX, R::new(col(1) + 4, y + 64, cw * 2 + 8, 26), corners, t.text_faint);
     y += 100;
     y = title(ui, b.x, y, b.w, "плавающие окна");
-    ui.toggle(R::new(b.x, y, half, 40), "фото и видео", "просмотр в Telegram, yami-view, mpv…", s.float_media, Act::SBool("float_media"));
+    ui.toggle(R::new(b.x, y, half, 40), "фото и видео", "Telegram, yami-view, mpv…", s.float_media, Act::SBool("float_media"));
     ui.toggle(R::new(b.x + half + 20, y, half, 40), "картинка в картинке", "в правом нижнем углу", s.float_pip, Act::SBool("float_pip"));
     y += 46;
     ui.slider(R::new(b.x, y, half, 40), "ширина", (s.float_w - 0.3) / 0.65, &format!("{:.0}%", s.float_w * 100.0), 13, Act::SSlider("float_w", 0.3, 0.95, 13));
@@ -566,7 +566,7 @@ pub(crate) fn tab_shots(ui: &mut Ui, st: &State, b: R) {
     ui.button(R::new(b.right() - 120, y + 2, 120, 26), "применить", "check", Tone::Primary, false, true, Act::SCycle("shot_dir_apply"));
     y += 46;
     y = title(ui, b.x, y, b.w, "оверлей");
-    ui.toggle(R::new(b.x, y, half, 40), "лупа", "пиксели под курсором, ctrl+c — цвет", c.loupe, Act::SBool("shot_loupe"));
+    ui.toggle(R::new(b.x, y, half, 40), "лупа", "пиксели под мышью, ctrl+c — цвет", c.loupe, Act::SBool("shot_loupe"));
     ui.toggle(R::new(b.x + half + 20, y, half, 40), "уведомление", "с миниатюрой и кнопками", c.notify, Act::SBool("shot_notify"));
     y += 50;
     let d = crate::tf!("{} с", "{} s", "{} s", c.delay);
@@ -587,7 +587,7 @@ pub(crate) fn tab_shots(ui: &mut Ui, st: &State, b: R) {
         y += 24;
     }
     y = title(ui, b.x, y, b.w, "клавиши");
-    for (k, v) in [("print", "область · окно · экран"), ("mod+shift+h", "скрыть экран в трансляции"), ("в оверлее", "1–7 инструменты · tab режим · enter готово · ctrl+s сохранить как")] {
+    for (k, v) in [("print", "область · окно · экран"), ("mod+shift+h", "скрыть экран в трансляции"), ("в оверлее", "1–7 инструменты · tab режим · enter готово · ctrl+s файл")] {
         ui.text_in(PX, R::new(b.x, y, 130, 20), k, t.red);
         ui.text_in(PX, R::new(b.x + 140, y, b.w - 140, 20), v, t.text_dim);
         y += 22;

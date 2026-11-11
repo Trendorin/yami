@@ -155,8 +155,7 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     ui.field(R::new(b.x, y, b.w - 130, 26), &st.game_field, "свои игры: app-id через запятую, osu!, minecraft*", focused, false, Act::SField("game_apps"));
     ui.button(R::new(b.right() - 120, y, 120, 26), "применить", "check", crate::ui::Tone::Plain, false, true, Act::SCycle("game_apply"));
     y += 30;
-    ui.text_in(crate::font::PX, R::new(b.x, y, b.w, 18), "app-id окна видно в «niri msg windows». * в конце — по началу имени.", t.text_faint);
-    y += 28;
+    y += ui.wrap(crate::font::PX, R::new(b.x, y, b.w, 40), "app-id окна видно в «niri msg windows». * в конце — по началу имени.", t.text_faint, 2) + 10;
     // пока игра в фокусе — и обратно после
     y = title(ui, b.x, y, b.w, "пока играешь");
     ui.toggle(R::new(l, y, half, 40), "не беспокоить", "уведомления — молча в историю", s.game_dnd, Act::SBool("game_dnd"));

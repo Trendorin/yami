@@ -234,42 +234,54 @@ fn tab_bar_look(ui: &mut Ui, st: &State, b: R) {
         "number" => "число",
         _ => "шкала",
     };
-    // три столбца: разделитель, края и модули, окна; числа — стрелками или колесом
-    opt_btn(ui, R::new(col(0), y, cw, 26), "разделитель", style, Act::SCycle("bar_sep"));
-    opt_btn(ui, R::new(col(1), y, cw, 26), "цвет", color, Act::SCycle("bar_sep_color"));
-    num_btn(ui, R::new(col(2), y, cw, 26), "ширина", s.num("bar_sep_w"), "bar_sep_w");
-    y += 32;
+    // два столбца: подписи на любом из восьми языков влезают целиком; числа — стрелками или колесом
+    let hw = (b.w - 12) / 2;
+    let mut i = 0;
+    let mut cell = |y: &mut i32| {
+        let r = R::new(b.x + (i % 2) * (hw + 12), *y, hw, 26);
+        i += 1;
+        if i % 2 == 0 {
+            *y += 32;
+        }
+        r
+    };
+    opt_btn(ui, cell(&mut y), "разделитель", style, Act::SCycle("bar_sep"));
+    opt_btn(ui, cell(&mut y), "цвет", color, Act::SCycle("bar_sep_color"));
+    num_btn(ui, cell(&mut y), "ширина", s.num("bar_sep_w"), "bar_sep_w");
+    num_btn(ui, cell(&mut y), "промежуток", s.num("bar_gap"), "bar_gap");
     let (pl, pr) = if crate::bar::vert(s) { ("край сверху", "край снизу") } else { ("край слева", "край справа") };
-    for (i, (k, label)) in [("bar_pad_l", pl), ("bar_pad_r", pr), ("bar_gap", "промежуток")].into_iter().enumerate() {
-        num_btn(ui, R::new(col(i as i32), y, cw, 26), label, s.num(k), k);
-    }
-    y += 32;
-    for (i, (k, label)) in [("bar_mid", "до окон"), ("bar_task_gap", "зазор окон"), ("task_width", "кнопка окна")].into_iter().enumerate() {
-        num_btn(ui, R::new(col(i as i32), y, cw, 26), label, s.num(k), k);
-    }
-    y += 34;
-    opt_btn(ui, R::new(col(0), y, cw, 26), "цп/память", cpu, Act::SCycle("cpu_style"));
-    ui.toggle(R::new(col(1), y, cw, 26), "часы с секундами", "", s.clock_seconds, Act::SBool("clock_seconds"));
-    ui.toggle(R::new(col(2), y, cw, 26), "дата в часах", "", s.clock_date, Act::SBool("clock_date"));
-    y += 32;
+    num_btn(ui, cell(&mut y), pl, s.num("bar_pad_l"), "bar_pad_l");
+    num_btn(ui, cell(&mut y), pr, s.num("bar_pad_r"), "bar_pad_r");
+    num_btn(ui, cell(&mut y), "до окон", s.num("bar_mid"), "bar_mid");
+    num_btn(ui, cell(&mut y), "зазор окон", s.num("bar_task_gap"), "bar_task_gap");
+    num_btn(ui, cell(&mut y), "кнопка окна", s.num("task_width"), "task_width");
+    opt_btn(ui, cell(&mut y), "цп/память", cpu, Act::SCycle("cpu_style"));
     // #11: трей одной стрелкой, температура столбиком
-    opt_btn(ui, R::new(col(0), y, cw, 26), "трей", if s.tray_mode == "arrow" { "стрелкой" } else { "значки" }, Act::SCycle("tray_mode"));
-    opt_btn(ui, R::new(col(1), y, cw, 26), "температура", if s.temp_style == "compact" { "коротко" } else { "как цп" }, Act::SCycle("temp_style"));
+    opt_btn(ui, cell(&mut y), "трей", if s.tray_mode == "arrow" { "стрелкой" } else { "значки" }, Act::SCycle("tray_mode"));
+    opt_btn(ui, cell(&mut y), "температура", if s.temp_style == "compact" { "коротко" } else { "как цп" }, Act::SCycle("temp_style"));
     // #13: эквалайзер модуля и всплывашки музыки, что всплывашка показывает
     let eq = if s.media_viz == "off" { "выкл" } else { crate::widgets::name_of(crate::widgets::STYLES, &s.media_viz) };
-    opt_btn(ui, R::new(col(2), y, cw, 26), "эквалайзер", eq, Act::SCycle("media_viz"));
-    y += 32;
-    opt_btn(ui, R::new(col(0), y, cw * 2 + (col(1) - col(0) - cw), 26), "всплывашка музыки", crate::widgets::name_of(crate::config::MEDIA_VIEWS, &s.media_view), Act::SCycle("media_view"));
-    ui.toggle(R::new(col(2), y, cw, 26), "трей клетками", "", s.tray_pixel, Act::SBool("tray_pixel"));
-    y += 32;
-    // #21: ноутбук от сети — заряженная батарея в баре не нужна
-    ui.toggle(R::new(col(0), y, cw * 2 + (col(1) - col(0) - cw), 26), "прятать полную батарею", "", s.bat_hide_full, Act::SBool("bat_hide_full"));
-    y += 32;
-    // индикатор приватности: что он стережёт
-    for (i, (k, label, on)) in [("privacy_mic", "приватность: микрофон", s.privacy_mic), ("privacy_cam", "камера", s.privacy_cam), ("privacy_screen", "показ экрана", s.privacy_screen)].into_iter().enumerate() {
-        ui.toggle(R::new(col(i as i32), y, cw, 26), label, "", on, Act::SBool(k));
+    opt_btn(ui, cell(&mut y), "эквалайзер", eq, Act::SCycle("media_viz"));
+    opt_btn(ui, cell(&mut y), "всплывашка музыки", crate::widgets::name_of(crate::config::MEDIA_VIEWS, &s.media_view), Act::SCycle("media_view"));
+    y += 6;
+    // переключатели — в три столбца, они короче
+    let toggles: [(&str, bool, &'static str); 8] = [
+        ("часы с секундами", s.clock_seconds, "clock_seconds"),
+        ("дата в часах", s.clock_date, "clock_date"),
+        ("трей клетками", s.tray_pixel, "tray_pixel"),
+        // #21: ноутбук от сети — заряженная батарея в баре не нужна
+        ("прятать полную батарею", s.bat_hide_full, "bat_hide_full"),
+        ("приватность: микрофон", s.privacy_mic, "privacy_mic"),
+        ("камера", s.privacy_cam, "privacy_cam"),
+        ("показ экрана", s.privacy_screen, "privacy_screen"),
+        ("", false, ""),
+    ];
+    for (j, (label, on, k)) in toggles.into_iter().enumerate() {
+        if !k.is_empty() {
+            ui.toggle(R::new(b.x + (j as i32 % 2) * (hw + 12), y + (j as i32 / 2) * 32, hw, 26), label, "", on, Act::SBool(k));
+        }
     }
-    y += 40;
+    y += 4 * 32 + 8;
     // панель управления (control.rs): какие плитки в её ряду, по порядку включения
     y = title(ui, b.x, y, b.w, "панель управления — ПКМ по пустому месту бара");
     let n = s.control_tiles.len();

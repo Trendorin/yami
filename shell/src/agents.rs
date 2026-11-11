@@ -127,7 +127,7 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     y += 46;
     if here.agents {
         y = title(ui, b.x, y, b.w, "флешки и телефоны");
-        ui.toggle(R::new(b.x, y, half, 40), "подключать сами", "флешки, диски, телефоны, камеры", ag.automount, Act::SBool("automount"));
+        ui.toggle(R::new(b.x, y, half, 40), "подключать сами", "флешки, телефоны, камеры", ag.automount, Act::SBool("automount"));
         ui.toggle(R::new(x2, y, half, 40), "сразу открывать в файлах", "иначе — карточка «открыть»", ag.automount_open, Act::SBool("automount_open"));
         y += 46;
     }

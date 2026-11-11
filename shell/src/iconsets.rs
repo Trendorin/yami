@@ -112,7 +112,7 @@ pub fn build(ramp: [u32; 5], pixel: bool, tint: bool) -> Sets {
     let sys = crate::icons::system_theme();
     let mut icons = vec![Card { name: String::new(), title: crate::tf!("как в системе: {}", "as the system: {}", "como no sistema: {}", sys), imgs: preview("") }];
     icons.extend(all.iter().filter(|f| f.icons).map(|f| Card { name: f.name.clone(), title: f.title.clone(), imgs: preview(&f.name) }));
-    let mut cursors = vec![Card { name: "yami".into(), title: crate::tf!("пиксельный yami, в цвет палитры", "yami pixel, in the palette", "pixel do yami, na paleta"), imgs: vec![] }];
+    let mut cursors = vec![Card { name: "yami".into(), title: crate::tf!("пиксельный, в цвет палитры", "pixel, in the palette", "pixel, na paleta"), imgs: vec![] }];
     cursors.extend(all.iter().filter(|f| f.cursors).map(|f| Card { name: f.name.clone(), title: f.title.clone(), imgs: cursor_img(&f.dir, 32).into_iter().collect() }));
     cursors.push(Card { name: "system".into(), title: crate::tf!("не трогать", "leave alone", "não mexer"), imgs: vec![] });
     Sets { icons, cursors }

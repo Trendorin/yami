@@ -545,7 +545,8 @@ fn bt(ui: &mut Ui, st: &State, b: R) {
 fn profile(ui: &mut Ui, st: &State, b: R) {
     let t = ui.t;
     let p = &st.prof;
-    let mut y = head(ui, b, p.icon(), "профиль питания", if p.present { crate::profile::label(&p.active) } else { "" });
+    // активный профиль — подсвечен в списке ниже: в шапке он только повторялся бы (и не влезал)
+    let mut y = head(ui, b, p.icon(), "профиль питания", "");
     if let Some(bat) = st.sys.bat {
         // заряд, состояние и сколько осталось — то, что ноутбуку важнее профиля
         let col = if bat.charging || bat.plugged { t.ok } else if bat.pct <= 15 { t.ember } else { t.red };

@@ -34,10 +34,6 @@ impl Prof {
     }
 }
 
-pub fn label(p: &str) -> &'static str {
-    KINDS.iter().find(|k| k.0 == p).map(|k| k.2).unwrap_or("баланс")
-}
-
 fn proxy<'a>(c: &'a zbus::blocking::Connection) -> Option<Proxy<'a>> {
     for (name, path, iface) in BUS {
         if let Ok(p) = Proxy::new(c, *name, *path, *iface) {

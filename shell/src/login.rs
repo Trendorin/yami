@@ -245,10 +245,10 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     }
     y = title(ui, b.x, y, b.w, "вид: палитра, язык и мониторы — как у шелла");
     let wall = WALLS.iter().find(|w| w.0 == wall_mode(s)).map(|w| w.1).unwrap_or(WALLS[0].1);
-    opt_btn(ui, R::new(lx, y + 7, half, 26), "обои", wall, Act::SCycle("greet_wall"));
+    opt_btn(ui, R::new(lx, y + 7, half, 26), "картинка", wall, Act::SCycle("greet_wall"));
     ui.slider(R::new(rx, y, half, 40), "вуаль над обоями", (s.greet_dim - 0.2) / 0.7, &format!("{}%", (s.greet_dim * 100.0).round()), 14, Act::SSlider("greet_dim", 0.2, 0.9, 14));
     y += 48;
-    ui.toggle(R::new(lx, y, half, 40), "часы и дата", "большие, как на экране блокировки", s.greet_clock, Act::SBool("greet_clock"));
+    ui.toggle(R::new(lx, y, half, 40), "часы и дата", "большие, как на блокировке", s.greet_clock, Act::SBool("greet_clock"));
     ui.toggle(R::new(rx, y, half, 40), "имя машины", "в левом верхнем углу", s.greet_host, Act::SBool("greet_host"));
     y += 52;
     y = title(ui, b.x, y, b.w, "кто и как входит");

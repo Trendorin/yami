@@ -109,7 +109,7 @@ pub fn tab(ui: &mut Ui, st: &State, b: R) {
     y += 48;
     y = title(ui, b.x, y, b.w, "браузер (Firefox, LibreWolf, Floorp, Zen)");
     ui.toggle(R::new(b.x, y, half, 40), "меню ПКМ в палитре", "тема браузера — твоя, не трогаем", s.browser_menus, Act::SBool("browser_menus"));
-    ui.toggle(R::new(b.x + half + 20, y, half, 40), "пиксельный шрифт", "в меню и интерфейсе, не на сайтах", s.browser_font, Act::SBool("browser_font"));
+    ui.toggle(R::new(b.x + half + 20, y, half, 40), "пиксельный шрифт", "в меню, не на сайтах", s.browser_font, Act::SBool("browser_font"));
     y += 48;
     ui.wrap(crate::font::PX, R::new(b.x, y, b.w, 40), "браузер подхватит при следующем запуске. Любой другой шрифт: yami-shell config set fontShell \"Имя\"", t.text_faint, 2);
 }

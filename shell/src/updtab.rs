@@ -71,7 +71,7 @@ pub(crate) fn picker(ui: &mut Ui, st: &State, r: R) {
     let foot = r.bottom() - 28;
     let mut rows: Vec<(String, String, String, bool)> = vec![];
     if let Some(p) = prev_version() {
-        rows.push(("prev".into(), crate::tf!("прошлая сборка  {}", "previous build  {}", "compilação anterior  {}", p), crate::tf!("сразу, без сборки", "instant, no build", "instantâneo, sem compilar"), true));
+        rows.push(("prev".into(), crate::tf!("прошлая сборка  {}", "previous build  {}", "build anterior  {}", p), crate::tf!("сразу, без сборки", "instant, no build", "instantâneo, sem compilar"), true));
     }
     if let Some(i) = &u.info {
         for rel in &i.releases {
