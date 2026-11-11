@@ -195,8 +195,9 @@ fn sorted_fields(s: &str) -> Vec<String> {
 
 /// английские строки, нужные языку: ключи португальской таблицы (в ней есть каждая надпись) и
 /// английские шаблоны tf!
+/// самоназвания языков кириллицей (Русский) не переводят
 fn needed(src: &Path) -> BTreeSet<String> {
-    let mut n: BTreeSet<String> = pairs_of(&std::fs::read_to_string(src.join("i18n_pt_br.rs")).unwrap_or_default()).into_iter().map(|p| p.0).collect();
+    let mut n: BTreeSet<String> = pairs_of(&std::fs::read_to_string(src.join("i18n_pt_br.rs")).unwrap_or_default()).into_iter().map(|p| p.0).filter(|k| !CYR.is_match(k)).collect();
     let files = std::fs::read_dir(src).map(|rd| rd.flatten().map(|e| e.path()).collect::<Vec<_>>()).unwrap_or_default();
     for f in files {
         let name = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
@@ -272,8 +273,9 @@ pub fn add(args: &[String]) -> i32 {
             bad += 1;
             continue;
         };
-        let tr = tr.trim();
-        let why = if tr.is_empty() {
+        // пробелы по краям — часть надписи (как у английской), только конец строки файла — нет
+        let tr = tr.trim_end_matches(['\r', '\n']);
+        let why = if tr.trim().is_empty() {
             "empty"
         } else if quote.is_match(tr) {
             "a bare quote"

@@ -178,7 +178,7 @@ fn cal(ui: &mut Ui, st: &State, b: R) {
     let now = crate::clock::local_now();
     let face = font::px(32);
     ui.text(face, b.x, b.y - 2, &format!("{:02}:{:02}", now.hour, now.min), t.text);
-    let date = crate::tf!("{}, {} {}", "{}, {} {}", "{}, {} de {}", crate::i18n::tr(crate::clock::RU_DAY_FULL[now.wday as usize]), now.day, crate::i18n::tr(crate::clock::RU_MON[(now.mon - 1) as usize]));
+    let date = yami_px::i18n::long_date(crate::i18n::tr(crate::clock::RU_DAY_FULL[now.wday as usize]), now.day as u32, (now.mon - 1) as usize, crate::i18n::tr(crate::clock::RU_MON[(now.mon - 1) as usize]));
     ui.text_in(PX, R::new(b.x, b.y + 34, 300, 20), &date, t.text_dim);
     let cr = R::new(b.x, b.y + 66, 290, b.h - 66);
     widgets::calendar(ui, st, cr, st.cal_month, t.red, true);
@@ -189,9 +189,16 @@ fn cal(ui: &mut Ui, st: &State, b: R) {
     let n = st.notifs.history.len();
     let sub = if n == 0 { String::new() } else { format!("{n}") };
     ui.cv.icon(if st.set.dnd { "bellx" } else { "bell" }, nr.x, nr.y + 3, 2, t.red);
-    ui.text_in(PX, R::new(nr.x + 22, nr.y, 160, 20), &crate::tf!("уведомления {sub}", "notifications {sub}", "notificações {sub}"), t.text);
-    ui.button(R::new(nr.right() - 172, nr.y - 2, 104, 24), "не беспокоить", "", Tone::Ghost, st.set.dnd, true, Act::Dnd);
-    ui.button(R::new(nr.right() - 64, nr.y - 2, 64, 24), "очистить", "", Tone::Ghost, false, n > 0, Act::NotifClear);
+    // кнопки по ширине своих надписей (в других языках они длиннее), заголовок — в остатке;
+    // не влез — остаётся одно число: колокольчик и так говорит, что это уведомления
+    let (cw, dw) = (ui.w(PX, "очистить") + 16, ui.w(PX, "не беспокоить") + 16);
+    let (cx, dx) = (nr.right() - cw, nr.right() - cw - 4 - dw);
+    let title = crate::tf!("уведомления {sub}", "notifications {sub}", "notificações {sub}").trim_end().to_string();
+    let tw = dx - 6 - (nr.x + 22);
+    let title = if ui.w(PX, &title) <= tw { title } else { sub };
+    ui.text_in(PX, R::new(nr.x + 22, nr.y, tw.max(0), 20), &title, t.text);
+    ui.button(R::new(dx, nr.y - 2, dw, 24), "не беспокоить", "", Tone::Ghost, st.set.dnd, true, Act::Dnd);
+    ui.button(R::new(cx, nr.y - 2, cw, 24), "очистить", "", Tone::Ghost, false, n > 0, Act::NotifClear);
     ui.cv.fill(R::new(nr.x, nr.y + 26, nr.w, 1), t.border);
     let mut y = nr.y + 34;
     if n == 0 {

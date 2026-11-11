@@ -449,7 +449,7 @@ fn draw_widget(ui: &mut Ui, st: &State, w: &Widget, sw: i32, sh: i32) {
             ui.text(face, x, y, &format!("{:02}", tm.min), t.text);
             let mut yy = y + ui.f.line(face) + 6;
             if w.date {
-                let s = crate::tf!("{}, {} {}", "{}, {} {}", "{}, {} de {}", crate::i18n::tr(RU_DAY_FULL[tm.wday as usize]), tm.day, crate::i18n::tr(RU_MON[(tm.mon - 1) as usize]));
+                let s = yami_px::i18n::long_date(crate::i18n::tr(RU_DAY_FULL[tm.wday as usize]), tm.day as u32, (tm.mon - 1) as usize, crate::i18n::tr(RU_MON[(tm.mon - 1) as usize]));
                 ui.text(PX, pad, yy, &s, t.text_dim);
                 yy += 24;
             }

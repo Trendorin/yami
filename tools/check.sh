@@ -54,17 +54,23 @@ fi
 # the shell in Brazilian Portuguese: nothing left in Russian or English from the catalogs
 "$BIN" shot --lang pt-BR -o "$TMP/pt" --defaults | grep untranslated
 [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-shell shot --lang pt-BR" || bad "yami-shell shot --lang pt-BR"
+# the newer languages (a missing line shows in English): every text fits its place, nothing cut
+fit=0
+for lang in es de fr uk pl; do
+  "$BIN" shot --defaults --fit --lang "$lang" -o "$TMP/$lang" >"$TMP/fit.log" 2>&1 || { grep -E "layout:|untranslated" "$TMP/fit.log" | head -10; fit=1; }
+done
+((fit)) && bad "yami-shell shot --fit (shorten the translation or give the text room)" || ok "yami-shell shot --fit: es de fr uk pl, every text fits"
 # the services' windows (yami-agents): both looks, three languages, nothing left untranslated
 AG="$ROOT/shell/target/release/yami-agents"
 printf '{"preset":"plain"}\n' >"$TMP/plain.json"
 printf '{"preset":"yami","palette":"ash"}\n' >"$TMP/yami.json"
 ag=0
 for look in plain yami; do
-  for lang in en ru pt-BR; do
+  for lang in en ru pt-BR es de fr uk pl; do
     YAMI_STYLE="$TMP/$look.json" "$AG" shot --lang "$lang" -o "$TMP/ag-$look-$lang" >"$TMP/ag.log" 2>&1 || { tail -5 "$TMP/ag.log"; ag=1; }
   done
 done
-((ag)) && bad "yami-agents shot" || ok "yami-agents shot: plain and yami, en ru pt-BR"
+((ag)) && bad "yami-agents shot" || ok "yami-agents shot: plain and yami, every language"
 step "unit tests"
 cargo test --release --locked --workspace --quiet --manifest-path "$ROOT/shell/Cargo.toml" >"$TMP/test.log" 2>&1 && ok "cargo test" || { tail -20 "$TMP/test.log"; bad "cargo test"; }
 # a package manager's build (Nix, distro packages): the updater is off (docs/PACKAGING.md)

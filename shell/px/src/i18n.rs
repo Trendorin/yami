@@ -66,6 +66,22 @@ pub fn pt_br() -> bool {
     code() == "pt-BR"
 }
 
+/// длинная дата «среда, 11 ноября» на языке интерфейса: день недели и месяц уже переведены
+/// (месяц — как в таблице, именительный); порядок, «de», точка и падеж у каждого языка свои
+pub fn long_date(wday: &str, day: u32, mon: usize, mon_name: &str) -> String {
+    const UK: [&str; 12] = ["січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"];
+    const PL: [&str; 12] = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "września", "października", "listopada", "grudnia"];
+    let m = mon.min(11);
+    match code() {
+        "pt-BR" | "es" => format!("{wday}, {day} de {}", mon_name.to_lowercase()),
+        "de" => format!("{wday}, {day}. {mon_name}"),
+        "fr" => format!("{wday} {day} {}", mon_name.to_lowercase()),
+        "uk" => format!("{wday}, {day} {}", UK[m]),
+        "pl" => format!("{wday}, {day} {}", PL[m]),
+        _ => format!("{wday}, {day} {mon_name}"),
+    }
+}
+
 /// не русский: надписи идут через таблицы
 pub fn translated() -> bool {
     LANGUAGE.load(Ordering::Relaxed) != RU

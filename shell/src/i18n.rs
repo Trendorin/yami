@@ -26,7 +26,9 @@ pub fn tr(s: &str) -> &str {
     let known = table().contains_key(s);
     // названия языков (Русский, Українська) не переводятся нарочно
     let name = yami_px::i18n::LANGS.iter().any(|l| l.1 == s);
-    let missing = (!known && !name && s.chars().any(|c| matches!(c, 'а'..='я' | 'А'..='Я' | 'ё' | 'Ё'))) || (pt_br() && known && !lang_table().is_some_and(|t| t.contains_key(english)));
+    // украинский сам кириллица: там выдаёт русский только буква, которой в нём нет (ы э ъ ё)
+    let ru = if code() == "uk" { s.chars().any(|c| matches!(c, 'ы' | 'э' | 'ъ' | 'ё' | 'Ы' | 'Э' | 'Ё')) } else { s.chars().any(|c| matches!(c, 'а'..='я' | 'А'..='Я' | 'ё' | 'Ё')) };
+    let missing = (!known && !name && ru) || (pt_br() && known && !lang_table().is_some_and(|t| t.contains_key(english)));
     if AUDIT.load(Ordering::Relaxed) && missing {
         if let Ok(mut m) = MISSED.lock() {
             if !m.iter().any(|x| x == out) {

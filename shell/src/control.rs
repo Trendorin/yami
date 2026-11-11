@@ -130,7 +130,7 @@ pub fn draw(ui: &mut Ui, st: &State, b: R) {
     let time = if st.set.clock_seconds { format!("{:02}:{:02}:{:02}", tm.hour, tm.min, tm.sec) } else { format!("{:02}:{:02}", tm.hour, tm.min) };
     let (lx, ty) = (card.x + 16, card.y + 14);
     ui.text(face, lx, ty, &time, t.text_hi);
-    let date = crate::tf!("{}, {} {}", "{}, {} {}", "{}, {} de {}", crate::i18n::tr(RU_DAY_FULL[tm.wday as usize]), tm.day, crate::i18n::tr(RU_MON[(tm.mon - 1) as usize]));
+    let date = yami_px::i18n::long_date(crate::i18n::tr(RU_DAY_FULL[tm.wday as usize]), tm.day as u32, (tm.mon - 1) as usize, crate::i18n::tr(RU_MON[(tm.mon - 1) as usize]));
     let ly = ty + ui.f.line(face) + 4;
     ui.cv.text_in(ui.f, PX, R::new(lx, ly, card.w - 32, 18), &date, t.text);
     // низ карточки: время работы, а под мышью на плитке — её название (у плиток одни значки)
