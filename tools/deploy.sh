@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build yami-shell and its services (yami-agents) and swap them into the running session: ~/.local/bin,
 # then restart the shell (the services move over as soon as they are idle).
-# Refuses while a game or any fullscreen window has focus (the restart flashes the bar and
+# Refuses while a game (Steam/Proton, gamescope, Roblox through Sober, a .exe) or any fullscreen window has focus (the restart flashes the bar and
 # panels); --force skips that guard.
 #   --modules       also build and install the modules next to this repository (YAMI_MODULES_DIR)
 #   --modules-only  only the modules, the shell keeps running
@@ -25,7 +25,7 @@ done
 
 if ((!FORCE && !ONLY_MODULES)) && command -v niri >/dev/null && [[ -n ${NIRI_SOCKET:-} ]]; then
   focus="$(niri msg --json focused-window 2>/dev/null || true)"
-  if grep -qiE '"app_id":"(steam_app_[0-9]+|gamescope|.*\.exe)"' <<<"$focus" ||
+  if grep -qiE '"app_id":"(steam_app_[0-9]+|gamescope|org\.vinegarhq\.Sober|.*\.exe)"' <<<"$focus" ||
     grep -q '"is_fullscreen":true' <<<"$focus"; then
     echo "deploy: a game / fullscreen window has focus, not restarting the shell (use --force)" >&2
     exit 3
