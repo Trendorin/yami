@@ -201,6 +201,11 @@ impl App {
                 self.slider_set(key, from + f * (to - from));
             }
             Act::VolSlider => audio::set_volume(frac as f64 * 1.0),
+            // панель управления: ползунки стоят, клетки снизу вверх
+            Act::CtlVol | Act::CtlBright => {
+                let fy = (1.0 - (y - zone.y as f64) / zone.h.max(1) as f64).clamp(0.0, 1.0) as f32;
+                self.control_drag(&act, fy);
+            }
             Act::MicSlider => audio::set_mic(frac as f64),
             Act::AppVol(i) => audio::set_stream(i, frac as f64),
             Act::MediaSeek => {

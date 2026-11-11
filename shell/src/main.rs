@@ -39,6 +39,7 @@ mod gameboost;
 mod games;
 mod i18n;
 mod config;
+mod control;
 mod curtain;
 mod ipc;
 mod keys;

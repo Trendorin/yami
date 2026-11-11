@@ -125,7 +125,15 @@ impl App {
             Act::CalMonth(d) => {
                 self.st.cal_month = if d == 0 { 0 } else { self.st.cal_month + d };
             }
-            Act::VolSlider | Act::MicSlider | Act::AppVol(_) => {}
+            Act::VolSlider | Act::MicSlider | Act::AppVol(_) | Act::CtlVol | Act::CtlBright => {}
+            Act::BarBg => match button {
+                RMB => self.toggle_control(&out, ax),
+                _ => self.close_popup(),
+            },
+            Act::LockNow => {
+                self.close_popup();
+                self.lock_now();
+            }
             Act::VolMute => audio::toggle_mute(),
             Act::MicMute => audio::toggle_mic(),
             Act::AppMute(i) => audio::mute_stream(i),

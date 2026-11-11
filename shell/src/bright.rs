@@ -1,12 +1,15 @@
 // Яркость экрана для OSD (из yami-lite: там нить опрашивает sysfs раз в 150 мс). Здесь опроса нет:
 // ядро шлёт событие udev при каждой смене подсветки (клавиши, brightnessctl, сама прошивка), фильтр в
 // ядре пропускает только подсистему backlight — в простое нить спит. Без подсветки (настольный
-// монитор) нить не заводится вовсе.
+// монитор) нить не заводится вовсе. Поставить яркость (ползунок панели управления) — через logind
+// SetBrightness: без root и без brightnessctl.
 
 use crate::app::Msg;
 use calloop::channel::Sender;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 const NETLINK_KOBJECT_UEVENT: i32 = 15;
 const SO_ATTACH_FILTER: i32 = 26;
@@ -18,6 +21,59 @@ const BACKLIGHT: u32 = 0xc370_b302;
 /// подсветка есть: хоть одно устройство в /sys/class/backlight
 pub fn present() -> bool {
     std::fs::read_dir("/sys/class/backlight").is_ok_and(|mut d| d.next().is_some())
+}
+
+/// подсветка, которой управлять (имя, папка): как у systemd — прошивка, потом платформа, потом «сырая»
+pub fn device() -> Option<(String, PathBuf)> {
+    let mut v: Vec<(u8, String, PathBuf)> = std::fs::read_dir("/sys/class/backlight")
+        .ok()?
+        .flatten()
+        .map(|e| {
+            let p = e.path();
+            let rank = match std::fs::read_to_string(p.join("type")).unwrap_or_default().trim() {
+                "firmware" => 0,
+                "platform" => 1,
+                _ => 2,
+            };
+            (rank, e.file_name().to_string_lossy().into_owned(), p)
+        })
+        .collect();
+    v.sort();
+    v.into_iter().next().map(|(_, n, p)| (n, p))
+}
+
+static WANT: Mutex<Option<f32>> = Mutex::new(None);
+static BUSY: AtomicBool = AtomicBool::new(false);
+
+/// поставить яркость 0..1. Тянут ползунок — значения копятся, нить берёт последнее; не ниже 1 %:
+/// чёрный экран ползунком не вернуть
+pub fn set(v: f32) {
+    if let Ok(mut w) = WANT.lock() {
+        *w = Some(v.clamp(0.01, 1.0));
+    }
+    if BUSY.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(|| loop {
+        let next = WANT.lock().ok().and_then(|mut w| w.take());
+        let Some(v) = next else {
+            BUSY.store(false, Ordering::SeqCst);
+            // пока гасли, пришло новое — взять его самим, если никто не взял
+            if WANT.lock().is_ok_and(|w| w.is_some()) && !BUSY.swap(true, Ordering::SeqCst) {
+                continue;
+            }
+            return;
+        };
+        let (Some((name, dir)), Some(c)) = (device(), crate::net::system()) else { continue };
+        let max = std::fs::read_to_string(dir.join("max_brightness")).ok().and_then(|s| s.trim().parse::<u32>().ok()).unwrap_or(0);
+        if max == 0 {
+            continue;
+        }
+        let val = ((v * max as f32).round() as u32).clamp(1, max);
+        if let Ok(p) = zbus::blocking::Proxy::new(&c, "org.freedesktop.login1", "/org/freedesktop/login1/session/auto", "org.freedesktop.login1.Session") {
+            let _ = p.call_method("SetBrightness", &("backlight", name.as_str(), val));
+        }
+    });
 }
 
 /// доля яркости устройства (папка в /sys): brightness / max_brightness
@@ -66,8 +122,12 @@ pub fn spawn(tx: Sender<Msg>) {
         return;
     }
     let _ = std::thread::Builder::new().name("bright".into()).spawn(move || {
+        // начальная яркость — для ползунка панели управления, без OSD
+        let mut last = device().and_then(|d| level(&d.1));
+        if let Some(v) = last {
+            let _ = tx.send(Msg::Bright(v, false));
+        }
         let Some(fd) = open() else { return };
-        let mut last: Option<f32> = None;
         let mut b = [0u8; 8192];
         loop {
             // SAFETY: читаем в свой буфер его длины
@@ -84,7 +144,7 @@ pub fn spawn(tx: Sender<Msg>) {
                 continue;
             }
             last = Some(v);
-            if tx.send(Msg::Bright(v)).is_err() {
+            if tx.send(Msg::Bright(v, true)).is_err() {
                 return;
             }
         }

@@ -154,8 +154,8 @@ pub enum Msg {
     Bt(net::BtState),
     /// индикатор приватности: кто пишет микрофон, кто держит камеру, кто смотрит трансляцию
     Mic(Vec<String>),
-    /// яркость подсветки 0..1 сменилась (bright.rs)
-    Bright(f32),
+    /// яркость подсветки 0..1 (bright.rs); true — сменилась, показать OSD
+    Bright(f32, bool),
     Camera(Vec<String>),
     CastWho(u64, String),
     /// прицел niri: app-id выбранного окна (пусто — отменили)

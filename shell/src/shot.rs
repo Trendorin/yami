@@ -68,6 +68,7 @@ const TARGETS: &[&str] = &[
     "popup:wifi",
     "popup:bt",
     "popup:privacy",
+    "popup:control",
     "popup:sys",
     "popup:profile",
     "popup:tray",
@@ -494,6 +495,14 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             }
             if arg == "privacy" {
                 mock_privacy(st);
+            }
+            if arg == "control" {
+                mock_net(st, true);
+                mock_bt(st);
+                st.audio.volume = 0.62;
+                st.audio.ready = true;
+                st.bright = Some(0.4);
+                st.set.dnd = true;
             }
             if arg == "sound" {
                 // два выхода и два микрофона: видны оба списка выбора (#10)

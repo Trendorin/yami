@@ -105,6 +105,15 @@ pub enum Act {
     // всплывашки
     CalMonth(i32),
     VolSlider,
+    /// панель управления (control.rs): вертикальные ползунки громкости и яркости
+    CtlVol,
+    CtlBright,
+    /// пустое место бара: ПКМ — панель управления
+    BarBg,
+    /// запереть экран сейчас (плитка панели)
+    LockNow,
+    /// настройки → бар: плитка панели управления вкл-выкл
+    SCtlTile(&'static str),
     VolMute,
     Sink(String),
     /// микрофон по умолчанию (всплывашка звука, #10)
@@ -179,7 +188,7 @@ pub enum Act {
 
 impl Act {
     pub fn is_drag(&self) -> bool {
-        matches!(self, Act::SSlider(..) | Act::VolSlider | Act::MicSlider | Act::AppVol(_) | Act::MediaSeek | Act::TDrag(_) | Act::TSize(_) | Act::MDrag | Act::WDrag(_) | Act::DispDrag(_) | Act::SModDrag(..) | Act::SModNew(_))
+        matches!(self, Act::SSlider(..) | Act::VolSlider | Act::CtlVol | Act::CtlBright | Act::MicSlider | Act::AppVol(_) | Act::MediaSeek | Act::TDrag(_) | Act::TSize(_) | Act::MDrag | Act::WDrag(_) | Act::DispDrag(_) | Act::SModDrag(..) | Act::SModNew(_))
     }
 }
 

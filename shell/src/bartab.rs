@@ -258,6 +258,23 @@ fn tab_bar_look(ui: &mut Ui, st: &State, b: R) {
         ui.toggle(R::new(col(i as i32), y, cw, 26), label, "", on, Act::SBool(k));
     }
     y += 40;
+    // панель управления (control.rs): какие плитки в её ряду, по порядку включения
+    y = title(ui, b.x, y, b.w, "панель управления — ПКМ по пустому месту бара");
+    let n = s.control_tiles.len();
+    for (i, (k, label, _)) in crate::control::TILES.iter().enumerate() {
+        let on = s.control_tiles.iter().any(|x| x == k);
+        // ряд полон — новые не включаются
+        let can = on || n < crate::control::MAX;
+        let r = R::new(col(i as i32 % 3), y + (i as i32 / 3) * 32, cw, 26);
+        if can {
+            ui.toggle(r, label, "", on, Act::SCtlTile(k));
+        } else {
+            ui.toggle(r, label, "", false, Act::Block);
+        }
+    }
+    y += crate::control::TILES.len().div_ceil(3) as i32 * 32;
+    ui.text_in(PX, R::new(b.x, y, b.w, 20), &crate::tf!("в ряду до {} плиток", "up to {} tiles in the row", "até {} blocos na fileira", crate::control::MAX), t.text_faint);
+    y += 34;
     y = title(ui, b.x, y, b.w, "как выглядит");
     shape_preview(ui, st, R::new(b.x, y, b.w, (b.bottom() - y).clamp(40, 96)));
 }

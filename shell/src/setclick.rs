@@ -54,6 +54,15 @@ impl App {
                     self.templates_run(None);
                 }
             }
+            Act::SCtlTile(k) => {
+                let l = &mut self.st.set.control_tiles;
+                if let Some(i) = l.iter().position(|x| x == k) {
+                    l.remove(i);
+                } else if l.len() < crate::control::MAX {
+                    l.push(k.to_string());
+                }
+                self.settings_changed();
+            }
             Act::STplAdd(i) => {
                 if crate::catalog::add(*i) {
                     self.templates_run(None);

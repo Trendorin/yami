@@ -76,6 +76,8 @@ pub fn strip(s: &Settings) -> bool {
 pub fn draw(ui: &mut Ui, st: &State, out: &str, w: i32) {
     let t = ui.t;
     let set = &st.set;
+    // пустое место бара (модули — поверх): ПКМ — панель управления
+    ui.zone(R::new(0, 0, w, H), Act::BarBg, Cur::Default);
     let w = if strip(set) {
         ui.cv.blur_rect(R::new(0, 0, w, H), 0);
         ui.cv.fill(R::new(0, 0, w, H), t.glass_panel());

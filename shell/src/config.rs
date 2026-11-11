@@ -267,6 +267,8 @@ pub struct Settings {
     pub lock_sleep: bool,
     /// OSD при смене яркости подсветки (ноутбук; bright.rs)
     pub osd_bright: bool,
+    /// плитки панели управления (control.rs TILES), по порядку
+    pub control_tiles: Vec<String>,
     pub screen_off_after: u32,
     pub dnd: bool,
     pub notif_timeout: u32,
@@ -608,6 +610,7 @@ impl Default for Settings {
             lock_after: 10,
             lock_sleep: true,
             osd_bright: true,
+            control_tiles: ["wifi", "bt", "dnd", "night", "mic", "theme"].map(String::from).to_vec(),
             screen_off_after: 15,
             dnd: false,
             notif_timeout: 7,
@@ -736,6 +739,10 @@ impl Settings {
             name(f);
         }
         self.lang = yami_px::i18n::normalize(&self.lang).into();
+        // плитки панели: только известные, без повторов, не больше ряда
+        let mut seen = std::collections::HashSet::new();
+        self.control_tiles.retain(|k| crate::control::TILES.iter().any(|t| t.0 == k) && seen.insert(k.clone()));
+        self.control_tiles.truncate(crate::control::MAX);
         if !self.accent.is_empty() && crate::theme::parse_hex(&self.accent).is_none() {
             self.accent.clear();
         }

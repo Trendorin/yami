@@ -816,6 +816,8 @@ const PAIRS: &[(&str, &str)] = &[
     ("яркость", "brightness"),
     ("яркость на экране", "brightness on screen"),
     ("при смене подсветки ноутбука", "when the laptop backlight changes"),
+    ("панель управления — ПКМ по пустому месту бара", "control panel: right-click an empty spot on the bar"),
+    ("светлая тема", "light theme"),
     ("как показывать", "display"),
     ("подгонка", "fit"),
     ("заполнить", "fill"),

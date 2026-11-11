@@ -9,6 +9,7 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+- A control panel (from yami-lite): right-click an empty spot on the bar. The clock and date on your wallpaper, uptime, upright volume and brightness sliders (brightness through logind, no root), and a row of tiles you pick in settings → bar → look: Wi-Fi, Bluetooth, do not disturb, night light, microphone, sound, light theme, curtain, settings, lock, power.
 - A brightness OSD (from yami-lite): changing the laptop backlight, by keys, `brightnessctl` or the firmware, shows its level like the volume does (settings → notifications, `osdBright`). It waits for the kernel's event instead of polling, so it costs nothing at idle and nothing at all without a backlight.
 - Settings → wallpaper has a folder row: choose the folder the wallpaper picker shows (then the picker opens on it) or put it back to auto; a folder typed into the path field does the same, also without yami-files. When the «pixel cells» slider is above 1 (the mouse wheel moves it easily), the wallpaper picker says so at the bottom, with «as is» one click away: photos looked worse for no visible reason.
 - The lock screen comes back by itself when the shell restarts or crashes while the screen is locked (an update, `yami restart`): before, niri kept the session locked with nothing to type the password into.

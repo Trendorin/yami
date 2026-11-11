@@ -125,9 +125,12 @@ impl App {
                 let tab = self.st.modal == Some(Modal::Settings) && self.st.stab == "bt";
                 self.dirty_where(|k| matches!(k, SKind::Popup | SKind::Bar) || (widget && matches!(k, SKind::Widget(_))) || (tab && *k == SKind::Modal));
             }
-            Msg::Bright(v) => {
+            Msg::Bright(v, show) => {
                 self.st.bright = Some(v);
-                if self.st.set.osd_bright {
+                if self.st.popup_is("control") {
+                    self.dirty(&SKind::Popup);
+                }
+                if show && self.st.set.osd_bright {
                     self.show_osd("bright");
                 }
             }
