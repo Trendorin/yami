@@ -159,6 +159,7 @@ impl crate::app::App {
             // свои обои: путь; без пути — пиксельные из палитры
             c if c == "wallpaper" || c.starts_with("wallpaper ") => self.set_wall(&c["wallpaper".len()..]),
             c if c == "curtain" || c.starts_with("curtain ") => self.curtain_cmd(&c["curtain".len()..]),
+            "cast-hide" => self.cast_pick(),
             _ => {}
         }
     }

@@ -124,6 +124,7 @@ fn help_msg(y: &Sty) {
         ("bar | edit | stacking", "бар / правка виджетов / режим «стол»", "bar / edit widgets / desk mode"),
         ("minimize | restore", "свернуть / вернуть окно", "minimize / restore a window"),
         ("wallpaper [path] | curtain [on|off]", "обои / шторка для трансляций", "wallpaper / privacy curtain"),
+        ("cast-hide", "щелчком по окну спрятать программу из трансляций (или вернуть)", "click a window to hide its app from screen sharing (or show it again)"),
         ("walls", "выбор обоев: картинки папки обоев", "wallpaper picker: the wallpaper folder's pictures"),
         ("media play-pause|next|previous|player", "плееру, что в баре; player — другой плеер", "to the player shown in the bar; player switches to another one"),
         ("profile", "следующий профиль питания", "next power profile"),
@@ -167,7 +168,7 @@ pub fn msg_ok(cmd: &str) -> bool {
     let head = w.next().unwrap_or("");
     let one = |w: &mut std::str::SplitWhitespace| w.next().is_none();
     match head {
-        "launcher" | "clipboard" | "power" | "lock" | "bar" | "stacking" | "minimize" | "restore" | "edit" | "reload" | "quit" | "ping" | "restart" | "profile" | "night" | "walls" => one(&mut w),
+        "launcher" | "clipboard" | "power" | "lock" | "bar" | "stacking" | "minimize" | "restore" | "edit" | "reload" | "quit" | "ping" | "restart" | "profile" | "night" | "walls" | "cast-hide" => one(&mut w),
         "settings" => w.next().is_none_or(|t| crate::settings::find(t).is_some()) && one(&mut w),
         "welcome" => w.next().is_none_or(crate::welcome::has_step) && one(&mut w),
         "popup" => w.next().is_some_and(|k| crate::popups::KINDS.contains(&k)) && one(&mut w),

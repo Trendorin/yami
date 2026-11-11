@@ -133,6 +133,8 @@ pub enum Act {
     BtSettings,
     /// остановить трансляцию PipeWire (сеанс niri)
     CastStop(u64),
+    /// щелчком по окну спрятать его программу из трансляций (или вернуть)
+    CastPick,
     /// полный менеджер bluetooth (blueman или bluetoothctl в терминале)
     BtManager,
     Dnd,

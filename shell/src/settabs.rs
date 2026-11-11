@@ -524,6 +524,15 @@ pub(crate) fn tab_windows(ui: &mut Ui, st: &State, b: R) {
     y += 40;
     ui.text_in(PX, R::new(b.x, y, b.w, 20), "app-id окна: niri msg windows · правила пишутся в ~/.config/yami/niri/rules.kdl", t.text_faint);
     y += 28;
+    // castHide: зрители трансляций видят на месте этих программ чёрное (правило niri block-out-from)
+    y = title(ui, b.x, y, b.w, "не показывать в трансляциях");
+    let focused = st.field_focus == Some("cast_hide");
+    ui.field(R::new(b.x, y, b.w - 300, 30), &st.cast_field, if s.cast_hide.is_empty() { "app-id через запятую" } else { &s.cast_hide }, focused, false, Act::SField("cast_hide"));
+    ui.button(R::new(b.right() - 290, y + 2, 120, 26), "применить", "check", Tone::Primary, false, true, Act::SCycle("cast_apply"));
+    ui.button(R::new(b.right() - 160, y + 2, 160, 26), "выбрать окно", "window", Tone::Plain, false, true, Act::CastPick);
+    y += 40;
+    ui.text_in(PX, R::new(b.x, y, b.w, 20), "зрители видят на их месте чёрное, у тебя на экране всё как обычно", t.text_faint);
+    y += 28;
     y = title(ui, b.x, y, b.w, "режим «стол»");
     ui.toggle(R::new(b.x, y, half, 40), "окна плавают, как в DE", "Mod+Shift+Space — назад к ленте", s.stacking, Act::SBool("stacking"));
     ui.toggle(R::new(b.x + half + 20, y, half, 40), "заголовки окон", "полоса с кнопками над окном", s.titlebars, Act::SBool("titlebars"));

@@ -464,6 +464,12 @@ impl App {
                     self.st.field_focus = None;
                     self.settings_changed();
                 }
+                "cast_apply" => {
+                    let p = self.st.cast_field.text.trim().to_string();
+                    self.st.set.cast_hide = p;
+                    self.st.field_focus = None;
+                    self.settings_changed();
+                }
                 "shot_dir_apply" => {
                     let p = self.st.shot_field.text.trim().to_string();
                     self.st.shot_cfg.dir = p;
@@ -585,6 +591,10 @@ impl App {
                 if *k == "float_apps" && self.st.float_field.text.is_empty() {
                     let p = self.st.set.float_apps.clone();
                     self.st.float_field.set(&p);
+                }
+                if *k == "cast_hide" && self.st.cast_field.text.is_empty() {
+                    let p = self.st.set.cast_hide.clone();
+                    self.st.cast_field.set(&p);
                 }
                 if *k == "kb_layout" && self.st.keys.lay.text.is_empty() {
                     let p = self.st.set.kb_layout.clone();

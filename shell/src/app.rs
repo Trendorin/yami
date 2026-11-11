@@ -156,6 +156,8 @@ pub enum Msg {
     Mic(Vec<String>),
     Camera(Vec<String>),
     CastWho(u64, String),
+    /// прицел niri: app-id выбранного окна (пусто — отменили)
+    CastPicked(String),
     Pam(bool),
     Prof(crate::profile::Prof),
     Clip(Vec<String>),
@@ -334,6 +336,9 @@ pub struct State {
     pub shot_cfg: crate::shotcfg::ShotCfg,
     pub shot_field: Field,
     pub float_field: Field,
+    pub cast_field: Field,
+    /// идёт прицел niri «какое окно спрятать из трансляций»; true — потом вернуть настройки
+    pub cast_pick: Option<bool>,
     pub dock_hover: bool,
     pub dock_leave: Option<Instant>,
     pub dock_bounce: Vec<(String, Instant)>,
@@ -538,6 +543,8 @@ impl State {
             shot_cfg: crate::shotcfg::ShotCfg::load(),
             shot_field: Field::default(),
             float_field: Field::default(),
+            cast_field: Field::default(),
+            cast_pick: None,
             dock_hover: false,
             dock_leave: None,
             dock_bounce: vec![],

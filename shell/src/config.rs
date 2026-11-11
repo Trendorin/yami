@@ -286,6 +286,8 @@ pub struct Settings {
     pub float_pip: bool,
     /// свои app-id через запятую
     pub float_apps: String,
+    /// программы, которых не видят зрители трансляций (app-id через запятую): чёрные в показе экрана
+    pub cast_hide: String,
     pub float_w: f32,
     pub float_h: f32,
     /// отступы окон (niri gaps/struts, пишутся в rules.kdl): между окнами и от краёв экрана
@@ -615,6 +617,7 @@ impl Default for Settings {
             float_media: true,
             float_pip: true,
             float_apps: String::new(),
+            cast_hide: String::new(),
             float_w: 0.62,
             float_h: 0.78,
             win_gap: 8,
@@ -736,6 +739,7 @@ impl Settings {
         // app-id: то, что бывает в app-id, и разделители списка
         let ids = |s: &mut String| s.retain(|c| c.is_alphanumeric() || "._-*!+, ".contains(c));
         ids(&mut self.float_apps);
+        ids(&mut self.cast_hide);
         ids(&mut self.game_apps);
         self.kb_switch.retain(|c| c.is_ascii_alphanumeric() || "_:,()-".contains(c));
         for o in self.bar_outputs.iter_mut() {
@@ -1179,6 +1183,23 @@ impl Settings {
         self.blur_term && !self.lite
     }
 
+    /// программы из castHide (настройки → окна): зрители трансляций видят на их месте чёрное, у тебя на
+    /// экране всё как обычно; снимки экрана их видят — это не трансляция
+    fn cast_hide_kdl(&self, l: &mut Vec<String>) {
+        let ids: Vec<&str> = self.cast_hide.split([',', ' ']).map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        if ids.is_empty() {
+            return;
+        }
+        l.push("// hidden from screen sharing (settings → windows): black for viewers, as usual on your screen".into());
+        l.push("window-rule {".into());
+        for id in ids {
+            l.push(format!("    match app-id=r#\"^{}$\"#", id.replace('"', "").replace('.', "\\.")));
+        }
+        l.push("    block-out-from \"screencast\"".into());
+        l.push("}".into());
+        l.push(String::new());
+    }
+
     /// rules.kdl для niri уровня `lvl` (0 — сток, иначе наш форк: allow-tearing; ≥ 4 —
     /// `show-only-in`; ≥ 5 — `hide-from`); curtain — шторка опущена (без `show-only-in` тогда
     /// прячутся окна). Матовость — размытие под терминалами (панели шелла — своим регионом)
@@ -1190,6 +1211,7 @@ impl Settings {
         crate::games::kdl(self, lvl > 0, &mut l);
         crate::skwd::kdl(self, &mut l);
         crate::curtain::kdl(lvl, curtain, self.notif_cast, &mut l);
+        self.cast_hide_kdl(&mut l);
         if self.lite {
             crate::lite::kdl(&mut l);
         }
@@ -1220,6 +1242,20 @@ mod tests {
         s.migrate(raw);
         s.migrate_seps();
         s
+    }
+
+    #[test]
+    fn cast_hide_is_one_rule_of_clean_ids() {
+        let mut s = load(r#"{"castHide": "org.telegram.desktop, \"x\"; spawn \"sh\", discord"}"#);
+        s.sanitize();
+        let k = s.fx_kdl(0, false);
+        let rule = k.split("// hidden from screen sharing").nth(1).and_then(|r| r.split("\n}\n").next()).unwrap_or("");
+        assert!(rule.contains(r##"match app-id=r#"^org\.telegram\.desktop$"#"##), "{rule}");
+        assert!(rule.contains(r##"match app-id=r#"^discord$"#"##), "{rule}");
+        assert!(rule.contains("block-out-from \"screencast\""), "{rule}");
+        // кавычки и точка с запятой из чужого файла не доходят до конфига niri
+        assert!(!k.contains("spawn \"sh\"") && !rule.contains(';'), "{k}");
+        assert!(!load("{}").fx_kdl(0, false).contains("hidden from screen sharing"));
     }
 
     #[test]

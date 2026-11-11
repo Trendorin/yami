@@ -139,6 +139,7 @@ impl App {
                     self.privacy_dirty();
                 }
             }
+            Msg::CastPicked(id) => self.cast_picked(id),
             Msg::CastWho(stream, who) => {
                 if let Some(c) = self.st.niri.casts.iter_mut().find(|c| c.stream == stream) {
                     c.who = who;

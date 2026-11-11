@@ -276,6 +276,8 @@ impl App {
                         self.apply_hex();
                     } else if f == "float_apps" {
                         self.settings_click(&Act::SCycle("float_apply"));
+                    } else if f == "cast_hide" {
+                        self.settings_click(&Act::SCycle("cast_apply"));
                     } else if f == "shot_dir" {
                         self.settings_click(&Act::SCycle("shot_dir_apply"));
                     } else if f == "game_apps" {
@@ -300,6 +302,7 @@ impl App {
                         "hex" => &mut self.st.hex,
                         "shot_dir" => &mut self.st.shot_field,
                         "float_apps" => &mut self.st.float_field,
+                        "cast_hide" => &mut self.st.cast_field,
                         "key_cmd" => &mut self.st.keys.cmd,
                         "game_apps" => &mut self.st.game_field,
                         "night_geo" => &mut self.st.geo_field,

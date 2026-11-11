@@ -42,7 +42,7 @@ pub fn bar(ui: &mut Ui, st: &State, x: i32, h: i32, measure: bool) -> i32 {
 pub fn popup_h(st: &State) -> i32 {
     let s = &st.set;
     let casts = if s.privacy_screen { st.niri.casts.len().clamp(1, 6) as i32 * 44 } else { 0 };
-    44 + s.privacy_mic as i32 * 44 + s.privacy_cam as i32 * 44 + casts + if !st.niri.casts.is_empty() && st.niri.cast_only { 40 } else { 0 } + 8
+    44 + s.privacy_mic as i32 * 44 + s.privacy_cam as i32 * 44 + casts + if s.privacy_screen && !st.niri.casts.is_empty() && st.niri.cast_only { 40 } else { 0 } + if s.privacy_screen && !st.niri.casts.is_empty() { 36 } else { 0 } + 8
 }
 
 /// строка: значок, что, кто; горит — цветом тревоги
@@ -109,6 +109,10 @@ pub fn popup(ui: &mut Ui, st: &State, b: R) {
         if !st.niri.casts.is_empty() && st.niri.cast_only {
             let on = st.curtain.is_some();
             ui.button(R::new(b.x, y + 4, b.w, 28), if on { "поднять шторку" } else { "опустить шторку" }, "eye", Tone::Plain, on, true, Act::Curtain);
+        }
+        if !st.niri.casts.is_empty() {
+            let y = y + if st.niri.cast_only { 36 } else { 0 };
+            ui.button(R::new(b.x, y + 4, b.w, 28), "спрятать окно из трансляций…", "window", Tone::Ghost, false, true, Act::CastPick);
         }
     }
 }
@@ -185,6 +189,64 @@ impl App {
         if pop {
             self.resize_popup();
             self.dirty(&SKind::Popup);
+        }
+    }
+}
+
+/// castHide как список app-id
+pub fn hidden(s: &crate::config::Settings) -> Vec<String> {
+    s.cast_hide.split([',', ' ']).map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()
+}
+
+impl App {
+    /// прицел niri: щелчок по окну прячет его программу из трансляций, по уже спрятанной — возвращает
+    /// (Esc — отмена). Всплывашка и настройки на это время закрываются: под ними окна
+    pub fn cast_pick(&mut self) {
+        if self.st.cast_pick.is_some() {
+            return;
+        }
+        let back = self.st.modal == Some(crate::app::Modal::Settings);
+        self.close_popup();
+        if back {
+            self.close_modal();
+        }
+        self.st.cast_pick = Some(back);
+        let tx = self.tx.clone();
+        let ok = std::thread::Builder::new().name("pick-window".into()).spawn(move || {
+            let r = crate::niri::request(&serde_json::json!("PickWindow"));
+            let id = r.and_then(|v| v["Ok"]["PickedWindow"]["app_id"].as_str().map(str::to_string)).unwrap_or_default();
+            let _ = tx.send(Msg::CastPicked(id));
+        });
+        if ok.is_err() {
+            self.st.cast_pick = None;
+        }
+    }
+
+    pub fn cast_picked(&mut self, id: String) {
+        let back = self.st.cast_pick.take().unwrap_or(false);
+        let id: String = id.chars().filter(|c| c.is_alphanumeric() || "._-+".contains(*c)).take(128).collect();
+        if !id.is_empty() {
+            let mut list = hidden(&self.st.set);
+            let now_hidden = match list.iter().position(|x| *x == id) {
+                Some(i) => {
+                    list.remove(i);
+                    false
+                }
+                None => {
+                    list.push(id.clone());
+                    true
+                }
+            };
+            self.st.set.cast_hide = list.join(", ");
+            let text = self.st.set.cast_hide.clone();
+            self.st.cast_field.set(&text);
+            self.settings_changed();
+            if !back {
+                self.toast_note(if now_hidden { "спрятано из трансляций" } else { "снова видно в трансляциях" }, &id);
+            }
+        }
+        if back {
+            self.open_settings_tab("windows");
         }
     }
 }

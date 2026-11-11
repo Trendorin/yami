@@ -960,6 +960,14 @@ const PAIRS: &[(&str, &str)] = &[
     ("никто не слушает и не смотрит", "nobody is listening or watching"),
     ("экран: ещё не выбран", "screen: not chosen yet"),
     ("программа не назвалась", "the program gave no name"),
+    // castHide (privacy.rs)
+    ("app-id через запятую", "app-ids, comma separated"),
+    ("не показывать в трансляциях", "keep out of screen sharing"),
+    ("выбрать окно", "pick a window"),
+    ("зрители видят на их месте чёрное, у тебя на экране всё как обычно", "viewers see black in their place, your screen stays as it is"),
+    ("спрятать окно из трансляций…", "hide a window from sharing…"),
+    ("спрятано из трансляций", "hidden from screen sharing"),
+    ("снова видно в трансляциях", "visible in screen sharing again"),
     // сон (sleep.rs)
     ("запереть экран перед сном", "lock the screen before sleep"),
     ("запирать перед сном", "lock before sleep"),

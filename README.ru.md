@@ -433,7 +433,7 @@ yami-shell binds list                  # клавиши: id, сочетание,
 - **IPC**: `yami-shell msg <команда>`, где команда — `launcher`, `clipboard`, `power`, `settings`,
   `lock`, `bar`, `stacking`, `minimize`, `restore`, `edit`, `reload`, `restart`, `quit`, `settings ВКЛАДКА`, `profile`
   (следующий профиль питания), `popup cal|sound|media|net|bt|sys|profile|tray`, `screenshot [area|window|screen]`,
-  `walls` (выбор обоев), `wallpaper [ПУТЬ]` (без пути — пиксельные обои из палитры), `curtain [on|off]` (шторка для трансляций), `night` (ночной свет вкл/выкл),
+  `walls` (выбор обоев), `wallpaper [ПУТЬ]` (без пути — пиксельные обои из палитры), `curtain [on|off]` (шторка для трансляций), `cast-hide` (щелчок по окну: его программа чёрная в трансляциях или снова видна), `night` (ночной свет вкл/выкл),
   `media play-pause|next|previous|player` (плееру, что показан в баре; `player` переключает на следующий, как клик по его имени в окне музыки).
 - **yami-files**: `~/.config/yami/files.json` (или ≡ → настройки). `yami-files --pick open|save|dir …`
   — диалог, который запускает портал; `yami-files --portal` — служба портала и FileManager1,

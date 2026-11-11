@@ -218,6 +218,7 @@ Settings → look → «pixel look» moves these keys, `iconPixel` and `cursor` 
 | `titlebars` | `true` | title bars and the resize corner in desk mode. Desk mode focuses a window on click (and raises it); focus follows the mouse only in tiling |
 | `floatMedia`, `floatPip` | `true` | photo/video viewers and picture-in-picture open floating |
 | `floatApps` | `""` | more app-ids to open floating, comma separated |
+| `castHide` | `""` | app-ids that viewers of a screen share never see: niri paints them black in the stream (`block-out-from "screencast"`), on your screen they stay as they are; screenshots still show them. Settings → windows, or `yami msg cast-hide` and a click on the window |
 | `floatW`, `floatH` | `0.62`, `0.78` | their size, share of the screen |
 | `winGap` | `8` | gap between tiled windows, px (0–64): niri `gaps` in `rules.kdl` |
 | `winLeft`, `winRight`, `winTop`, `winBottom` | `8` each | from the screen edge to the windows, px (0–128; the top one from the bar): niri `struts` = edge − gap. Struts in your niri `config.kdl` replace these whole |
