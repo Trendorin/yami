@@ -825,14 +825,14 @@ impl App {
                 self.close(*sid);
             }
         }
-        let top = self.bar_bottom(&out);
+        let (top, _, _, left) = self.bar_reserve(&out);
         let mut auto_y = top + 40;
         for w in want {
             let (ww, wh) = size_of(&w);
             let (mut x, mut y) = (w.x, w.y);
             if x < 0 || y < 0 {
-                // место по умолчанию
-                x = 48;
+                // место по умолчанию — у левого края, за боковым баром, если он там
+                x = left + 48;
                 y = auto_y;
                 auto_y += wh + 16;
             }

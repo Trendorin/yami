@@ -47,7 +47,9 @@ Everything it does and its flags: [Installation](#installation).
   with DBusMenu), calendar, sound/music/network/Bluetooth/system popups, a power profile switch
   (power-profiles-daemon), Bluetooth devices paired, connected and forgotten right in settings, and its
   own **polkit password window** instead of a Qt/GTK agent. A privacy light on the bar says which
-  program records the microphone, holds the camera or shares the screen.
+  program records the microphone, holds the camera or shares the screen. Right-click the bar for a
+  control panel: clock, volume and brightness sliders, what is playing, quick tiles and the bar's edge.
+  Notification cards and the volume OSD go to whichever corner you click on a screen map.
 - **Desktop widgets.** Clock, calendar, weather, Bluetooth devices with their battery, the output of your own script, music card with an
   audio-reactive equalizer, and graphs
   for CPU, RAM, temperature and rx/tx network traffic in five styles (bars, line, blocks, wave,
@@ -115,8 +117,11 @@ Everything it does and its flags: [Installation](#installation).
   it, or let the palette follow the image. The login screen gets the same picture. With
   [skwd-wall](https://github.com/liixini/skwd-wall) its picks (videos and Wallpaper Engine scenes
   too) become the wallpaper and its palette recolours the rice; nothing to configure on its side.
-- **Your bar shape.** Full-width strip, a centred panel of any width, or a floating pill with a gap
-  and a shadow; the centre modules sit dead centre. Windows can get rounded corners and any border
+- **Your bar, any edge.** Top, bottom, left or right: click an edge on the screen map in settings →
+  bar → look. A side bar is a column with every module drawn narrow (the clock as hours over
+  minutes, icons instead of labels, windows as icons), and popups, menus, the dock and the widgets
+  open beside it. Full-width strip, a centred panel of any length, or a floating pill with a gap and
+  a shadow; the centre modules sit dead centre. Windows can get rounded corners and any border
   width (games stay square).
 - **Crisp on any screen.** The shell, yami-files and yami-view render at the monitor's real scale
   (fractional-scale + viewporter) and upscale their pixels by nearest neighbour, so a 4K screen at
@@ -341,8 +346,8 @@ program has stopped running (its start-up, a closed settings window) goes back t
 These are the defaults: change any of them in settings → keys (`yami-shell binds list` prints the
 current set).
 
-In the bar: left click on a task focuses, minimizes and restores it, middle click closes, right
-click opens the window menu; scroll over workspaces to switch, over the volume to change it. The
+In the bar: right click on an empty spot opens the control panel; left click on a task focuses,
+minimizes and restores it, middle click closes, right click opens the window menu; scroll over workspaces to switch, over the volume to change it. The
 track opens the player (drag its position bar to seek), right click pauses, middle click skips;
 the button in the player's header switches it between the cover with the equalizer, the cover
 with lyrics, lyrics alone (the sung line lit when the lyrics have timestamps) and a short view.
@@ -413,10 +418,11 @@ yami-shell config check                # bad values and unknown keys
 yami-shell binds list                  # keybindings: id, keys, action
 ```
 
-- **Settings tabs**: color, wallpaper, look, fonts, bar (drag module chips and separators; spacing at the
-  edges, between modules and around the windows with arrows), widgets,
-  dock, windows (gaps between windows and from the screen edges, floating rules, cursor), keys, games, screenshots, screens, system, services
-  (notifications, tray, polkit, portals, covers: each can be handed to another program), updates.
+- **Settings tabs**: color, wallpaper, look, animations, fonts, bar (the screen edge on a map, drag module
+  chips and separators; spacing at the edges, between modules and around the windows with arrows), widgets,
+  dock, windows (gaps between windows and from the screen edges, floating rules, cursor), screens, keys,
+  screenshots, games, system, login screen, Bluetooth, notifications (where the cards and the OSD go, on a
+  map), services (tray, polkit, portals, covers: each can be handed to another program), updates.
 - **niri**: your `~/.config/niri/config.kdl` stays yours: yami adds one include line at its top
   (`yami niri connect`, `yami niri disconnect` takes it out), and what you write below it wins. The
   line brings `~/.config/yami/niri/yami.kdl`: the shell's keys (`binds.kdl`), window rules, blur and
