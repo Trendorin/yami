@@ -567,11 +567,21 @@ pub fn cava(cx: &Cx, p: &P) -> Res {
     if !cx.on("cava") || !conf.exists() {
         return Ok(());
     }
-    let ours = [("gradient", "1".to_string()), ("gradient_count", "4".to_string()), ("gradient_color_1", format!("'{}'", p.g("deep"))), ("gradient_color_2", format!("'{}'", p.g("accent"))), ("gradient_color_3", format!("'{}'", p.g("bright"))), ("gradient_color_4", format!("'{}'", mix(p.g("bright"), p.g("text"), 0.5)))];
-    let rows = || ours.iter().map(|(k, v)| format!("{k} = {v}"));
+    let ours: [(&str, String); 6] = [("gradient", "1".to_string()), ("gradient_count", "4".to_string()), ("gradient_color_1", format!("'{}'", p.g("deep"))), ("gradient_color_2", format!("'{}'", p.g("accent"))), ("gradient_color_3", format!("'{}'", p.g("bright"))), ("gradient_color_4", format!("'{}'", mix(p.g("bright"), p.g("text"), 0.5)))];
     let text = std::fs::read_to_string(&conf)?;
+    let new = cava_merge(&text, &ours);
+    if new != text {
+        write(&conf, &new)?;
+        signal("USR2", "cava");
+    }
+    Ok(())
+}
+
+/// [color] конфига cava с нашими строками: свои ключи заменены, `theme` погашен, остальное как было
+fn cava_merge(text: &str, ours: &[(&str, String)]) -> String {
+    let rows = || ours.iter().map(|(k, v)| format!("{k} = {v}"));
     let (mut out, mut in_color, mut done): (Vec<String>, bool, bool) = (vec![], false, false);
-    for line in lines_of(&text) {
+    for line in lines_of(text) {
         if let Some(h) = head_word(line) {
             in_color = h == "color";
             out.push(line.to_string());
@@ -584,6 +594,11 @@ pub fn cava(cx: &Cx, p: &P) -> Res {
         if in_color && key_word(line).is_some_and(|k| ours.iter().any(|(x, _)| *x == k)) {
             continue;
         }
+        // тема cava 0.10 (`theme = …`) главнее градиента: строку не стираем, а гасим, вернуть — убрать «;» (#34)
+        if in_color && key_word(line) == Some("theme") {
+            out.push(format!("; {}  ; yami: off, the palette gradient of this section wins", line.trim()));
+            continue;
+        }
         out.push(line.to_string());
     }
     if !done {
@@ -591,12 +606,7 @@ pub fn cava(cx: &Cx, p: &P) -> Res {
         out.push("[color]".to_string());
         out.extend(rows());
     }
-    let new = out.join("\n") + "\n";
-    if new != text {
-        write(&conf, &new)?;
-        signal("USR2", "cava");
-    }
-    Ok(())
+    out.join("\n") + "\n"
 }
 
 /// `[имя]` в начале строки: имя как есть
@@ -983,5 +993,15 @@ mod tests {
     fn foot_lines_come_out() {
         let t = "[main]\nfont=x\n\n# YAMI: settings → color → apps → foot off takes these lines out\n[main]\ninclude=~/.config/foot/yami-colors.ini\n";
         assert_eq!(foot_strip(t), "[main]\nfont=x\n");
+    }
+
+    #[test]
+    fn cava_gets_the_gradient_and_its_theme_goes_quiet() {
+        let ours = [("gradient", "1".to_string()), ("gradient_color_1", "'#000000'".to_string())];
+        let t = "[general]\nbars = 0\n\n[color]\ntheme = 'tricolor'\ngradient = 0\nbackground = default\n";
+        let once = cava_merge(t, &ours);
+        assert_eq!(once, "[general]\nbars = 0\n\n[color]\ngradient = 1\ngradient_color_1 = '#000000'\n; theme = 'tricolor'  ; yami: off, the palette gradient of this section wins\nbackground = default\n");
+        assert_eq!(cava_merge(&once, &ours), once, "a second run changes nothing");
+        assert!(cava_merge("[general]\n", &ours).ends_with("[color]\ngradient = 1\ngradient_color_1 = '#000000'\n"));
     }
 }
