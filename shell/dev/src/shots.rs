@@ -52,7 +52,7 @@ fn demo(dir: &str, root: &Path) -> Result<(), String> {
             }
         }
         let big = imageops::resize(&im, 480 * 4, 270 * 4, imageops::FilterType::Nearest);
-        big.save(d.join(format!("{id}.png"))).map_err(|e| e.to_string())?;
+        crate::art::save_best(&image::DynamicImage::ImageRgb8(big), &d.join(format!("{id}.png")))?;
     }
     let w = |n: &str, b: Vec<u8>| std::fs::write(d.join(n), b).map_err(|e| e.to_string());
     w("notes.md", b"# yami\n\nPixel-art desktop for niri.\n".to_vec())?;
@@ -136,14 +136,14 @@ pub fn run(args: &[String]) -> i32 {
                 let (w, h): (i64, i64) = (w.parse().map_err(|_| "w")?, h.parse().map_err(|_| "h")?);
                 let m = 28;
                 let (x, y) = ((im.width() as i64 - w) / 2 - m, (im.height() as i64 - h) / 2 - m);
-                im.crop_imm(x.max(0) as u32, y.max(0) as u32, (w + 2 * m) as u32, (h + 2 * m) as u32).save(dst).map_err(|e| e.to_string())?;
+                crate::art::save_best(&im.crop_imm(x.max(0) as u32, y.max(0) as u32, (w + 2 * m) as u32, (h + 2 * m) as u32), std::path::Path::new(dst))?;
             }
             ["crop-top-right", src, w, h, dst] => {
                 let im = open(src)?;
                 let (w, h): (u32, u32) = (w.parse().map_err(|_| "w")?, h.parse().map_err(|_| "h")?);
-                im.crop_imm(im.width().saturating_sub(w), 0, w, h).save(dst).map_err(|e| e.to_string())?;
+                crate::art::save_best(&im.crop_imm(im.width().saturating_sub(w), 0, w, h), std::path::Path::new(dst))?;
             }
-            ["rgb", src, dst] => open(src)?.to_rgb8().save(dst).map_err(|e| e.to_string())?,
+            ["rgb", src, dst] => crate::art::save_best(&image::DynamicImage::ImageRgb8(open(src)?.to_rgb8()), std::path::Path::new(dst))?,
             _ => return Err("shots: unknown command".into()),
         }
         Ok(())

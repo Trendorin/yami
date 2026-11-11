@@ -27,7 +27,7 @@ shell, **yami-shell**, draws the bar, launcher, dock, notifications, lock screen
 settings itself, in Rust and shared memory, in one ~6 MB binary that uses **about 15 MB of RAM**.
 Files, images, the login screen and every other app follow the same palette.
 
-<img src=".github/assets/features-en.png" width="100%" alt="What is inside: a ~15 MB shell, one accent for everything, our own login screen, made for games, files, viewer and player, screenshots, a curtain for streams, signed updates, any distribution, three languages">
+<img src=".github/assets/features-en.png" width="100%" alt="What is inside: a ~15 MB shell, one accent for everything, our own login screen, made for games, files, viewer and player, screenshots, a curtain for streams, signed updates, any distribution, eight languages">
 
 Install on any of eight distributions with one command, built from source:
 
@@ -138,7 +138,7 @@ Everything it does and its flags: [Installation](#installation).
   the programs of your last session reopened at login (opt-in), your themes one click away
   (settings → color → themes), shared as one file or a link (`yami theme export | import`) and the
   whole setup moved to a new system (`yami export | import`).
-- **Three interface languages.** English, Russian and Brazilian Portuguese, switchable live in settings.
+- **Eight interface languages.** English, Russian, Brazilian Portuguese, Spanish, German, French, Ukrainian and Polish, switchable live in settings; the modules, the login screen and the installer speak them too.
 - **Portable installer.** One script for Arch, Fedora (including atomic), Debian/Ubuntu,
   openSUSE, Void, Alpine, Gentoo and NixOS.
 
@@ -220,7 +220,7 @@ No flag is needed for a normal install; these are for the rest:
 | `--yes` | no questions |
 | `--full` | everything now, no first-run setup at the first login |
 | `--apply "files view …"` | install exactly these modules (what the first-run setup runs) |
-| `--lang en\|ru\|pt-BR` | language of the installer, the shell and the key hints |
+| `--lang en\|ru\|pt-BR\|es\|de\|fr\|uk\|pl` | language of the installer, the shell and the key hints |
 | `--palette ID` | `blood` `ash` `sakura` `amber` `venom` `ice` `dusk` |
 | `--look ID` | panels: `matte` `glass` `light` `solid` |
 | `--font sans\|pixel` | app font: readable sans (default) or the pixel Tiny5 everywhere |
@@ -476,7 +476,7 @@ log in, `~/.local/lib/yami-niri/yami-niri.sh off`.
 | `tools/map.sh [TEXT]` | every source file with its one-line description |
 | `yami-shell shot [TARGET…] --lang en [--transparent] -o DIR` | render panels to PNG without a compositor; fails on untranslated text |
 | `yami-agents shot`, `yami-files shot`, `yami-view shot`, `yami-play shot`, `yami-shot shot` | the same for each module (the first-run setup is the shell's `welcome:STEP` targets) |
-| `tools/check-modules.sh [NAME…]` | every module next to this repository: no warnings, tests, translations, every state in both looks and three languages |
+| `tools/check-modules.sh [NAME…]` | every module next to this repository: no warnings, tests, translations, every state in both looks and every language, every text fits |
 | `yami-greet shot -o DIR`, `yami-greet --demo` | the login screen offscreen in each state; `--demo` runs it without greetd (password `yami`) inside a nested niri |
 | `yami-dev readme-art`, `tools/readme-shots.sh` | the README's logo and cards; real screenshots of your session (empty workspace, plain device names, everything put back) |
 | `tools/release.sh X.Y.Z` | cut a release: changelog, versions, check, signed tag, push (`--keygen` once for the key) |

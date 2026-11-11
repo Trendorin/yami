@@ -139,7 +139,7 @@ const CARDS: [[&str; 7]; 10] = [
     ["eye", "stream curtain", "viewers of a stream see a frozen, blurred", "screen while you keep working", "шторка стрима", "зрители видят размытый стоп-кадр,", "а ты спокойно работаешь дальше"],
     ["down", "signed updates", "one click or yami update, built from source,", "tags checked by the author's key, rollback", "обновления", "в один клик или yami update, сборка", "из исходников, подпись автора, откат"],
     ["screen", "any distro", "Arch, Fedora, Debian, openSUSE, Void, Alpine,", "Gentoo: one installer; NixOS: a flake", "8 дистрибутивов", "Arch, Fedora, Debian, openSUSE, Void, Alpine,", "Gentoo — установщик; NixOS — flake"],
-    ["text", "three languages", "English, Russian and Brazilian Portuguese,", "switched live, the login screen too", "три языка", "русский, английский и бразильский", "португальский, на лету, экран входа тоже"],
+    ["text", "eight languages", "en ru pt-BR es de fr uk pl,", "switched live, the login screen too", "восемь языков", "en ru pt-BR es de fr uk pl,", "на лету, экран входа тоже"],
 ];
 
 /// акцент — тот же, что на скриншотах (палитра шелла), а без настроек — «кровь»
@@ -290,7 +290,7 @@ pub fn run(args: &[String]) -> i32 {
     for lang in ["en", "ru"] {
         match features(&mut d, lang) {
             Ok(im) => {
-                if im.save(out.join(format!("features-{lang}.png"))).is_err() {
+                if !save_png(&out.join(format!("features-{lang}.png")), im.width(), im.height(), im.as_raw(), image::ExtendedColorType::Rgba8) {
                     return 1;
                 }
             }
@@ -301,9 +301,27 @@ pub fn run(args: &[String]) -> i32 {
         }
     }
     let soc = social(&mut d);
-    if image::DynamicImage::ImageRgba8(soc).to_rgb8().save(out.join("social.png")).is_err() {
+    let soc = image::DynamicImage::ImageRgba8(soc).to_rgb8();
+    if !save_png(&out.join("social.png"), soc.width(), soc.height(), soc.as_raw(), image::ExtendedColorType::Rgb8) {
         return 1;
     }
     println!("readme-art: logo, features-{{en,ru}}.png ({} cards) and social.png in .github/assets", CARDS.len());
     0
+}
+
+/// PNG с лучшим сжатием: save() у image 0.25 пишет быстро и в 4–15 раз крупнее, а картинки лежат в git
+fn save_png(path: &std::path::Path, w: u32, h: u32, data: &[u8], color: image::ExtendedColorType) -> bool {
+    use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+    use image::ImageEncoder;
+    let Ok(f) = std::fs::File::create(path) else { return false };
+    PngEncoder::new_with_quality(std::io::BufWriter::new(f), CompressionType::Best, FilterType::Adaptive).write_image(data, w, h, color).is_ok()
+}
+
+/// то же для любой картинки: снимки README (yami-dev shots) тоже лежат в git
+pub(crate) fn save_best(im: &image::DynamicImage, path: &std::path::Path) -> Result<(), String> {
+    if save_png(path, im.width(), im.height(), im.as_bytes(), im.color().into()) {
+        Ok(())
+    } else {
+        Err(format!("cannot write {}", path.display()))
+    }
 }

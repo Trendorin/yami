@@ -89,7 +89,7 @@ file for one run. The files are reread when they change.
 | `iconPixel`, `iconTheme` | `true`, `false`; a theme name | app icons |
 | `animations`, `animSpeed` | `true`, `false`; a number | on or off, speed |
 | `wallpaperCmd` | a command with `{}` | «set as wallpaper» outside the yami shell, e.g. `swww img {}` |
-| `lang` | `ru`, `en`, `pt-BR` | empty: as the system |
+| `lang` | `ru`, `en`, `pt-BR`, `es`, `de`, `fr`, `uk`, `pl` | empty: as the system |
 | `colors` | an object of `#rrggbb` | any of `bg` `panel` `surface` `surfaceHi` `codeBg` `border` `dim` `accent` `deep` `glow` `bright` `selection` `text` `textDim` `textFaint` `onAccent` `textHi` `ok` `warn` |
 
 ## shell.json
@@ -136,7 +136,7 @@ file for one run. The files are reread when they change.
 | `iconPixel` | `true` | app icons as clean pixel art: the icon is drawn large, averaged down to a grid of 16–30 cells (2 px cells in the dock), in 5–10 of its own colours with a dark outline, no dithering |
 | `iconTint` | `false` | pixel icons in four tones of the palette instead of their own colours |
 | `fetchFull` | `false` | fastfetch with the hardware (kernel, packages, CPU, GPU, memory, disk, display); off: who, OS, wm, shell, terminal, uptime |
-| `lang` | `""` | `ru`, `en`, `pt-BR`, or empty to follow `LC_ALL`, `LC_MESSAGES`, then `$LANG`; `pt_BR.UTF-8` and `pt` are also accepted |
+| `lang` | `""` | `ru`, `en`, `pt-BR`, `es`, `de`, `fr`, `uk`, `pl`, or empty to follow `LC_ALL`, `LC_MESSAGES`, then `$LANG`; locale names such as `pt_BR.UTF-8`, `pt` or `de_AT` are also accepted; a line not translated yet shows in English |
 | `themeApps` | all of them | the other programs `yami recolor` recolours (settings → color → apps, the installer's `--restyle`): `gtk` (gtk.css, settings.ini, gsettings), `qt` (qt6ct, the KDE colour scheme, kdeglobals), `kitty` (its colours and font; off takes the `include yami.conf` line out of `kitty.conf`), `fastfetch` (its `config.jsonc` while that is yami's; your own one is kept and yami's look goes to `yami.jsonc` next to it), `btop`, `firefox` (menus), `mangohud` (only a config yami wrote), `foot` (`foot/yami-colors.ini` and an `include=~/…` line at the end of `foot.ini` under its own `[main]`, so it wins over colours set above; new windows), `cava` (a gradient in the `[color]` section of its config, open cava reloads at once), `starship` (a `[palettes.yami]` table that also retints `red`, `green` and the other names, and `palette = "yami"` unless you chose another palette). A program left out is not touched. Up to 2.6 it was `appThemes` (foot, cava and starship only), read once and carried over |
 
 ### Apps in the palette colours

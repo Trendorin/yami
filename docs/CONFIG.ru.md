@@ -90,7 +90,7 @@ yami-shell binds list | print | write     # сочетания клавиш
 | `iconPixel`, `iconTheme` | `true`, `false`; имя набора | значки программ |
 | `animations`, `animSpeed` | `true`, `false`; число | вкл или выкл, скорость |
 | `wallpaperCmd` | команда с `{}` | «сделать обоями» вне шелла yami, например `swww img {}` |
-| `lang` | `ru`, `en`, `pt-BR` | пусто — как в системе |
+| `lang` | `ru`, `en`, `pt-BR`, `es`, `de`, `fr`, `uk`, `pl` | пусто — как в системе |
 | `colors` | объект из `#rrggbb` | любой из `bg` `panel` `surface` `surfaceHi` `codeBg` `border` `dim` `accent` `deep` `glow` `bright` `selection` `text` `textDim` `textFaint` `onAccent` `textHi` `ok` `warn` |
 
 ## shell.json
@@ -137,7 +137,7 @@ yami-shell binds list | print | write     # сочетания клавиш
 | `iconPixel` | `true` | значки программ чистым пиксель-артом: значок рисуется крупно и усредняется до сетки 16–30 клеток (в доке клетка 2 px), в 5–10 своих цветах с тёмной обводкой, без дизеринга |
 | `iconTint` | `false` | пиксельные значки в четырёх тонах палитры вместо своих цветов |
 | `fetchFull` | `false` | fastfetch с железом (ядро, пакеты, CPU, GPU, память, диск, дисплей); выключено — кто, ОС, wm, оболочка, терминал, время работы |
-| `lang` | `""` | `ru`, `en`, `pt-BR` или пусто — по `LC_ALL`, `LC_MESSAGES`, затем `$LANG`; также принимаются `pt_BR.UTF-8` и `pt` |
+| `lang` | `""` | `ru`, `en`, `pt-BR`, `es`, `de`, `fr`, `uk`, `pl` или пусто — по `LC_ALL`, `LC_MESSAGES`, затем `$LANG`; также принимаются имена локалей вроде `pt_BR.UTF-8`, `pt` или `de_AT`; строка, ещё не переведённая, показывается по-английски |
 | `themeApps` | все | какие чужие программы `yami recolor` красит (настройки → цвет → программы, `--restyle` установщика): `gtk` (gtk.css, settings.ini, gsettings), `qt` (qt6ct, цветовая схема KDE, kdeglobals), `kitty` (цвета и шрифт; выключенный — строка `include yami.conf` уходит из `kitty.conf`), `fastfetch` (его `config.jsonc`, пока тот от yami; твой остаётся, а вид yami ложится рядом в `yami.jsonc`), `btop`, `firefox` (меню), `mangohud` (только конфиг, который написал yami), `foot` (`foot/yami-colors.ini` и строка `include=~/…` в конце `foot.ini` под своей `[main]`, так что она перекрывает цвета выше; для новых окон), `cava` (градиент в секции `[color]` её конфига, открытая cava перечитывает сразу), `starship` (таблица `[palettes.yami]`, которая перекрашивает и `red`, `green` и другие имена, и `palette = "yami"`, если ты не выбрал другую палитру). Невыбранную программу yami не трогает. До 2.6 включительно — `appThemes` (только foot, cava и starship), его читают один раз и переносят |
 
 ### Программы в цветах палитры
