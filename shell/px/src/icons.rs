@@ -519,8 +519,19 @@ pub fn thumb(path: &Path, mtime: i64, size: i32) -> Option<image::RgbaImage> {
     rd.limits(lim);
     let t = rd.decode().ok()?.thumbnail(size as u32, size as u32).to_rgba8();
     let _ = std::fs::create_dir_all(cp.parent()?);
-    let _ = t.save(&cp);
+    let tmp = thumb_tmp(&cp);
+    if t.save_with_format(&tmp, image::ImageFormat::Png).is_ok() {
+        let _ = std::fs::rename(&tmp, &cp);
+    } else {
+        let _ = std::fs::remove_file(&tmp);
+    }
     Some(t)
+}
+
+/// куда писать миниатюру до готовности: кеш общий у yami-files и выбора обоев, и полфайла (вторая
+/// программа читает, пока первая пишет, или запись оборвалась) не должно попасть под настоящим именем
+pub fn thumb_tmp(cp: &Path) -> PathBuf {
+    cp.with_extension(format!("{}.part", std::process::id()))
 }
 
 pub fn load_file(p: &Path, size: i32) -> Option<Img> {

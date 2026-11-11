@@ -243,7 +243,9 @@ pub fn tidy(dir: &Path, days: u64, max_bytes: u64) {
             continue;
         }
         let t = m.modified().unwrap_or(now);
-        if t < old {
+        // недописанное (запись оборвалась, см. icons::thumb_tmp) — старше суток уже не допишется
+        let part = e.file_name().to_str().is_some_and(|n| n.ends_with(".part"));
+        if t < old || (part && now.duration_since(t).unwrap_or_default() > Duration::from_secs(86_400)) {
             let _ = std::fs::remove_file(e.path());
         } else {
             kept.push((t, m.len(), e.path()));
@@ -326,8 +328,11 @@ mod tests {
         put("old", 10, 200);
         put("mid", 100, 50);
         put("new", 100, 1);
+        put("x.123.part", 1, 2);
         std::fs::create_dir(d.join("sub")).unwrap();
         tidy(&d, 120, 150);
+        // недописанное старше суток — тоже
+        assert!(!d.join("x.123.part").exists());
         // старше 120 дней — прочь; потом самые старые, пока не влезет в 150 байт; папки не трогаются
         assert!(!d.join("old").exists());
         assert!(!d.join("mid").exists());
