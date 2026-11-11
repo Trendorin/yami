@@ -17,7 +17,8 @@ path = "src/main.rs"
 package-managed = []
 
 [dependencies]
-yami-px = { git = "https://github.com/Trendorin/yami-px", tag = "v3.0.0" }
+# the drawing library lives here (px/); the modules take it by the tag px-vX.Y.Z of this repository
+yami-px = { path = "px" }
 smithay-client-toolkit = "0.20"
 wayland-client = "0.31"
 wayland-protocols = { version = "0.32", features = ["client", "staging", "unstable"] }
@@ -33,7 +34,7 @@ blocking = "=1.6.2"
 libc = "0.2"
 
 [workspace]
-members = ["dev"]
+members = ["dev", "px", "agents"]
 
 [profile.release]
 opt-level = 3

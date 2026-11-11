@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build yami-shell and swap it into the running session: ~/.local/bin/yami-shell, then restart.
+# Build yami-shell and its services (yami-agents) and swap them into the running session: ~/.local/bin,
+# then restart the shell (the services move over as soon as they are idle).
 # Refuses while a game or any fullscreen window has focus (the restart flashes the bar and
 # panels); --force skips that guard.
 #   --modules       also build and install the modules next to this repository (YAMI_MODULES_DIR)
@@ -35,7 +36,7 @@ fi
 # leaves the old binary in place instead of a cut one
 put() { install -Dm755 "$ROOT/shell/target/release/$1" "$HOME/.local/bin/.$1.new" && mv -f "$HOME/.local/bin/.$1.new" "$HOME/.local/bin/$1"; }
 if ((WITH_MODULES)); then
-  for m in yami-files yami-view yami-play yami-shot yami-agents; do
+  for m in yami-files yami-view yami-play yami-shot; do
     [[ -f $MODS/$m/Cargo.toml ]] || { echo "deploy: no $MODS/$m" >&2; exit 1; }
     (cd "$MODS/$m" && cargo build --release --locked)
     "$MODS/$m/target/release/$m" install --yes --all
@@ -45,7 +46,6 @@ if ((WITH_MODULES)); then
   busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus ReloadConfig >/dev/null 2>&1 || true
 fi
 if ((ONLY_MODULES)); then
-  "$HOME/.local/bin/yami-agents" --reload || true
   echo "deploy: modules installed"
   exit 0
 fi
@@ -58,6 +58,8 @@ cargo build --release --locked --workspace --manifest-path "$ROOT/shell/Cargo.to
 rm -f "$HOME/.local/bin/yami-setup"
 put yami-shell
 ln -sfn yami-shell "$HOME/.local/bin/yami"
+# the shell's services: the binary, its portal and D-Bus files (`install --yes --all` puts both)
+"$ROOT/shell/target/release/yami-agents" install --yes --all >/dev/null
 # what runs now (`yami update` compares against it); a dirty tree is marked as such
 # без env.sh: иначе в запись попадёт локальный адрес вместо настоящего
 env -u GIT_CONFIG_COUNT -u GIT_CONFIG_KEY_0 -u GIT_CONFIG_VALUE_0 "$BIN" update stamp "$ROOT" || true
@@ -84,12 +86,11 @@ if ((!started)) && [[ -n ${NIRI_SOCKET:-} ]]; then
   niri msg action spawn-sh -- "until $BIN; do sleep 1; done"
   up && started=1
 fi
-if ((WITH_MODULES)); then
-  # after the shell: the old one held the polkit agent's place until it was replaced
-  "$HOME/.local/bin/yami-agents" --reload || true
-  if ((old_cast)) && ! pgrep -x obs >/dev/null; then
-    systemctl --user restart xdg-desktop-portal || true
-  fi
+# after the shell: the old one held the polkit agent's place until it was replaced. A running service
+# moves to the new binary as soon as no password window or screen share is open
+"$HOME/.local/bin/yami-agents" --reload || true
+if ((old_cast)) && ! pgrep -x obs >/dev/null; then
+  systemctl --user restart xdg-desktop-portal || true
 fi
 # these binaries did not come from the installer: the next update must not take them for its own
 rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/yami/built"

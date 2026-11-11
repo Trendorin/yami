@@ -146,6 +146,8 @@ say "$(t "версия" "version") $cur → $ver"
 echo "$ver" >VERSION
 crates=(shell/Cargo.toml shell/*/Cargo.toml)
 for f in "${crates[@]}"; do
+  # yami-px keeps its own version (the modules' tag px-vX.Y.Z)
+  [[ $f == shell/px/Cargo.toml ]] && continue
   # only the [package] version (the first `version =` line of the file)
   sed -i "0,/^version = \".*\"/s//version = \"$ver\"/" "$f"
 done

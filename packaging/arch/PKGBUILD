@@ -1,7 +1,7 @@
 # yami from the release's ready binaries (tools/dist.sh), one package per program.
 # Updates and modules are the package manager's: stage.sh --managed leaves the mark the shell looks for.
 pkgbase=yami-bin
-pkgname=(yami-shell-bin yami-files-bin yami-view-bin yami-play-bin yami-shot-bin yami-agents-bin yami-greet-bin)
+pkgname=(yami-shell-bin yami-files-bin yami-view-bin yami-play-bin yami-shot-bin yami-greet-bin)
 pkgver=2.7.0
 pkgrel=1
 pkgdesc='Lightweight pixel-art Wayland desktop for the niri compositor'
@@ -15,12 +15,12 @@ sha256sums=('SKIP') # release: tools/release.sh prints the sum, `updpkgsums` wri
 _put() { cd "yami-$pkgver-x86_64-linux" && ./stage.sh --prefix /usr --destdir "$pkgdir" --managed --only "$1"; }
 
 package_yami-shell-bin() {
-  pkgdesc='yami: bar, launcher, dock, lock screen, notifications and widgets for niri'
-  depends=(niri pam libxkbcommon gcc-libs glibc)
+  pkgdesc='yami: bar, launcher, dock, lock screen, notifications, widgets and the password, screen-share and automount services for niri'
+  depends=(niri pam polkit libxkbcommon gcc-libs glibc)
   optdepends=('yami-files-bin: file manager and the file dialog' 'yami-view-bin: images' 'yami-play-bin: video and music'
-    'yami-shot-bin: screenshots' 'yami-agents-bin: password windows, screen sharing, automount' 'yami-greet-bin: login screen'
+    'yami-shot-bin: screenshots' 'yami-greet-bin: login screen'
     'grim: screenshots' 'wl-clipboard: clipboard' 'cliphist: clipboard history' 'playerctl: music' 'brightnessctl: brightness'
-    'wlsunset: night light' 'kitty: the terminal yami restyles')
+    'wlsunset: night light' 'kitty: the terminal yami restyles' 'udisks2: automount of drives' 'gvfs: phones and cameras')
   provides=(yami-shell) conflicts=(yami-shell)
   _put yami-shell
 }
@@ -49,13 +49,6 @@ package_yami-shot-bin() {
   optdepends=('tesseract: text from screenshots' 'zbar: QR codes')
   provides=(yami-shot) conflicts=(yami-shot)
   _put yami-shot
-}
-package_yami-agents-bin() {
-  pkgdesc='yami-agents: password windows, screen sharing, automount'
-  depends=(polkit libxkbcommon gcc-libs glibc)
-  optdepends=('udisks2: automount' 'gvfs: phones')
-  provides=(yami-agents) conflicts=(yami-agents)
-  _put yami-agents
 }
 package_yami-greet-bin() {
   pkgdesc='yami-greet: login screen for greetd'

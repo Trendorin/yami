@@ -193,7 +193,7 @@ fn services(y: &Sty, problems: &mut u32) {
         }
     }
     if !which("yami-agents") {
-        line(y, &y.dim("·"), "yami-agents", &crate::tf!("не установлен: окон пароля polkit и автоподключения нет (yami setup)", "not installed: no polkit password window and no automount (yami setup)", "não instalado: sem janela de senha do polkit e sem montagem automática (yami setup)"));
+        line(y, &y.dim("·"), "yami-agents", &crate::tf!("нет: окон пароля polkit и автоподключения нет — это часть шелла, вернёт ./install.sh", "missing: no polkit password window and no automount; it is part of the shell, ./install.sh brings it back", "ausente: sem janela de senha do polkit e sem montagem automática; faz parte do shell, o ./install.sh traz de volta"));
     }
 }
 

@@ -7,7 +7,7 @@
 # niri — the compositor; base — what the shell and the session use at runtime (git and ssh-keygen:
 # sources and their signatures); build — to compile the shell; apps — the terminal and the everyday
 # tools, with the base; drives — udisks2 and gvfs (drives, phones, network shares), with yami-files or
-# yami-agents; files — yami-files' thumbnails and archives; play — libmpv for yami-play; shot — text
+# the shell (its automount, yami-agents); files — yami-files' thumbnails and archives; play — libmpv for yami-play; shot — text
 # and QR from screenshots; look — the Qt/GTK theme; games — GameMode, MangoHud; login — greetd for
 # yami-greet (agreety: the text fallback); nirisrc — to build niri itself
 packages_for_family() {
@@ -149,7 +149,7 @@ wanted_packages() {
       printf '%s\n' "$p"
     done
   fi
-  { on files || on agents; } && printf '%s\n' "${P_drives[@]}"
+  { on files || on core; } && printf '%s\n' "${P_drives[@]}"
   on files && printf '%s\n' "${P_files[@]}"
   on play && printf '%s\n' "${P_play[@]}"
   on shot && printf '%s\n' "${P_shot[@]}"
@@ -251,7 +251,7 @@ do_need_pkgs() {
   wants core && want+=("${P_base[@]}")
   # the terminal and the everyday tools came with the first install; an update does not bring them back
   wants core && ((!UPDATE)) && want+=("${P_apps[@]}")
-  { wants files || wants agents; } && want+=("${P_drives[@]}")
+  { wants files || wants core; } && want+=("${P_drives[@]}")
   wants files && want+=("${P_files[@]}")
   wants play && want+=("${P_play[@]}")
   wants shot && want+=("${P_shot[@]}")

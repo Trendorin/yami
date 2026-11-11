@@ -6,10 +6,6 @@
 #   --fast  skip the installer dry run
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# пока модулей нет на GitHub: yami-px берётся из соседней папки (env.sh указывает git туда)
-MODS="${YAMI_MODULES_DIR:-$ROOT/../yami-modules}"
-# shellcheck source=/dev/null
-[[ -f $MODS/env.sh ]] && . "$MODS/env.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 FAST=0
@@ -37,6 +33,8 @@ want="$(cat "$ROOT/VERSION")"
 vbad=0
 for f in "$ROOT"/shell/Cargo.toml "$ROOT"/shell/*/Cargo.toml; do
   [[ -f $f ]] || continue
+  # yami-px has its own version: the modules take it by the tag px-vX.Y.Z (see shell/px/Cargo.toml)
+  [[ $f == */shell/px/Cargo.toml ]] && continue
   v="$(sed -n '0,/^version = "\(.*\)"/s//\1/p' "$f")"
   [[ $v == "$want" ]] || { echo "${f#"$ROOT"/}: $v, VERSION: $want"; vbad=1; }
 done
@@ -56,6 +54,17 @@ fi
 # the shell in Brazilian Portuguese: nothing left in Russian or English from the catalogs
 "$BIN" shot --lang pt-BR -o "$TMP/pt" --defaults | grep untranslated
 [[ ${PIPESTATUS[0]} -eq 0 ]] && ok "yami-shell shot --lang pt-BR" || bad "yami-shell shot --lang pt-BR"
+# the services' windows (yami-agents): both looks, three languages, nothing left untranslated
+AG="$ROOT/shell/target/release/yami-agents"
+printf '{"preset":"plain"}\n' >"$TMP/plain.json"
+printf '{"preset":"yami","palette":"ash"}\n' >"$TMP/yami.json"
+ag=0
+for look in plain yami; do
+  for lang in en ru pt-BR; do
+    YAMI_STYLE="$TMP/$look.json" "$AG" shot --lang "$lang" -o "$TMP/ag-$look-$lang" >"$TMP/ag.log" 2>&1 || { tail -5 "$TMP/ag.log"; ag=1; }
+  done
+done
+((ag)) && bad "yami-agents shot" || ok "yami-agents shot: plain and yami, en ru pt-BR"
 step "unit tests"
 cargo test --release --locked --workspace --quiet --manifest-path "$ROOT/shell/Cargo.toml" >"$TMP/test.log" 2>&1 && ok "cargo test" || { tail -20 "$TMP/test.log"; bad "cargo test"; }
 # a package manager's build (Nix, distro packages): the updater is off (docs/PACKAGING.md)

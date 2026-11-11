@@ -36,8 +36,12 @@ if want yami-shell; then
   install -Dm644 -t "$D/share/yami" "$HERE/config/kitty/yami.conf" "$HERE/config/fontconfig/50-yami-pixel.conf"
   ((MANAGED)) && install -Dm644 /dev/null "$D/share/yami/package-managed"
   licence yami-shell
+  # the shell's services (polkit window, screen sharing, automount): part of the shell's package
+  install -Dm755 "$HERE/bin/yami-agents" "$D/bin/yami-agents"
+  install -Dm644 "$M/yami-agents/config/yami-agents.portal" "$D/share/xdg-desktop-portal/portals/yami-agents.portal"
+  service "$M/yami-agents/config/org.freedesktop.impl.portal.desktop.yamiagents.service" yami-agents
 fi
-for m in yami-files yami-view yami-play yami-shot yami-agents; do
+for m in yami-files yami-view yami-play yami-shot; do
   want "$m" || continue
   install -Dm755 "$HERE/bin/$m" "$D/bin/$m"
   licence "$m"
@@ -48,10 +52,6 @@ if want yami-files; then
   service "$M/yami-files/config/org.freedesktop.impl.portal.desktop.yami.service" yami-files
   # no org.freedesktop.FileManager1 here: Nautilus owns that system file, and «show in folder» for every
   # app is each person's choice (`yami-files install` asks and puts it into the home folder)
-fi
-if want yami-agents; then
-  install -Dm644 "$M/yami-agents/config/yami-agents.portal" "$D/share/xdg-desktop-portal/portals/yami-agents.portal"
-  service "$M/yami-agents/config/org.freedesktop.impl.portal.desktop.yamiagents.service" yami-agents
 fi
 if want yami-greet; then
   # the login screen finds bin/yami-greet from libexec/yami and its fonts in share/yami-greet/fonts (docs/PACKAGING.md)

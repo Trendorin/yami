@@ -14,7 +14,7 @@ plan_build() {
   ((APPLY)) || add "$(t "шелл: сборка из исходников" "shell: build from source" "shell: compilar do código-fonte")" do_build_shell
   # каждый модуль — своя строка: видно, что сейчас собирается
   local id
-  for id in files view play shot agents; do
+  for id in files view play shot; do
     on "$id" && add "$(t "сборка:" "build:" "compilar:") yami-$id" do_build_module "$id"
   done
   wants login && add "$(t "сборка:" "build:" "compilar:") yami-greet" do_build_greet
@@ -73,11 +73,13 @@ built_mark() { # binary source-tree
   printf '%s\n' "${rev:--}" >"$CACHE/built-$1"
 }
 do_build_shell() {
-  rm -f "$CACHE/built-yami-shell"
-  src_installed yami-shell "$ROOT" && return 99
+  rm -f "$CACHE/built-yami-shell" "$CACHE/built-yami-agents"
+  # the services (yami-agents) are part of the shell: built from the same tree, with it
+  src_installed yami-shell "$ROOT" && src_installed yami-agents "$ROOT" && return 99
   need_rust || return 1
-  cargo_build "$ROOT/shell/Cargo.toml" -p yami-shell || return 1
+  cargo_build "$ROOT/shell/Cargo.toml" -p yami-shell -p yami-agents || return 1
   built_mark yami-shell "$ROOT"
+  built_mark yami-agents "$ROOT"
 }
 do_build_module() {
   local repo src

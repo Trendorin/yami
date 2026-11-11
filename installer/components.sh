@@ -5,10 +5,11 @@
 # shellcheck shell=bash
 
 # the order of the components page; look is not on it (restyle.sh sets it)
-C_ID=(core files view play shot agents login games fork look)
+C_ID=(core files view play shot login games fork look)
 # groups of packages that used to be components: their packages now come with core (apps, the night
-# light) or with what uses them (drives with files and agents, text and QR with shot)
-C_RETIRED=" apps drives tools "
+# light) or with what uses them (drives with files and the shell, text and QR with shot); agents: the
+# services (yami-agents) are part of the shell since 3.0, built and installed with it
+C_RETIRED=" apps drives tools agents "
 # components this installer offered last time: one that came later starts at its default on an
 # update instead of «off because it was not in the list»
 KNOWN_F="$STATE/components-known"
@@ -19,8 +20,8 @@ c_idx() { local i; for i in "${!C_ID[@]}"; do [[ ${C_ID[$i]} == "$1" ]] && { ech
 c_set() { local i; i="$(c_idx "$1")" && C_ON[i]=$2; }
 
 components_init() {
-  # core files view play shot agents login games fork look
-  C_ON=(1 1 1 1 1 1 "$LOGIN_ON" "$GAMES_ON" "$FORK_ON" 1)
+  # core files view play shot login games fork look
+  C_ON=(1 1 1 1 1 "$LOGIN_ON" "$GAMES_ON" "$FORK_ON" 1)
   COMP=""
   local known i f id
   if ((UPDATE || REPAIR)); then
@@ -70,7 +71,6 @@ c_name() {
     view) t "картинки (yami-view)" "images (yami-view)" "imagens (yami-view)" ;;
     play) t "плеер (yami-play)" "player (yami-play)" "player (yami-play)" ;;
     shot) t "скриншоты (yami-shot)" "screenshots (yami-shot)" "capturas (yami-shot)" ;;
-    agents) t "службы (yami-agents)" "services (yami-agents)" "serviços (yami-agents)" ;;
     login) t "экран входа" "login screen" "tela de login" ;;
     games) t "игры" "games" "jogos" ;;
     fork) t "yami-niri (форк)" "yami-niri (fork)" "yami-niri (fork)" ;;
@@ -84,7 +84,6 @@ c_desc() {
     view) t "открывает картинки по умолчанию; быстрые правки: поворот, обрезка" "opens pictures by default; quick edits: rotate, crop" "abre imagens por padrão; edições rápidas: girar, recortar" ;;
     play) t "открывает видео и музыку по умолчанию (libmpv)" "opens videos and music by default (libmpv)" "abre vídeos e músicas por padrão (libmpv)" ;;
     shot) t "заморозить экран, разметить, скопировать; текст и QR (tesseract, zbar)" "freeze the screen, mark up, copy; text and QR (tesseract, zbar)" "congelar a tela, anotar, copiar; texto e QR (tesseract, zbar)" ;;
-    agents) t "окна паролей, выбор экрана для трансляций, автоподключение" "password windows, the screen-share picker, automount" "janelas de senha, seleção de tela, montagem automática" ;;
     login) if [[ -n $OTHER_DM ]]; then t "свой, как экран блокировки: greetd + yami-greet, без Qt; заменит $OTHER_DM" "our own, like the lock screen: greetd + yami-greet, no Qt; replaces $OTHER_DM" "a nossa, como a tela de bloqueio: greetd + yami-greet, sem Qt; substitui $OTHER_DM"
       else t "свой, как экран блокировки: greetd + yami-greet, без Qt, вход в niri" "our own, like the lock screen: greetd + yami-greet, no Qt, logs into niri" "a nossa, como a tela de bloqueio: greetd + yami-greet, sem Qt, entra no niri"; fi ;;
     games) t "GameMode и MangoHud в палитре" "GameMode and MangoHud in the palette" "GameMode e MangoHud na paleta" ;;
@@ -103,7 +102,7 @@ c_shown() {
 }
 # packages or files outside the home folder; the rest installs into it (missing packages of those go
 # to packages-needed)
-needs_root() { case $1 in files | view | play | shot | agents | fork | look) return 1 ;; *) return 0 ;; esac; }
+needs_root() { case $1 in files | view | play | shot | fork | look) return 1 ;; *) return 0 ;; esac; }
 # the packages of a component are optional: without sudo they go to packages-needed
 can() { ! needs_root "$1" || ((SUDO)); }
 on() { local i; i="$(c_idx "$1")" || return 1; ((C_ON[i])); }

@@ -159,7 +159,7 @@ fn check(src: &Path) -> (Vec<String>, usize) {
 
 pub fn run(args: &[String]) -> i32 {
     let root = crate::root().join("shell");
-    let dirs: Vec<PathBuf> = if args.is_empty() { vec![root.join("src"), root.join("setup/src")] } else { args.iter().map(|a| Path::new(a).canonicalize().unwrap_or_else(|_| PathBuf::from(a))).collect() };
+    let dirs: Vec<PathBuf> = if args.is_empty() { vec![root.join("src"), root.join("agents/src")] } else { args.iter().map(|a| Path::new(a).canonicalize().unwrap_or_else(|_| PathBuf::from(a))).collect() };
     let (mut problems, mut n) = (vec![], 0);
     for d in dirs {
         let (p, k) = check(&d);

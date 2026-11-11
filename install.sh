@@ -19,7 +19,7 @@
 # Choices: --lang en|ru|pt-BR  --palette blood|ash|sakura|amber|venom|ice|dusk  --theme dark|light
 #   --look matte|glass|light|solid  --font sans|pixel  --fetch mini|full
 #   --restyle LIST (all, none, or: gtk qt cursor kitty fastfetch btop firefox mangohud foot cava starship)
-# Modules (with --full or --apply): files view play shot agents login games fork
+# Modules (with --full or --apply): files view play shot login games fork (the services, yami-agents, come with the shell)
 #   --no-ID leaves one out, --ID takes it. --no-sudo: the home folder only, no packages.
 # Rarely needed: --no-monocraft, --no-count, --keep-build, --no-anim, --print-packages,
 #   --prebuilt DIR|URL  (a folder or address with the release's archive and SHA256SUMS).

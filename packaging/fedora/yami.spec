@@ -17,8 +17,8 @@ The yami shell for niri and its modules, each its own package.
 
 %package shell
 Summary:        Bar, launcher, dock, lock screen, notifications and widgets for niri
-Requires:       niri pam libxkbcommon
-Recommends:     yami-files yami-view yami-play yami-shot yami-agents grim wl-clipboard cliphist playerctl brightnessctl
+Requires:       niri pam polkit libxkbcommon
+Recommends:     yami-files yami-view yami-play yami-shot udisks2 gvfs grim wl-clipboard cliphist playerctl brightnessctl
 %description shell
 The yami shell.
 
@@ -48,13 +48,6 @@ Recommends:     tesseract zbar
 %description shot
 yami-shot.
 
-%package agents
-Summary:        Password windows, screen sharing, automount
-Requires:       polkit libxkbcommon
-Recommends:     udisks2 gvfs
-%description agents
-yami-agents.
-
 %package greet
 Summary:        Login screen for greetd
 Requires:       greetd niri libxkbcommon
@@ -70,6 +63,9 @@ yami-greet.
 %files shell
 %{_bindir}/yami
 %{_bindir}/yami-shell
+%{_bindir}/yami-agents
+%{_datadir}/xdg-desktop-portal/portals/yami-agents.portal
+%{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service
 %{_sysconfdir}/xdg/autostart/yami-shell.desktop
 %{_datadir}/fonts/yami
 %{_datadir}/yami
@@ -95,12 +91,6 @@ yami-greet.
 %files shot
 %{_bindir}/yami-shot
 %{_datadir}/licenses/yami-shot
-
-%files agents
-%{_bindir}/yami-agents
-%{_datadir}/xdg-desktop-portal/portals/yami-agents.portal
-%{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service
-%{_datadir}/licenses/yami-agents
 
 %files greet
 %{_bindir}/yami-greet

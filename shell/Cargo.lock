@@ -1467,6 +1467,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
+name = "yami-agents"
+version = "2.7.0"
+dependencies = [
+ "async-channel",
+ "blocking",
+ "calloop",
+ "calloop-wayland-source",
+ "image",
+ "libc",
+ "serde",
+ "serde_json",
+ "smithay-client-toolkit",
+ "wayland-client",
+ "wayland-protocols",
+ "yami-px",
+ "zbus",
+]
+
+[[package]]
 name = "yami-dev"
 version = "2.7.0"
 dependencies = [
@@ -1479,7 +1498,6 @@ dependencies = [
 [[package]]
 name = "yami-px"
 version = "3.0.0"
-source = "git+https://github.com/Trendorin/yami-px?tag=v3.0.0#33a2a2821f93fbe502a06e28cf739ec7e85d15a8"
 dependencies = [
  "ab_glyph",
  "image",

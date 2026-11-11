@@ -17,7 +17,8 @@
 }:
 
 let
-  # the drawing library yami-px is a git dependency pinned in each Cargo.lock
+  # each Cargo.lock pins its crates; the modules take the drawing library yami-px by a tag of this
+  # repository (px-vX.Y.Z), the shell has it in its own tree (shell/px)
   lockOf = dir: {
     lockFile = "${dir}/Cargo.lock";
     allowBuiltinFetchGit = true;
@@ -47,9 +48,12 @@ let
       buildAndTestSubdir = "shell";
       cargoLock = lockOf "${src}/shell";
       buildFeatures = [ "yami-shell/package-managed" ];
+      # the shell and its services (polkit window, screen sharing, automount) from the same workspace
       cargoBuildFlags = [
         "-p"
         "yami-shell"
+        "-p"
+        "yami-agents"
       ];
       buildInputs = common.buildInputs ++ [ linux-pam ];
       postInstall = ''
@@ -61,7 +65,9 @@ let
           config/portal/niri-portals.conf config/fontconfig/50-yami-pixel.conf
         install -Dm644 -t $out/share/fonts/truetype/yami fonts/*.ttf
         install -Dm644 -t $out/share/licenses/yami fonts/OFL-*.txt LICENSE
-      '';
+        install -Dm644 shell/agents/config/yami-agents.portal $out/share/xdg-desktop-portal/portals/yami-agents.portal
+      ''
+      + service "shell/agents/config" "org.freedesktop.impl.portal.desktop.yamiagents.service" "yami-agents";
       meta = common.meta // {
         description = "Lightweight pixel-art Wayland shell for the niri compositor";
         mainProgram = "yami";
@@ -86,8 +92,8 @@ let
     install -Dm644 config/${name}.desktop $out/share/applications/${name}.desktop
   '';
   # a D-Bus service file: @BIN@ is the binary that serves it
-  service = name: bin: ''
-    install -Dm644 config/${name} $out/share/dbus-1/services/${name}
+  service = dir: name: bin: ''
+    install -Dm644 ${dir}/${name} $out/share/dbus-1/services/${name}
     substituteInPlace $out/share/dbus-1/services/${name} --replace-fail @BIN@ $out/bin/${bin}
   '';
 
@@ -97,8 +103,8 @@ let
       + ''
         install -Dm644 config/yami.portal $out/share/xdg-desktop-portal/portals/yami.portal
       ''
-      + service "org.freedesktop.impl.portal.desktop.yami.service" "yami-files"
-      + service "org.freedesktop.FileManager1.service" "yami-files";
+      + service "config" "org.freedesktop.impl.portal.desktop.yami.service" "yami-files"
+      + service "config" "org.freedesktop.FileManager1.service" "yami-files";
   };
   view = module "yami-view" { postInstall = desktop "yami-view"; };
   play = module "yami-play" {
@@ -109,12 +115,6 @@ let
     '';
   };
   shot = module "yami-shot" { };
-  agents = module "yami-agents" {
-    postInstall = ''
-      install -Dm644 config/yami-agents.portal $out/share/xdg-desktop-portal/portals/yami-agents.portal
-    ''
-    + service "org.freedesktop.impl.portal.desktop.yamiagents.service" "yami-agents";
-  };
   greet = module "yami-greet" {
     postInstall = ''
       # the login screen: its session script and its two fonts
@@ -131,7 +131,6 @@ symlinkJoin {
     view
     play
     shot
-    agents
     greet
   ];
   meta = shell.meta;

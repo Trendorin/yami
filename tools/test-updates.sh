@@ -17,7 +17,8 @@ SHIMS="$WORK/shims"
 LOGS="$WORK/logs"
 H="$WORK/home"
 REAL_HOME="$HOME"
-MODULES=(yami-files yami-view yami-play yami-shot yami-agents yami-greet yami-niri)
+# the modules, each its own repository; the shell's services (yami-agents) come from the shell's tree
+MODULES=(yami-files yami-view yami-play yami-shot yami-greet yami-niri)
 BINS=(yami-shell yami-files yami-view yami-play yami-shot yami-agents)
 PASS=0 FAIL=0 FAILED_NAMES=()
 
@@ -97,11 +98,18 @@ new_repo() { # name from-tree
   git -C "$GH/$1.git" config uploadpack.allowFilter true
   git -C "$SRC/$1" remote add origin "$GH/$1.git"
 }
+# the shell and its services at a version (both crates, one Cargo.lock)
+shell_ver() { # tree version
+  set_crate_ver "$1/shell" yami-shell "$2"
+  [[ -f $1/shell/agents/Cargo.toml ]] || return 0
+  sed -i '0,/^version = "/s/^version = ".*/version = "'"$2"'"/' "$1/shell/agents/Cargo.toml"
+  sed -i '/^name = "yami-agents"$/{n;s/^version = .*/version = "'"$2"'"/}' "$1/shell/Cargo.lock"
+}
 # the shell at a version, with the modules.lock of that version
 shell_tag() { # version
   local d="$SRC/yami" r
   printf '%s\n' "$1" >"$d/VERSION"
-  set_crate_ver "$d/shell" yami-shell "$1"
+  shell_ver "$d" "$1"
   commit_tag "$d" "v$1"
   push yami
 }
@@ -122,9 +130,8 @@ world() {
   [[ -f $WORK/key ]] || ssh-keygen -q -t ed25519 -N "" -f "$WORK/key" -C test
   [[ -f $WORK/rogue ]] || ssh-keygen -q -t ed25519 -N "" -f "$WORK/rogue" -C rogue
   make_shims
-  # yami-px comes through cargo with its real history: Cargo.lock names its commit
-  git clone -q --bare "$MODS/yami-px" "$GH/yami-px.git"
   new_repo yami "$ROOT"
+  px_tags
   printf 'test namespaces="git,yami-release" %s\n' "$(cut -d' ' -f1,2 "$WORK/key.pub")" >"$SRC/yami/keys/allowed_signers"
   rm -f "$SRC/yami/CLAUDE.md" "$SRC/yami/AGENTS.md" "$SRC/yami/GEMINI.md"
   local m
@@ -136,6 +143,14 @@ world() {
   lock_all 3.0.0
   shell_tag 3.0.0
   ok "repositories at 3.0.0"
+}
+# yami-px comes through cargo from the shell's repository with its real history: the modules' Cargo.lock
+# names a commit of it (the tag px-vX.Y.Z), which the test history of the shell does not have
+px_tags() {
+  local px
+  for px in $(git -C "$ROOT" tag -l 'px-v*'); do
+    git -C "$GH/yami.git" fetch -q --no-tags "$ROOT" "refs/tags/$px:refs/tags/$px"
+  done
 }
 # yami-niri without its 5–25 minute build: the same commands, a stand-in binary
 stub_niri() {
@@ -222,6 +237,8 @@ t_base() {
   check "yami command" test -L "$H/.local/bin/yami"
   check "no module was installed" missing "$H/.local/bin/yami-files"
   check "the record says core" has_comp core
+  check "the shell's services come with the base" is_ver yami-agents 3.0.0
+  check "  their screen-share backend" exists "$(data xdg-desktop-portal/portals/yami-agents.portal)"
   check "the first-run mark is set" exists "$(state first-run)"
   check "niri accepts the config" niri_ok
   check "the source is remembered" contains "$(state source)" "/.local/share/yami/src"
@@ -250,11 +267,11 @@ t_pieces() { # one module added at a time, one taken away
   nocheck "  yami-files is gone" exists "$H/.local/bin/yami-files"
   nocheck "  the portal is gone" exists "$(data xdg-desktop-portal/portals/yami.portal)"
   nocheck "  folders no longer open in it" contains "$(cfg mimeapps.list)" "yami-files.desktop"
-  nocheck "  no portal config without our backends" exists "$(cfg xdg-desktop-portal/niri-portals.conf)"
-  check "agents alone" apply "agents"
-  check "  the screen-share backend is ours" contains "$(cfg xdg-desktop-portal/niri-portals.conf)" "ScreenCast=yami-agents;gnome;"
   check "  file dialogs fall back to GTK" contains "$(cfg xdg-desktop-portal/niri-portals.conf)" "FileChooser=gtk;"
-  check "everything" apply "files view play shot agents"
+  check "  the screen-share backend stays the shell's" contains "$(cfg xdg-desktop-portal/niri-portals.conf)" "ScreenCast=yami-agents;gnome;"
+  check "an old list that still names agents" apply "view agents"
+  check "  the services stay" exists "$H/.local/bin/yami-agents"
+  check "everything" apply "files view play shot"
   for b in yami-files yami-view yami-play yami-shot yami-agents; do check "  $b" exists "$H/.local/bin/$b"; done
   check "one package transaction per run" sh -c "grep -c 'root: .*pacman -S' '$H/root.log' | grep -qx 6"
   check "OCR comes with screenshots" sh -c "grep 'root: .*pacman -S' '$H/root.log' | tail -1 | grep -q tesseract"
@@ -270,14 +287,15 @@ t_module() { # one module on its own through a whole update, then back, then for
   first_install --yes
   check "installed $m on its own" apply "$m"
   user_mark
-  [[ $m == files || $m == view || $m == play || $m == shot || $m == agents ]] && check "  $version_bin 3.0.0" is_ver "$version_bin" 3.0.0
+  [[ $m == files || $m == view || $m == play || $m == shot ]] && check "  $version_bin 3.0.0" is_ver "$version_bin" 3.0.0
   publish 3.1.0
   check "the update to 3.1.0 goes through" update
   check "  the record says 3.1.0" test "$(installed_version)" = 3.1.0
   check "  the shell is 3.1.0" is_ver yami-shell 3.1.0
   check "  the choice is kept" has_comp "$m"
-  [[ $m == files || $m == view || $m == play || $m == shot || $m == agents ]] && check "  $version_bin is 3.1.0" is_ver "$version_bin" 3.1.0
-  for b in files view play shot agents; do [[ $b == "$m" ]] || nocheck "  yami-$b did not appear" exists "$H/.local/bin/yami-$b"; done
+  [[ $m == files || $m == view || $m == play || $m == shot ]] && check "  $version_bin is 3.1.0" is_ver "$version_bin" 3.1.0
+  check "  the shell's services moved with it" is_ver yami-agents 3.1.0
+  for b in files view play shot; do [[ $b == "$m" ]] || nocheck "  yami-$b did not appear" exists "$H/.local/bin/yami-$b"; done
   check "  settings and user.kdl kept" user_kept
   check "  niri accepts the config" niri_ok
   check "  a rollback point exists" sh -c "ls -d '$(state snapshots)'/*/ | grep -q ."
@@ -286,11 +304,11 @@ t_module() { # one module on its own through a whole update, then back, then for
   check "the rollback goes through" yami update rollback
   check "  the shell is 3.0.0 again" is_ver yami-shell 3.0.0
   check "  the record says 3.0.0" test "$(installed_version)" = 3.0.0
-  [[ $m == files || $m == view || $m == play || $m == shot || $m == agents ]] && check "  $version_bin is 3.0.0 again" is_ver "$version_bin" 3.0.0
+  [[ $m == files || $m == view || $m == play || $m == shot ]] && check "  $version_bin is 3.0.0 again" is_ver "$version_bin" 3.0.0
   check "  settings kept through the rollback" user_kept
   check "updating again after a rollback" update
   check "  the shell is 3.1.0 again" is_ver yami-shell 3.1.0
-  [[ $m == files || $m == view || $m == play || $m == shot || $m == agents ]] && check "  $version_bin is 3.1.0 again" is_ver "$version_bin" 3.1.0
+  [[ $m == files || $m == view || $m == play || $m == shot ]] && check "  $version_bin is 3.1.0 again" is_ver "$version_bin" 3.1.0
 }
 t_full() {
   reset_world
@@ -432,7 +450,8 @@ make_archive() { # folder version key
   rm -rf "$a" "$out"
   mkdir -p "$a/$n/bin" "$a/$n/modules" "$out"
   for m in "${BINS[@]}" yami-greet; do install -m755 "$WORK/bins/$m" "$a/$n/bin/$m"; done
-  for m in yami-files yami-view yami-play yami-agents; do mkdir -p "$a/$n/modules/$m"; cp -a "$SRC/$m/config" "$a/$n/modules/$m/"; done
+  for m in yami-files yami-view yami-play; do mkdir -p "$a/$n/modules/$m"; cp -a "$SRC/$m/config" "$a/$n/modules/$m/"; done
+  mkdir -p "$a/$n/modules/yami-agents"; cp -a "$SRC/yami/shell/agents/config" "$a/$n/modules/yami-agents/"
   mkdir -p "$a/$n/modules/yami-shot" "$a/$n/modules/yami-greet"
   cp -a "$SRC/yami-greet/fonts" "$SRC/yami-greet/greet-session" "$SRC/yami-greet/install-system.sh" "$a/$n/modules/yami-greet/"
   tar -C "$a" -czf "$out/$n.tar.gz" "$n"
@@ -479,7 +498,7 @@ t_prebuilt() { # a release with ready binaries: no compiler, signature first, ev
   printf '#!/bin/sh\n[ "$1" = --reload ] && { sleep 600 & }\nexit 0\n' >"$WORK/bins/yami-agents"
   make_archive "$rel" 3.1.0 "$WORK/key"
   SANDBOX_ENV=(YAMI_PREBUILT_URL="$rel" NIRI_SOCKET=/nonexistent)
-  check "a service left behind by a step does not hold the run" sandbox timeout -k 5 240 bash -c 'out=$(bash "$1" --lang en --apply "agents" 2>&1); printf "%s\n" "$out" >/dev/null' _ "$H/.local/share/yami/src/install.sh"
+  check "a service left behind by a step does not hold the run" sandbox timeout -k 5 240 bash -c 'out=$(bash "$1" --lang en --update 2>&1); printf "%s\n" "$out" >/dev/null' _ "$H/.local/share/yami/src/install.sh"
   check "  and the step did start it" exists "$H/.local/bin/yami-agents"
   command pkill -f '[s]leep 600' 2>/dev/null
   rm -rf "$WORK/bins"; mv "$WORK/bins-keep" "$WORK/bins"
@@ -520,7 +539,7 @@ t_askpass() { # the first-run setup's way in: no terminal, the password through 
 t_standalone() { # a module taken on its own, from its repository, without the shell
   reset_world
   local m
-  for m in yami-view yami-play yami-shot yami-agents yami-files; do
+  for m in yami-view yami-play yami-shot yami-files; do
     machine
     rm -f "$SRC/$m/target"
     ln -s "$WORK/target" "$SRC/$m/target"
@@ -555,6 +574,7 @@ t_migrate() { # the real previous release (2.7.0, one repository) updates to thi
   printf 'test namespaces="git" %s\n' "$(cut -d' ' -f1,2 "$WORK/key.pub")" >"$d/keys/allowed_signers"
   rm -rf "$GH/yami.git"; git init -q --bare -b main "$GH/yami.git"; git -C "$GH/yami.git" config uploadpack.allowFilter true
   git init -q -b main "$d"; git -C "$d" remote add origin "$GH/yami.git"
+  px_tags
   commit_tag "$d" v2.7.0
   g -C "$d" push -q origin main --tags
   sandbox bash -c 'cat "$1" | bash -s -- "${@:2}"' _ "$d/install.sh" --lang en --yes --no-sudo --no-monocraft --no-fork --no-login >>"$(log_for "$SCEN")" 2>&1
@@ -566,7 +586,7 @@ t_migrate() { # the real previous release (2.7.0, one repository) updates to thi
   (cd "$SRC/yami" && git ls-files -z --cached --others --exclude-standard | tar --null -T - -cf -) | tar -xC "$d"
   git -C "$d" ls-files -z | while IFS= read -r -d '' f; do [[ -e $SRC/yami/$f ]] || rm -f "$d/$f"; done
   printf '3.1.0\n' >"$d/VERSION"
-  set_crate_ver "$d/shell" yami-shell 3.1.0
+  shell_ver "$d" 3.1.0
   local m
   for m in "${MODULES[@]}"; do module_tag "$m" 3.1.0; done
   : >"$d/modules.lock"
@@ -588,7 +608,7 @@ t_migrate() { # the real previous release (2.7.0, one repository) updates to thi
   check "  yami doctor runs" sh -c "'$H/.local/bin/yami-shell' doctor >/dev/null 2>&1; [ \$? -le 1 ]"
 }
 
-SCENARIOS=(base prebuilt pieces standalone module-files module-view module-play module-shot module-agents module-login module-games module-fork full failures repair privacy askpass tty migrate)
+SCENARIOS=(base prebuilt pieces standalone module-files module-view module-play module-shot module-login module-games module-fork full failures repair privacy askpass tty migrate)
 run_scenario() {
   SCEN=$1
   : >"$(log_for "$SCEN")"

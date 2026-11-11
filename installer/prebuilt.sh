@@ -50,7 +50,7 @@ prebuilt_init() {
   ver="$(cat "$ROOT/VERSION")"
   # the archive is built from a release: another commit or a tree with edits is built from itself
   if ((!asked)); then
-    [[ "$(git -C "$ROOT" describe --tags --exact-match HEAD 2>/dev/null)" == "v$ver" && -n "$(src_rev "$ROOT")" ]] || return 0
+    [[ "$(git -C "$ROOT" describe --tags --exact-match --match 'v[0-9]*' HEAD 2>/dev/null)" == "v$ver" && -n "$(src_rev "$ROOT")" ]] || return 0
   fi
   PREBUILT_ASSET="yami-$ver-x86_64-linux.tar.gz"
   if ! prebuilt_has "$PREBUILT_ASSET"; then
@@ -107,8 +107,9 @@ prebuilt_take() { # binary
 }
 do_prebuilt_bins() {
   local id repo
-  ((APPLY)) || prebuilt_take yami-shell || return 1
-  for id in files view play shot agents; do
+  # the services come with the shell
+  ((APPLY)) || { prebuilt_take yami-shell && prebuilt_take yami-agents; } || return 1
+  for id in files view play shot; do
     on "$id" || continue
     repo="$(m_repo "$id")" && prebuilt_take "$repo" || return 1
   done

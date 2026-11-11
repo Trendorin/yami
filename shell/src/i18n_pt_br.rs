@@ -792,7 +792,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("our own login screen", "nossa própria tela de login"),
     ("GameMode and MangoHud", "GameMode e MangoHud"),
     ("our niri, a 5–25 min build", "nosso niri, compilação de 5–25 min"),
-    ("yami came as a package: the package manager installs the modules, packages yami-files, yami-view, yami-play, yami-shot, yami-agents, yami-greet", "o yami veio como pacote: o gerenciador de pacotes instala os módulos, pacotes yami-files, yami-view, yami-play, yami-shot, yami-agents, yami-greet"),
+    ("yami came as a package: the package manager installs the modules, packages yami-files, yami-view, yami-play, yami-shot, yami-greet", "o yami veio como pacote: o gerenciador de pacotes instala os módulos, pacotes yami-files, yami-view, yami-play, yami-shot, yami-greet"),
     ("nothing to install with: neither the yami sources nor git. Each module installs itself too: yami-files install", "nada para instalar: nem os fontes do yami nem o git. Cada módulo também se instala sozinho: yami-files install"),
     ("done: the modules are in place", "pronto: os módulos estão no lugar"),
     ("again", "de novo"),

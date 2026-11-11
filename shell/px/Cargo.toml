@@ -1,0 +1,18 @@
+[package]
+name = "yami-px"
+# своя версия, не VERSION шелла: модули (yami-files, yami-view, …) берут библиотеку по тегу
+# px-vX.Y.Z этого репозитория, и новая версия нужна, только когда меняется то, чем они пользуются
+version = "3.0.0"
+edition = "2021"
+description = "Canvas, styles, fonts, theme and immediate-mode UI shared by the yami shell and its modules"
+license = "MIT"
+repository = "https://github.com/Trendorin/yami"
+publish = false
+
+[dependencies]
+ab_glyph = "0.2"
+resvg = { version = "0.45", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+serde = "1"
+serde_json = "1"
+libc = "0.2"

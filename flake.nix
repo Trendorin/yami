@@ -3,7 +3,8 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    # the modules live in their own repositories; the versions are those of modules.lock
+    # the modules live in their own repositories; the versions are those of modules.lock (the shell's
+    # services, yami-agents, and the drawing library yami-px are part of this repository)
     yami-files = {
       url = "github:Trendorin/yami-files/v3.0.0";
       flake = false;
@@ -18,10 +19,6 @@
     };
     yami-shot = {
       url = "github:Trendorin/yami-shot/v3.0.0";
-      flake = false;
-    };
-    yami-agents = {
-      url = "github:Trendorin/yami-agents/v3.0.0";
       flake = false;
     };
     yami-greet = {
@@ -56,7 +53,6 @@
         "yami-view"
         "yami-play"
         "yami-shot"
-        "yami-agents"
         "yami-greet"
       ] inputs;
       packagesFor = pkgs: {

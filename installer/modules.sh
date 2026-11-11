@@ -12,7 +12,6 @@ m_repo() {
     view) echo yami-view ;;
     play) echo yami-play ;;
     shot) echo yami-shot ;;
-    agents) echo yami-agents ;;
     login) echo yami-greet ;;
     fork) echo yami-niri ;;
     *) return 1 ;;
@@ -30,7 +29,7 @@ do_fetch_module() {
 # выбранные модули: одной строкой на экране; дальше root-шаги и сборка берут всё из готовых папок
 fetch_list() {
   local id repo
-  for id in files view play shot agents login fork; do
+  for id in files view play shot login fork; do
     wants "$id" || continue
     repo="$(m_repo "$id")" && printf '%s\n' "$repo"
   done

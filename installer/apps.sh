@@ -8,8 +8,8 @@
 plan_apps() {
   if on shot; then :
   elif may_drop && app_here yami-shot; then add "$(t "скриншоты: убрать yami-shot (не выбран)" "screenshots: remove yami-shot (not chosen)" "capturas: remover o yami-shot (não escolhido)")" drop_app yami-shot; fi
-  if on agents; then add "$(t "службы: yami-agents" "services: yami-agents" "serviços: yami-agents")" do_agents
-  elif may_drop && app_here yami-agents; then add "$(t "службы: убрать yami-agents (не выбран)" "services: remove yami-agents (not chosen)" "serviços: remover o yami-agents (não escolhido)")" drop_agents; fi
+  # the services (yami-agents) are part of the shell: their portal and D-Bus files go with it
+  on core && add "$(t "службы шелла: пароли, показ экрана, флешки" "the shell's services: passwords, screen sharing, drives" "serviços do shell: senhas, compartilhar a tela, pendrives")" do_agents
   if on files; then add "$(t "файлы: yami-files и диалог выбора файлов" "files: yami-files and the file dialog" "arquivos: yami-files e diálogo de arquivos")" do_files
   elif may_drop && app_here yami-files; then add "$(t "файлы: убрать yami-files (не выбран)" "files: remove yami-files (not chosen)" "arquivos: remover o yami-files (não escolhido)")" drop_files; fi
   if on view; then add "$(t "картинки: yami-view" "images: yami-view" "imagens: yami-view")" do_view
@@ -84,8 +84,7 @@ portal_sync() {
 
 # ── services: the screen-share portal backend and the agent process ─────────
 do_agents() {
-  local data="${XDG_DATA_HOME:-$HOME/.local/share}" src
-  src="$(m_src yami-agents)" || return 1
+  local data="${XDG_DATA_HOME:-$HOME/.local/share}" src="$ROOT/shell/agents"
   install -Dm644 "$src/config/yami-agents.portal" "$data/xdg-desktop-portal/portals/yami-agents.portal" || return 1
   mkdir -p "$data/dbus-1/services"
   sed "s|@BIN@|$BIN/yami-agents|" "$src/config/org.freedesktop.impl.portal.desktop.yamiagents.service" \
@@ -94,13 +93,6 @@ do_agents() {
   ((RUNNING_NIRI)) && "$BIN/yami-agents" --reload </dev/null >/dev/null 2>&1
   portal_sync
 }
-drop_agents() {
-  local data="${XDG_DATA_HOME:-$HOME/.local/share}"
-  "$BIN/yami-agents" --version >/dev/null 2>&1 && pkill -x yami-agents 2>/dev/null
-  rm -f -- "$BIN/yami-agents" "$data/xdg-desktop-portal/portals/yami-agents.portal" "$data/dbus-1/services/org.freedesktop.impl.portal.desktop.yamiagents.service" "$CFG/yami/agents.json"
-  portal_sync
-}
-
 # ── files: yami-files as the folder handler, the portal file dialog ─────────
 do_files() {
   local data="${XDG_DATA_HOME:-$HOME/.local/share}" src

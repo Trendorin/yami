@@ -78,7 +78,6 @@ fn modules() -> Vec<Module> {
         m("view", "yami-view", "картинки с быстрыми правками"),
         m("play", "yami-play", "видео и музыка (libmpv)"),
         m("shot", "yami-shot", "скриншоты, текст и QR"),
-        m("agents", "yami-agents", "пароли, показ экрана, флешки"),
         m("login", "yami-greet", "свой экран входа"),
         m("games", "games", "GameMode и MangoHud"),
         m("fork", "yami-niri", "наш niri, сборка 5–25 минут"),
@@ -191,7 +190,6 @@ fn probe_mods(mods: &mut [Module]) {
             "view" => here.view,
             "play" => here.play,
             "shot" => here.shot,
-            "agents" => here.agents,
             "login" => here.greet,
             "games" => comps.split_whitespace().any(|c| c == "games"),
             "fork" => yami_px::paths::home().join(".local/lib/yami-niri/current/niri").exists(),
@@ -640,11 +638,11 @@ pub fn mock(st: &mut State, arg: &str) {
     let step = steps.iter().position(|&i| ALL[i].id == id).unwrap_or(0);
     let mut mods = modules();
     for m in mods.iter_mut() {
-        m.have = matches!(m.id, "files" | "shot" | "agents");
+        m.have = matches!(m.id, "files" | "shot" | "play");
         m.want = m.have || m.id == "view";
     }
-    mods[2].want = false;
-    if let Some(m) = mods.iter_mut().find(|m| m.id == "agents") {
+    // одна программа поставится, одна уйдёт
+    if let Some(m) = mods.iter_mut().find(|m| m.id == "play") {
         m.want = false;
     }
     let mut inst = Inst { sudo: true, pass: state == "pass", ..Default::default() };

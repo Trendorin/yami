@@ -651,7 +651,7 @@ const PAIRS: &[(&str, &str)] = &[
     ("свой экран входа", "our own login screen"),
     ("GameMode и MangoHud", "GameMode and MangoHud"),
     ("наш niri, сборка 5–25 минут", "our niri, a 5–25 min build"),
-    ("yami поставлен пакетом: модули ставит менеджер пакетов — пакеты yami-files, yami-view, yami-play, yami-shot, yami-agents, yami-greet", "yami came as a package: the package manager installs the modules, packages yami-files, yami-view, yami-play, yami-shot, yami-agents, yami-greet"),
+    ("yami поставлен пакетом: модули ставит менеджер пакетов — пакеты yami-files, yami-view, yami-play, yami-shot, yami-greet", "yami came as a package: the package manager installs the modules, packages yami-files, yami-view, yami-play, yami-shot, yami-greet"),
     ("ставить нечем: нет ни исходников yami, ни git. Каждый модуль ставится и сам: yami-files install", "nothing to install with: neither the yami sources nor git. Each module installs itself too: yami-files install"),
     ("готово: модули на месте", "done: the modules are in place"),
     ("ещё раз", "again"),

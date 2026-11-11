@@ -37,7 +37,8 @@ ARCH=x86_64
 NAME="yami-$VER-$ARCH-linux"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/yami"
 TARGET="$CACHE/dist-target"
-PROGS=(yami-files yami-view yami-play yami-shot yami-agents yami-greet)
+# the modules, each from its own repository; the shell and its services (yami-agents) come from this tree
+PROGS=(yami-files yami-view yami-play yami-shot yami-greet)
 say() { printf '\e[1m── %s\e[0m\n' "$*"; }
 ver_gt() { [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" == "$1" && $1 != "$2" ]]; }
 
@@ -121,7 +122,7 @@ build() { # the crate's Cargo.toml, cargo arguments
 }
 BUILT="$TARGET/x86_64-unknown-linux-gnu/release"
 say "yami-shell $VER"
-build "$ROOT/shell/Cargo.toml" -p yami-shell
+build "$ROOT/shell/Cargo.toml" -p yami-shell -p yami-agents
 locked() { awk -v r="$1" '$1 == r { print $2 }' "$ROOT/modules.lock"; }
 for m in "${PROGS[@]}"; do
   [[ -f $MODS/$m/Cargo.toml ]] || { echo "dist: no $MODS/$m" >&2; exit 1; }
@@ -142,6 +143,7 @@ T="$STAGE/$NAME"
 mkdir -p "$T/bin" "$T/modules"
 strip_to() { install -m755 "$BUILT/$1" "$T/bin/$1"; }
 strip_to yami-shell
+strip_to yami-agents
 for m in "${PROGS[@]}"; do strip_to "$m"; done
 glibc_of() { objdump -T "$1" | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -n1 | cut -d_ -f2; }
 for b in "$T"/bin/*; do
@@ -153,10 +155,13 @@ cp -a "$ROOT/config" "$ROOT/fonts" "$T/"
 install -m644 "$ROOT/LICENSE" "$ROOT/VERSION" "$ROOT/modules.lock" "$T/"
 install -m755 "$ROOT/packaging/stage.sh" "$T/stage.sh"
 # what each module keeps next to its binary: .desktop files, portals, D-Bus services, the login screen's scripts
-for m in yami-files yami-view yami-play yami-agents; do
+for m in yami-files yami-view yami-play; do
   mkdir -p "$T/modules/$m"
   cp -a "$MODS/$m/config" "$T/modules/$m/"
 done
+# the services' portal and D-Bus files, where stage.sh and the packages look for them
+mkdir -p "$T/modules/yami-agents"
+cp -a "$ROOT/shell/agents/config" "$T/modules/yami-agents/"
 mkdir -p "$T/modules/yami-shot" "$T/modules/yami-greet"
 cp -a "$MODS/yami-greet/fonts" "$MODS/yami-greet/greet-session" "$MODS/yami-greet/install-system.sh" "$T/modules/yami-greet/"
 mkdir -p "$OUT"
@@ -188,19 +193,18 @@ make_deb() { # package, stage.sh target
 if ((DEB)); then
   say ".deb"
   base="libc6 (>= $GLIBC_MAX), libgcc-s1, libxkbcommon0"
-  make_deb yami-shell "$base, libpam0g" "niri, yami-files, yami-view, yami-play, yami-shot, yami-agents, grim, wl-clipboard, cliphist, playerctl, brightnessctl, kitty"
+  make_deb yami-shell "$base, libpam0g, polkitd | policykit-1" "niri, yami-files, yami-view, yami-play, yami-shot, udisks2, gvfs-backends, gvfs-fuse, grim, wl-clipboard, cliphist, playerctl, brightnessctl, kitty"
   make_deb yami-files "$base" "ffmpegthumbnailer, libarchive-tools, udisks2, gvfs-backends, gvfs-fuse"
   make_deb yami-view "$base"
   make_deb yami-play "$base, libmpv2"
   make_deb yami-shot "$base, grim" "tesseract-ocr, tesseract-ocr-eng, zbar-tools"
-  make_deb yami-agents "$base" "udisks2, gvfs-backends, gvfs-fuse"
   make_deb yami-greet "$base, greetd"
 fi
 
 # ── checksums and the signature ─────────────────────────────────────────────
 LOOSE_FILES=()
 if ((LOOSE)); then
-  for m in yami-files yami-view yami-play yami-shot yami-agents; do install -m755 "$T/bin/$m" "$OUT/$m"; LOOSE_FILES+=("$m"); done
+  for m in yami-files yami-view yami-play yami-shot; do install -m755 "$T/bin/$m" "$OUT/$m"; LOOSE_FILES+=("$m"); done
 fi
 (cd "$OUT" && rm -f SHA256SUMS SHA256SUMS.sig && sha256sum "$ARCHIVE" $( ((DEB)) && printf '%s ' ./*.deb) ${LOOSE_FILES[@]+"${LOOSE_FILES[@]}"} >SHA256SUMS)
 if [[ -n $KEY ]]; then

@@ -516,7 +516,7 @@ pub fn modules(ui: &mut Ui, st: &State, b: R) {
 fn install_row(ui: &mut Ui, st: &State, w: &Welcome, b: R, mut y: i32, half: i32, packaged: bool) {
     let t = ui.t;
     if packaged {
-        ui.wrap(PX, R::new(b.x, y, b.w, 60), "yami поставлен пакетом: модули ставит менеджер пакетов — пакеты yami-files, yami-view, yami-play, yami-shot, yami-agents, yami-greet", t.text_dim, 3);
+        ui.wrap(PX, R::new(b.x, y, b.w, 60), "yami поставлен пакетом: модули ставит менеджер пакетов — пакеты yami-files, yami-view, yami-play, yami-shot, yami-greet", t.text_dim, 3);
         return;
     }
     if !crate::wizinst::can_install() {
