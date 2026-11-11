@@ -573,6 +573,13 @@ impl App {
                 self.wall_dir_ask();
                 return true;
             }
+            // из выбора обоев: фото без клеток
+            "cells_off" => {
+                s.wall_pixel = 1;
+                self.settings_changed();
+                self.dirty(&SKind::Modal);
+                return true;
+            }
             "dir_auto" => {
                 s.wall_dir.clear();
                 self.dirty(&SKind::Modal);

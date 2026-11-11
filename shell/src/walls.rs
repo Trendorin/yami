@@ -251,6 +251,15 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
         i => wl.tiles.get(i).map(|p| file_name(p)).unwrap_or_default(),
     };
     ui.cv.text_in(ui.f, PX, R::new(GX, fy, fr.w / 2, 24), &name, t.text);
+    // фото лягут клетками (ползунок «пиксельные клетки»; его легко сдвинуть колесом): сказать здесь,
+    // где картинку выбирают, и вернуть «как есть» одним нажатием
+    let c = crate::wall::cell(st.set.wall_pixel);
+    if !skwd && c > 1 && wl.more == 0 {
+        let label = crate::tf!("фото — клетками {} px · как есть", "photos in {} px cells · as is", "fotos em células de {} px · como está", c);
+        let bw = ui.f.width(PX, &label) + 44;
+        ui.button(R::new(fr.right() - GX - bw, fy - 2, bw, 26), &label, "image", Tone::Ghost, false, true, Act::SWall("cells_off"));
+        return;
+    }
     let hint = if skwd {
         crate::i18n::tr("обои ведёт skwd-wall: выбор здесь выключит его").to_string()
     } else if wl.more > 0 {
