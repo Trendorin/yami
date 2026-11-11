@@ -261,6 +261,13 @@ impl App {
         match a {
             Act::Popup("sound" | "media") | Act::VolSlider | Act::VolMute => audio::step_volume(if up { 1 } else { -1 }),
             Act::WallPick(_) | Act::WallsScroll => self.walls_scroll(if up { -1 } else { 1 }),
+            // ползунки панели управления: шаг 5 %
+            Act::CtlVol => audio::step_volume(if up { 1 } else { -1 }),
+            Act::CtlBright => {
+                if let Some(v) = self.st.bright {
+                    self.control_drag(&Act::CtlBright, (v + if up { 0.05 } else { -0.05 }).clamp(0.0, 1.0));
+                }
+            }
             Act::MicSlider | Act::MicMute => {
                 let v = (self.st.audio.mic + if up { 0.05 } else { -0.05 }).clamp(0.0, 1.0);
                 audio::set_mic(v);

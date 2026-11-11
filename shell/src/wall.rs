@@ -564,6 +564,12 @@ impl App {
                 self.walls_open(true);
                 return true;
             }
+            // из панели управления: выбор обоев сам по себе, без возврата в настройки
+            "browse" => {
+                self.close_popup();
+                self.walls_open(false);
+                return true;
+            }
             "reset" => {
                 self.set_wall("");
                 return true;

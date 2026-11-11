@@ -123,7 +123,7 @@ pub fn draw(ui: &mut Ui, st: &State, b: R) {
     if ui.hover(card) {
         ui.cv.icon("image", card.right() - 26, card.y + 10, 2, t.text);
     }
-    ui.zone(card, Act::SWall("pick"), Cur::Pointer);
+    ui.zone(card, Act::SWall("browse"), Cur::Pointer);
     let tm = local_now();
     let face = font::px(48);
     let time = if st.set.clock_seconds { format!("{:02}:{:02}:{:02}", tm.hour, tm.min, tm.sec) } else { format!("{:02}:{:02}", tm.hour, tm.min) };
