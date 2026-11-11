@@ -156,6 +156,37 @@ pub fn take_text() -> Vec<Laid> {
 pub fn text_layer() {
     LAYER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 }
+
+/// `shot --fit`: что не так с надписями, нарисованными с прошлого вызова: обрезана многоточием или по
+/// числу строк, вылезла за свой клип, налезла на другую надпись того же слоя (тень той же строки — не наложение)
+pub fn fit_report() -> Vec<String> {
+    let laid = take_text();
+    let vis: Vec<(R, &Laid)> = laid.iter().map(|l| (l.r.inter(&l.clip), l)).filter(|(r, _)| r.w > 0 && r.h > 0).collect();
+    let mut out = vec![];
+    for (_, l) in &vis {
+        if l.cut && l.s.contains("~/") {
+            // длинный путь и должен сокращаться многоточием
+        } else if l.cut {
+            out.push(format!("cut «{}» (fits {} of {})", l.s, l.fit, l.s.chars().count()));
+        } else if l.r.x < l.clip.x || l.r.right() > l.clip.right() {
+            out.push(format!("past the edge «{}»", l.s));
+        }
+    }
+    for (i, (ra, a)) in vis.iter().enumerate() {
+        for (rb, b) in &vis[i + 1..] {
+            if a.buf != b.buf || a.layer != b.layer || a.s == b.s {
+                continue;
+            }
+            let o = ra.inter(rb);
+            if o.w >= 2 && o.h >= 3 {
+                out.push(format!("overlap «{}» × «{}»", a.s, b.s));
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
 /// последний записанный текст — обрезанная часть строки s
 fn laid_cut(s: &str) {
     if !WATCH.load(std::sync::atomic::Ordering::Relaxed) {

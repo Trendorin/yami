@@ -211,7 +211,7 @@ pub fn run(args: &[String]) -> i32 {
         shoot(&mut st, &mut res, t, &path);
         if fit {
             // эти снимки и проверяют тесноту: там многоточие — задуманное
-            let p: Vec<String> = fit_problems().into_iter().filter(|p| !(CROWD.contains(&t.as_str()) && p.starts_with("cut "))).collect();
+            let p: Vec<String> = yami_px::gfx::fit_report().into_iter().filter(|p| !(CROWD.contains(&t.as_str()) && p.starts_with("cut "))).collect();
             loose += p.len();
             for s in p {
                 println!("{}  layout: {s}", path.display());
@@ -238,35 +238,6 @@ pub fn run(args: &[String]) -> i32 {
 
 /// --fit: надписи, которым не хватило места (длинные языки): обрезаны многоточием или по
 /// строкам, вылезли за свою обрезку, легли на другую надпись того же холста
-fn fit_problems() -> Vec<String> {
-    let laid = yami_px::gfx::take_text();
-    let vis: Vec<(crate::gfx::R, &yami_px::gfx::Laid)> = laid.iter().map(|l| (l.r.inter(&l.clip), l)).filter(|(r, _)| r.w > 0 && r.h > 0).collect();
-    let mut out = vec![];
-    for (_, l) in &vis {
-        if l.cut && l.s.contains("~/") {
-            // длинный путь и должен сокращаться многоточием
-        } else if l.cut {
-            out.push(format!("cut «{}» (fits {} of {})", l.s, l.fit, l.s.chars().count()));
-        } else if l.r.x < l.clip.x || l.r.right() > l.clip.right() {
-            out.push(format!("past the edge «{}»", l.s));
-        }
-    }
-    for (i, (ra, a)) in vis.iter().enumerate() {
-        for (rb, b) in &vis[i + 1..] {
-            if a.buf != b.buf || a.layer != b.layer || a.s == b.s {
-                continue;
-            }
-            let o = ra.inter(rb);
-            if o.w >= 2 && o.h >= 3 {
-                out.push(format!("overlap «{}» × «{}»", a.s, b.s));
-            }
-        }
-    }
-    out.sort();
-    out.dedup();
-    out
-}
-
 fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
     let (kind, arg) = target.split_once(':').unwrap_or((target, ""));
     // образцы формы бара: свои настройки — только на этот снимок
