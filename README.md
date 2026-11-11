@@ -46,7 +46,8 @@ Everything it does and its flags: [Installation](#installation).
   (PAM), notification server with history and do-not-disturb, OSD, system tray (StatusNotifierItem
   with DBusMenu), calendar, sound/music/network/Bluetooth/system popups, a power profile switch
   (power-profiles-daemon), Bluetooth devices paired, connected and forgotten right in settings, and its
-  own **polkit password window** instead of a Qt/GTK agent.
+  own **polkit password window** instead of a Qt/GTK agent. A privacy light on the bar says which
+  program records the microphone, holds the camera or shares the screen.
 - **Desktop widgets.** Clock, calendar, weather, Bluetooth devices with their battery, the output of your own script, music card with an
   audio-reactive equalizer, and graphs
   for CPU, RAM, temperature and rx/tx network traffic in five styles (bars, line, blocks, wave,
@@ -352,7 +353,7 @@ One command for the whole desktop (`~/.local/bin/yami`, the same binary as `yami
 `yami help` prints it in the palette's colours, `yami help <command>` explains one.
 
 ```sh
-yami open settings:keys       # launcher clipboard settings[:tab] power lock walls screenshot cal sound media net bt sys profile tray
+yami open settings:keys       # launcher clipboard settings[:tab] power lock walls screenshot cal sound media net bt sys profile tray weather privacy
 yami palette ash              # list palettes without an argument; a colour: '#3a9fd0'; or wallpaper
 yami wallpaper ~/x.png        # own wallpaper; no path: the palette's pixel art
 yami restart                  # restart the shell (waits while a game has focus)

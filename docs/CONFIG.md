@@ -33,7 +33,7 @@ of the file is kept), unknown keys are ignored: `yami-shell config check` lists 
 prints the help instead of starting the shell. `yami help <command>` explains one command.
 
 ```sh
-yami open settings:updates                # a panel: launcher clipboard settings[:tab] power lock walls screenshot cal sound media net bt sys profile tray
+yami open settings:updates                # a panel: launcher clipboard settings[:tab] power lock walls screenshot cal sound media net bt sys profile tray weather privacy
 yami palette | yami palette ash | yami palette '#3a9fd0' | yami palette wallpaper
 yami palette show | yami palette export NAME   # every colour with its hex (the {{names}} of templates); the palette as a saved theme
 yami wallpaper ~/Pictures/x.png           # no path: the palette's pixel wallpaper
@@ -186,12 +186,13 @@ Settings → look → «pixel look» moves these keys, `iconPixel` and `cursor` 
 
 | Key | Default | Meaning |
 |---|---|---|
-| `barLeft`, `barCenter`, `barRight` | see `config list` | module ids in order: `launcher` `workspaces` `mode` `tasks` `media` `tray` `net` `netspeed` `bt` `kb` `cpu` `ram` `temp` `gpu` `disk` `weather` `bat` `vol` `profile` `clock` `notif` `settings` `power` `sep` (`bat`: laptop battery, hidden without one; `gpu`: graphics load from amdgpu or `nvidia-smi` every 3 s, hidden without either, «sleep» while a laptop's discrete card sleeps; `disk`: how full `/` is) |
+| `barLeft`, `barCenter`, `barRight` | see `config list` | module ids in order: `launcher` `workspaces` `mode` `tasks` `media` `tray` `net` `netspeed` `bt` `kb` `cpu` `ram` `temp` `gpu` `disk` `weather` `bat` `vol` `profile` `night` `privacy` `clock` `notif` `settings` `power` `sep` (`bat`: laptop battery, hidden without one; `gpu`: graphics load from amdgpu or `nvidia-smi` every 3 s, hidden without either, «sleep» while a laptop's discrete card sleeps; `disk`: how full `/` is; `privacy`: lights up while a program records the microphone, holds the camera or shares the screen, and is hidden otherwise; a click says who and can mute the microphone or stop the sharing) |
 | `cpuStyle` | `"gauge"` | `gauge` `graph` `number`, for `cpu` `ram` `gpu` `disk` (`disk` has no history: `graph` draws a gauge) |
 | `tempStyle` | `"full"` | the `temp` module: `full` like `cpu` and `ram` (label and `cpuStyle`), `compact` a small thermometer column and the number |
 | `trayMode` | `"icons"` | `icons`: every tray icon on the bar; `arrow`: one arrow that opens them as a list (clicks work as on the bar; a dot when an app asks for attention). A network applet (`nm-applet` and the like) is left out while the bar has `net` |
 | `trayPixel` | `false` | tray icons (on the bar and in the arrow's list) redrawn in pixel cells like the dock and the launcher with `iconPixel`: own colours, or palette tones with `iconTint` (#19) |
 | `batHideFull` | `false` | the `bat` module hides while the laptop is on power and not charging: full, or held at a charge limit (#21) |
+| `privacyMic`, `privacyCam`, `privacyScreen` | `true` | what the `privacy` module watches: the microphone (PulseAudio/PipeWire recordings that are not of a sound output), the camera (who holds `/dev/video*`), screen sharing (niri's casts; the shell's own screenshots do not count); watched only while the module is on the bar |
 | `mediaViz` | `"bars"` | the equalizer of the `media` module and the music popup: `bars` `line` `blocks` `wave` `dots`, or `off` (no equalizer, and no audio capture for it) |
 | `mediaView` | `"cover"` | what the music popup shows (the button in its header switches it): `cover` (cover, buttons, equalizer), `both` (cover and lyrics), `lyrics`, `minimal` (title and buttons) |
 | `clockSeconds`, `clockDate` | `false`, `true` | |

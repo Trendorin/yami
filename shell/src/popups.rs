@@ -11,7 +11,7 @@ use crate::widgets;
 use smithay_client_toolkit::seat::keyboard::{KeyEvent, Keysym};
 
 /// виды всплывашек: `popup KIND`, `yami open KIND`, shot
-pub const KINDS: &[&str] = &["cal", "sound", "media", "net", "bt", "sys", "profile", "tray", "weather"];
+pub const KINDS: &[&str] = &["cal", "sound", "media", "net", "bt", "sys", "profile", "tray", "weather", "privacy"];
 
 impl State {
     /// открыта всплывашка этого вида
@@ -77,6 +77,7 @@ pub fn size(kind: &str, st: &State) -> (i32, i32) {
             let wifi = if st.net.wifi_present { 40 + msg + if st.net.wifi_on { st.net.nets.len().min(8) as i32 * 28 + if st.wifi_target.is_empty() { 0 } else { 44 } } else { 0 } } else { 0 };
             (420, 44 + 24 + st.net.active.len().max(1) as i32 * 22 + 130 + wifi + 50)
         }
+        "privacy" => (380, crate::privacy::popup_h(st)),
         "bt" => (380, 44 + 40 + if st.bt.msg.is_empty() { 0 } else { 24 } + if st.bt.powered { st.bt.devices.len().clamp(1, 8) as i32 * 34 } else { 30 } + 50),
         "sys" => (440, 44 + 4 * 74 + 40 + 50),
         "tray" => (300, 66 + tray_items(st).count().clamp(1, 12) as i32 * 32),
@@ -104,6 +105,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
         "media" => media(ui, st, body),
         "net" => net(ui, st, body),
         "bt" => bt(ui, st, body),
+        "privacy" => crate::privacy::popup(ui, st, body),
         "sys" => sys(ui, st, body),
         "profile" => profile(ui, st, body),
         "tray" => tray(ui, st, body),
@@ -112,7 +114,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     }
 }
 
-fn head(ui: &mut Ui, r: R, icon: &str, title: &str, sub: &str) -> i32 {
+pub(crate) fn head(ui: &mut Ui, r: R, icon: &str, title: &str, sub: &str) -> i32 {
     let t = ui.t;
     ui.cv.icon(icon, r.x, r.y + 3, 2, t.red);
     let w = ui.text_in(PX, R::new(r.x + 22, r.y, r.w - 22, 20), title, t.text);

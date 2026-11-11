@@ -152,6 +152,10 @@ pub enum Msg {
     TrayMenu(String, Vec<menu::MItem>),
     Net(net::NetState),
     Bt(net::BtState),
+    /// индикатор приватности: кто пишет микрофон, кто держит камеру, кто смотрит трансляцию
+    Mic(Vec<String>),
+    Camera(Vec<String>),
+    CastWho(u64, String),
     Pam(bool),
     Prof(crate::profile::Prof),
     Clip(Vec<String>),
@@ -240,6 +244,11 @@ pub struct State {
     pub osd: Option<(&'static str, Instant)>,
     /// шторка для трансляций опущена
     pub curtain: Option<crate::curtain::Curtain>,
+    /// индикатор приватности (privacy.rs): кто пишет микрофон, кто держит камеру, у каких потоков
+    /// PipeWire уже спрошено, кто смотрит
+    pub mic: Vec<String>,
+    pub camera: Vec<String>,
+    pub cast_asked: Vec<(u64, u32)>,
     pub audio: audio::AudioState,
     /// показанный плеер (media_pick_sync), все живые и выбранный в шапке всплывашки (#24)
     pub media: media::MediaState,
@@ -464,6 +473,9 @@ impl State {
             anim_demo: None,
             osd: None,
             curtain: None,
+            mic: vec![],
+            camera: vec![],
+            cast_asked: vec![],
             audio: audio::AudioState::default(),
             media: media::MediaState::default(),
             players: Vec::new(),

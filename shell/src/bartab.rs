@@ -252,6 +252,11 @@ fn tab_bar_look(ui: &mut Ui, st: &State, b: R) {
     y += 32;
     // #21: ноутбук от сети — заряженная батарея в баре не нужна
     ui.toggle(R::new(col(0), y, cw * 2 + (col(1) - col(0) - cw), 26), "прятать полную батарею", "", s.bat_hide_full, Act::SBool("bat_hide_full"));
+    y += 32;
+    // индикатор приватности: что он стережёт
+    for (i, (k, label, on)) in [("privacy_mic", "приватность: микрофон", s.privacy_mic), ("privacy_cam", "камера", s.privacy_cam), ("privacy_screen", "показ экрана", s.privacy_screen)].into_iter().enumerate() {
+        ui.toggle(R::new(col(i as i32), y, cw, 26), label, "", on, Act::SBool(k));
+    }
     y += 40;
     y = title(ui, b.x, y, b.w, "как выглядит");
     shape_preview(ui, st, R::new(b.x, y, b.w, (b.bottom() - y).clamp(40, 96)));

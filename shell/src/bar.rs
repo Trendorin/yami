@@ -323,6 +323,7 @@ fn module(ui: &mut Ui, st: &State, out: &str, m: &str, x: i32, measure: bool) ->
             }
             w
         }
+        "privacy" => crate::privacy::bar(ui, st, x, H, measure),
         "bt" => {
             if !st.bt.present {
                 return 0;

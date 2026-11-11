@@ -205,6 +205,10 @@ pub struct Settings {
     pub tray_pixel: bool,
     /// модуль bat прячется от сети без зарядки: полная или держит порог заряда (#21)
     pub bat_hide_full: bool,
+    /// модуль privacy (privacy.rs): что из трёх он показывает
+    pub privacy_mic: bool,
+    pub privacy_cam: bool,
+    pub privacy_screen: bool,
     /// чужие программы, которые recolor красит по палитре (THEME_APPS; настройки → цвет → программы,
     /// установщик); выключенную yami не трогает. До 2.7 — appThemes: foot, cava, starship сверх остальных
     pub theme_apps: Vec<String>,
@@ -426,7 +430,7 @@ fn group(m: &str) -> i32 {
         "workspaces" => 1,
         "mode" => 2,
         "tray" => 3,
-        "net" | "netspeed" | "bt" | "kb" | "cpu" | "ram" | "temp" | "bat" | "profile" | "night" => 4,
+        "net" | "netspeed" | "bt" | "kb" | "cpu" | "ram" | "temp" | "bat" | "profile" | "night" | "privacy" => 4,
         "vol" | "media" => 5,
         "clock" | "notif" | "settings" | "power" => 6,
         _ => 7,
@@ -454,6 +458,7 @@ pub const ALL_MODULES: &[(&str, &str)] = &[
     ("bat", "батарея"),
     ("profile", "профиль питания"),
     ("night", "ночной свет"),
+    ("privacy", "приватность"),
     ("clock", "часы"),
     ("notif", "уведомления"),
     ("settings", "настройки"),
@@ -566,6 +571,9 @@ impl Default for Settings {
             tray_mode: "icons".into(),
             tray_pixel: false,
             bat_hide_full: false,
+            privacy_mic: true,
+            privacy_cam: true,
+            privacy_screen: true,
             theme_apps: THEME_APPS.iter().map(|a| a.0.to_string()).collect(),
             clock_seconds: false,
             clock_date: true,

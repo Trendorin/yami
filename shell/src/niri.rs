@@ -43,10 +43,28 @@ pub struct Ws {
     pub urgent: bool,
 }
 
+/// трансляция экрана (события niri Cast*, niri ≥ 25.11): что показывается и кому. Свои снимки
+/// (grim шелла и yami-shot) сюда не попадают — см. `ours`
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Cast {
+    pub stream: u64,
+    pub session: u64,
+    /// PipeWire (порталы: OBS, браузер, Discord) — такую niri умеет остановить; иначе wlr-screencopy
+    pub pipewire: bool,
+    pub active: bool,
+    /// монитор или окно; оба пусты — цель ещё не выбрана
+    pub output: String,
+    pub window: Option<u64>,
+    pub pw_node: Option<u32>,
+    /// кто смотрит: имя процесса (wlr-screencopy) или программы из PipeWire (privacy.rs); пусто — не знаем
+    pub who: String,
+}
+
 #[derive(Default)]
 pub struct Niri {
     pub ws: Vec<Ws>,
     pub wins: Vec<Win>,
+    pub casts: Vec<Cast>,
     pub kb_names: Vec<String>,
     pub kb_idx: usize,
     pub overview: bool,
@@ -68,6 +86,8 @@ pub enum Ev {
     /// окно открылось впервые
     NewWindow(u64),
     KbSwitched,
+    /// трансляции экрана поменялись
+    Casts,
     Changed,
 }
 
@@ -466,8 +486,73 @@ impl Niri {
             "OverviewOpenedOrClosed" => {
                 self.overview = d["is_open"].as_bool().unwrap_or(false);
             }
+            // весь список — в начале потока, дальше по одной: началась (или сменилась) и кончилась
+            "CastsChanged" => {
+                let old = std::mem::take(&mut self.casts);
+                self.casts = d["casts"].as_array().into_iter().flatten().filter_map(|c| cast_of(c, &old)).collect();
+                out.push(Ev::Casts);
+            }
+            "CastStartedOrChanged" => {
+                if let Some(c) = cast_of(&d["cast"], &self.casts) {
+                    match self.casts.iter_mut().find(|x| x.stream == c.stream) {
+                        Some(x) => *x = c,
+                        None => self.casts.push(c),
+                    }
+                    out.push(Ev::Casts);
+                }
+            }
+            "CastStopped" => {
+                let id = d["stream_id"].as_u64();
+                self.casts.retain(|x| Some(x.stream) != id);
+                out.push(Ev::Casts);
+            }
             _ => {}
         }
         out
     }
+}
+
+/// трансляция из события; свои (снимки шелла и yami-shot) — None. Имя смотрящего сохраняется из
+/// прошлого состояния того же потока: PipeWire его не повторяет
+fn cast_of(v: &Value, old: &[Cast]) -> Option<Cast> {
+    let stream = v["stream_id"].as_u64()?;
+    let pid = v["pid"].as_u64().map(|p| p as u32);
+    if pid.is_some_and(ours) {
+        return None;
+    }
+    let t = &v["target"];
+    let mut c = Cast {
+        stream,
+        session: v["session_id"].as_u64().unwrap_or(0),
+        pipewire: v["kind"].as_str() == Some("PipeWire"),
+        active: v["is_active"].as_bool().unwrap_or(true),
+        output: t["Output"]["name"].as_str().unwrap_or("").into(),
+        window: t["Window"]["id"].as_u64(),
+        pw_node: v["pw_node_id"].as_u64().map(|n| n as u32),
+        who: pid.and_then(|p| std::fs::read_to_string(format!("/proc/{p}/comm")).ok()).map(|s| s.trim().to_string()).unwrap_or_default(),
+    };
+    if c.who.is_empty() {
+        c.who = old.iter().find(|o| o.stream == stream && o.pw_node == c.pw_node).map(|o| o.who.clone()).unwrap_or_default();
+    }
+    Some(c)
+}
+
+/// снимок экрана от нас самих: процесс — шелл, yami-shot или их ребёнок (grim) — до трёх колен вверх
+fn ours(pid: u32) -> bool {
+    let me = std::process::id();
+    let mut p = pid;
+    for _ in 0..4 {
+        if p == me || p <= 1 {
+            return p == me;
+        }
+        let comm = std::fs::read_to_string(format!("/proc/{p}/comm")).unwrap_or_default();
+        if matches!(comm.trim(), "yami-shell" | "yami-shot") {
+            return true;
+        }
+        let stat = std::fs::read_to_string(format!("/proc/{p}/stat")).unwrap_or_default();
+        // поле 4 — родитель; имя (поле 2) в скобках может содержать пробелы
+        let Some(pp) = stat.rsplit_once(')').and_then(|(_, r)| r.split_whitespace().nth(1)?.parse().ok()) else { return false };
+        p = pp;
+    }
+    false
 }

@@ -160,6 +160,7 @@ impl App {
             }
             Act::BtScan => net::bt_scan(&self.st.bt.adapter.clone(), self.tx.clone()),
             Act::BtForget(path) => net::bt_forget(&self.st.bt.adapter.clone(), &path, self.tx.clone(), self.st.bt.clone()),
+            Act::CastStop(id) => self.st.niri.act(serde_json::json!({"StopCast": {"session_id": id}})),
             Act::BtSettings => {
                 self.close_popup();
                 self.open_settings_tab("bt");

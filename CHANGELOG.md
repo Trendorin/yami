@@ -9,6 +9,7 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+- A privacy light for the bar (`privacy`): it lights up while a program records the microphone, holds the camera or shares the screen, and a click says which one, mutes the microphone, stops a screen share or lowers the curtain. It watches only while it is on the bar; what it watches: `privacyMic`, `privacyCam`, `privacyScreen` (settings → bar → look; from the yami-lite fork).
 - The screen locks before any sleep, not only from the power menu: closing the lid, `systemctl suspend` or the system's own sleep timer wait until the lock screen is up (settings → system, `lockSleep`; from the yami-lite fork).
 - Bluetooth without a terminal (#36): settings → bluetooth lists the connected, paired and nearby devices with their battery, and connects, disconnects, pairs and forgets them; the bar popup opens it with «all devices»; a `bt` desktop widget shows what is connected and how charged it is; paired headphones, speakers, keyboards and mice reconnect when Bluetooth turns on (`btReconnect`). All through BlueZ on D-Bus, nothing else to install.
 - Updates and modules trust only what the installed version was built with: the release keys are part of the program, a tag is taken by its full name and the build runs from the very commit the checked tag names, so a branch called like a version cannot stand in for it. `yami report` also hides the weather city and the names of hidden drives.

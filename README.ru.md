@@ -46,7 +46,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Trendorin/yami/main/install.
   блокировки (PAM), сервер уведомлений с историей и режимом «не беспокоить», OSD, трей
   (StatusNotifierItem с DBusMenu), календарь, всплывающие панели звука, музыки, сети, Bluetooth и системы,
   переключатель профиля питания (power-profiles-daemon), устройства Bluetooth, которые сопрягаются,
-  подключаются и забываются прямо в настройках, и своё **окно пароля polkit** вместо Qt/GTK-агента.
+  подключаются и забываются прямо в настройках, и своё **окно пароля polkit** вместо Qt/GTK-агента. Индикатор приватности в баре говорит, какая
+  программа пишет микрофон, держит камеру или показывает экран.
 - **Виджеты рабочего стола.** Часы, календарь, погода, устройства Bluetooth с зарядом, вывод своего скрипта, карточка музыки с
   эквалайзером по звуку, графики
   процессора, памяти, температуры и сетевого трафика rx/tx: пять стилей (столбики, линия, клетки,
@@ -359,7 +360,7 @@ install -Dm755 target/release/yami-shell ~/.local/bin/yami-shell
 печатает справку в цветах палитры, `yami help <команда>` — про одну команду.
 
 ```sh
-yami open settings:keys       # launcher clipboard settings[:вкладка] power lock walls screenshot cal sound media net bt sys profile tray
+yami open settings:keys       # launcher clipboard settings[:вкладка] power lock walls screenshot cal sound media net bt sys profile tray weather privacy
 yami palette ash              # без аргумента — список палитр; свой цвет: '#3a9fd0'; или wallpaper
 yami wallpaper ~/x.png        # свои обои; без пути — пиксельные из палитры
 yami restart                  # перезапустить шелл (подождёт, пока в фокусе игра)

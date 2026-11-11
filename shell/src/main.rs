@@ -19,6 +19,8 @@ mod bar;
 mod bartab;
 mod bttab;
 mod sleep;
+mod camera;
+mod privacy;
 mod bundle;
 mod calc;
 mod cli;

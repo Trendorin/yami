@@ -34,7 +34,7 @@
 справку, а не запускает шелл. `yami help <команда>` объясняет одну команду.
 
 ```sh
-yami open settings:updates                # панель: launcher clipboard settings[:вкладка] power lock walls screenshot cal sound media net bt sys profile tray
+yami open settings:updates                # панель: launcher clipboard settings[:вкладка] power lock walls screenshot cal sound media net bt sys profile tray weather privacy
 yami palette | yami palette ash | yami palette '#3a9fd0' | yami palette wallpaper
 yami palette show | yami palette export NAME   # все цвета с HEX ({{имена}} для шаблонов); палитра как сохранённая тема
 yami wallpaper ~/Pictures/x.png           # без пути: пиксельные обои палитры
@@ -187,12 +187,13 @@ text-color={{text}}
 
 | Ключ | По умолчанию | Значение |
 |---|---|---|
-| `barLeft`, `barCenter`, `barRight` | см. `config list` | id модулей по порядку: `launcher` `workspaces` `mode` `tasks` `media` `tray` `net` `netspeed` `bt` `kb` `cpu` `ram` `temp` `gpu` `disk` `weather` `bat` `vol` `profile` `clock` `notif` `settings` `power` `sep` (`bat`: батарея ноутбука, скрыт без неё; `gpu`: загрузка видеокарты из amdgpu или `nvidia-smi` раз в 3 с, скрыт без обоих, «сон», пока дискретка ноутбука спит; `disk`: заполненность `/`) |
+| `barLeft`, `barCenter`, `barRight` | см. `config list` | id модулей по порядку: `launcher` `workspaces` `mode` `tasks` `media` `tray` `net` `netspeed` `bt` `kb` `cpu` `ram` `temp` `gpu` `disk` `weather` `bat` `vol` `profile` `night` `privacy` `clock` `notif` `settings` `power` `sep` (`bat`: батарея ноутбука, скрыт без неё; `gpu`: загрузка видеокарты из amdgpu или `nvidia-smi` раз в 3 с, скрыт без обоих, «сон», пока дискретка ноутбука спит; `disk`: заполненность `/`; `privacy`: горит, пока программа пишет микрофон, держит камеру или показывает экран, иначе скрыт; щелчок говорит, кто именно, и может заглушить микрофон или остановить показ) |
 | `cpuStyle` | `"gauge"` | `gauge` `graph` `number` — для `cpu` `ram` `gpu` `disk` (у `disk` нет истории: `graph` рисует шкалу) |
 | `tempStyle` | `"full"` | модуль `temp`: `full` — как `cpu` и `ram` (подпись и `cpuStyle`), `compact` — столбик-градусник и число |
 | `trayMode` | `"icons"` | `icons` — все значки трея в баре; `arrow` — одна стрелка, по ней они открываются списком (щелчки — как в баре; точка, когда программа зовёт). Апплет сети (`nm-applet` и подобные) не показывается, пока в баре есть `net` |
 | `trayPixel` | `false` | значки трея (в баре и в списке за стрелкой) перерисованы клетками, как док и лаунчер с `iconPixel`: в своих цветах или в тонах палитры с `iconTint` (#19) |
 | `batHideFull` | `false` | модуль `bat` прячется, пока ноутбук от сети и не заряжается: батарея полная или держит порог заряда (#21) |
+| `privacyMic`, `privacyCam`, `privacyScreen` | `true` | за чем следит модуль `privacy`: микрофон (записи PulseAudio/PipeWire не с вывода звука), камера (кто держит `/dev/video*`), показ экрана (трансляции niri; свои снимки шелла не в счёт); следит, только пока модуль в баре |
 | `mediaViz` | `"bars"` | эквалайзер модуля `media` и всплывашки музыки: `bars` `line` `blocks` `wave` `dots` или `off` (без эквалайзера и без захвата звука для него) |
 | `mediaView` | `"cover"` | что показывает всплывашка музыки (кнопка в её шапке переключает): `cover` (обложка, кнопки, эквалайзер), `both` (обложка и текст), `lyrics` (текст), `minimal` (название и кнопки) |
 | `clockSeconds`, `clockDate` | `false`, `true` | |

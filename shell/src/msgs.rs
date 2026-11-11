@@ -15,12 +15,17 @@ impl App {
                 // первый полный список окон: только теперь видно, что уже открыто
                 let full_list = v.get("WindowsChanged").is_some();
                 let evs = self.st.niri.handle(v);
+                let mut casts = false;
                 for e in evs {
                     match e {
                         niri::Ev::KbSwitched => self.show_osd("layout"),
                         niri::Ev::NewWindow(id) => self.on_new_window(id),
+                        niri::Ev::Casts => casts = true,
                         niri::Ev::Changed => {}
                     }
+                }
+                if casts {
+                    self.casts_changed();
                 }
                 if !layout_only {
                     self.st.session.dirty = true;
@@ -119,6 +124,26 @@ impl App {
                 let widget = self.st.set.widgets.iter().any(|w| w.on && w.kind == "bt");
                 let tab = self.st.modal == Some(Modal::Settings) && self.st.stab == "bt";
                 self.dirty_where(|k| matches!(k, SKind::Popup | SKind::Bar) || (widget && matches!(k, SKind::Widget(_))) || (tab && *k == SKind::Modal));
+            }
+            Msg::Mic(v) => {
+                // модуль убрали, пока нить спрашивала — не показывать
+                let v = if crate::audio::WANT_REC.load(std::sync::atomic::Ordering::Relaxed) { v } else { vec![] };
+                if v != self.st.mic {
+                    self.st.mic = v;
+                    self.privacy_dirty();
+                }
+            }
+            Msg::Camera(v) => {
+                if v != self.st.camera {
+                    self.st.camera = v;
+                    self.privacy_dirty();
+                }
+            }
+            Msg::CastWho(stream, who) => {
+                if let Some(c) = self.st.niri.casts.iter_mut().find(|c| c.stream == stream) {
+                    c.who = who;
+                    self.privacy_dirty();
+                }
             }
             Msg::PrepareSleep => self.prepare_sleep(),
             Msg::Pam(ok) => self.on_pam(ok),

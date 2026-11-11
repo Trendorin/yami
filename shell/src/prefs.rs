@@ -220,6 +220,7 @@ impl App {
     /// процессы при шелле: ночной свет, модули-скрипты — по настройкам
     pub fn side_sync(&mut self) {
         self.night_sync();
+        self.privacy_sync();
         let s = &self.st.set;
         let mut on_bar: Vec<String> = s.bar_left.iter().chain(&s.bar_center).chain(&s.bar_right).cloned().collect();
         // виджет-скрипт на столе — тот же модуль, запущенный один раз

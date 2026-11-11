@@ -131,6 +131,8 @@ pub enum Act {
     BtForget(String),
     /// настройки → bluetooth: все устройства (#36)
     BtSettings,
+    /// остановить трансляцию PipeWire (сеанс niri)
+    CastStop(u64),
     /// полный менеджер bluetooth (blueman или bluetoothctl в терминале)
     BtManager,
     Dnd,

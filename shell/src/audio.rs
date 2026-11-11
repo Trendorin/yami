@@ -115,11 +115,17 @@ const SOURCE: u8 = 2;
 const STREAM: u8 = 4;
 const SERVER: u8 = 8;
 const ALL: u8 = SINK | SOURCE | STREAM | SERVER;
+/// записи программ (source-output): только для индикатора микрофона, и только пока он в баре
+const REC: u8 = 16;
 
-/// «Event 'change' on sink-input #12» → что переспросить; записи программ (source-output),
-/// клиенты и модули шеллу не нужны — на них ни одного запуска pactl
+/// индикатор микрофона (privacy.rs) в баре: тогда поток звука следит и за записями программ
+pub static WANT_REC: AtomicBool = AtomicBool::new(false);
+
+/// «Event 'change' on sink-input #12» → что переспросить; клиенты и модули шеллу не нужны, записи
+/// программ — только с индикатором микрофона: на остальное ни одного запуска pactl
 fn facility(l: &str) -> u8 {
     match l.split(" on ").nth(1).and_then(|r| r.split_whitespace().next()) {
+        Some("source-output") if WANT_REC.load(Ordering::Relaxed) => REC,
         Some("sink") => SINK,
         Some("source") => SOURCE,
         Some("sink-input") => STREAM,
@@ -150,6 +156,36 @@ fn refresh(mut a: AudioState, what: u8) -> AudioState {
 
 pub fn query() -> AudioState {
     refresh(AudioState::default(), ALL)
+}
+
+/// кто сейчас пишет микрофон: записи программ не с мониторов звука (эквалайзер шелла, cava слушают
+/// вывод, а не микрофон), не на паузе и не измерители уровня (pavucontrol); по имени программы
+pub fn recorders() -> Vec<String> {
+    let short = Command::new("pactl").args(["list", "short", "sources"]).output().map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
+    let monitors: Vec<u64> = short.lines().filter_map(|l| {
+        let mut f = l.split('\t');
+        let i = f.next()?.parse().ok()?;
+        f.next()?.ends_with(".monitor").then_some(i)
+    }).collect();
+    let mut out: Vec<String> = vec![];
+    for x in pactl_json(&["list", "source-outputs"]).as_array().into_iter().flatten() {
+        let p = &x["properties"];
+        if x["source"].as_u64().is_some_and(|s| monitors.contains(&s)) || x["corked"].as_bool() == Some(true) || p["media.name"].as_str() == Some("Peak detect") {
+            continue;
+        }
+        let name: String = p["application.name"].as_str().or(p["application.process.binary"].as_str()).unwrap_or("?").into();
+        if !out.contains(&name) {
+            out.push(name);
+        }
+    }
+    out
+}
+
+/// индикатор микрофона только что появился в баре: спросить сразу, не дожидаясь событий
+pub fn recorders_now(tx: Sender<Msg>) {
+    let _ = std::thread::Builder::new().name("mic".into()).spawn(move || {
+        let _ = tx.send(Msg::Mic(recorders()));
+    });
 }
 
 static SET: OnceLock<mpsc::Sender<Vec<String>>> = OnceLock::new();
@@ -240,6 +276,14 @@ pub fn spawn(tx: Sender<Msg>) {
                     std::thread::sleep(std::time::Duration::from_millis(40));
                     while let Ok(f) = lrx.try_recv() {
                         what |= f;
+                    }
+                    // записи программ: главная сама сравнит с прошлым (её могли спросить и мимо этой нити)
+                    if what & REC != 0 {
+                        let _ = tx2.send(Msg::Mic(recorders()));
+                        what &= !REC;
+                        if what == 0 {
+                            continue;
+                        }
                     }
                     let a = refresh(last.clone(), what);
                     if a != last {

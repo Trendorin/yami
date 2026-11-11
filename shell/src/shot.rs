@@ -29,6 +29,7 @@ const TARGETS: &[&str] = &[
     "bar:tasks-mid",
     "bar:tasks-right",
     "bar:tasks-crowd",
+    "bar:privacy",
     "settings:color",
     "settings:bar",
     "settings:bar-look",
@@ -65,6 +66,7 @@ const TARGETS: &[&str] = &[
     "popup:net",
     "popup:wifi",
     "popup:bt",
+    "popup:privacy",
     "popup:sys",
     "popup:profile",
     "popup:tray",
@@ -248,6 +250,11 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                     st.niri.wins.push(Win { id: i, app_id: "kitty".into(), title: format!("~/src/project-{i}"), ws: Some(1), ..Default::default() });
                 }
             }
+        } else if arg == "privacy" {
+            // индикатор приватности: микрофон, камера и показ экрана заняты разом
+            st.set.bar_width_pc = 100;
+            st.set.bar_right = v(&["privacy", "sep", "net", "vol", "sep", "clock", "sep", "settings", "power"]);
+            mock_privacy(st);
         } else if arg.starts_with("sys") {
             // #8: видеокарта и диск рядом с цп, озу и температурой; sys-graph — стилем «график»
             st.set.bar_width_pc = 100;
@@ -266,6 +273,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
         st.set = set;
         st.media.title = media;
         st.niri.wins = wins;
+        (st.mic, st.camera, st.niri.casts) = (vec![], vec![], vec![]);
         return;
     }
     st.modal = None;
@@ -474,6 +482,9 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             }
             if arg == "bt" {
                 mock_bt(st);
+            }
+            if arg == "privacy" {
+                mock_privacy(st);
             }
             if arg == "sound" {
                 // два выхода и два микрофона: видны оба списка выбора (#10)
@@ -823,3 +834,18 @@ fn mock_weather(st: &mut State, city: bool) {
     };
 }
 
+
+/// образец индикатора приватности: браузер пишет микрофон, OBS держит камеру и показывает экран,
+/// вторая трансляция (окно) на паузе
+fn mock_privacy(st: &mut State) {
+    use crate::niri::Cast;
+    st.mic = vec!["Firefox".into()];
+    st.camera = vec!["obs".into()];
+    st.audio.ready = true;
+    st.niri.cast_only = true;
+    st.niri.wins.push(Win { id: 77, app_id: "kitty".into(), title: "~/src/yami".into(), ws: Some(1), ..Default::default() });
+    st.niri.casts = vec![
+        Cast { stream: 1, session: 1, pipewire: true, active: true, output: "DP-2".into(), pw_node: Some(90), who: "OBS Studio".into(), ..Default::default() },
+        Cast { stream: 2, session: 2, pipewire: true, active: false, window: Some(77), ..Default::default() },
+    ];
+}
