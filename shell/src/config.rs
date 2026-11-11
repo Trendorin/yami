@@ -265,6 +265,8 @@ pub struct Settings {
     pub lock_after: u32,
     /// запирать экран перед любым сном: крышка, systemctl suspend, таймер системы (sleep.rs)
     pub lock_sleep: bool,
+    /// OSD при смене яркости подсветки (ноутбук; bright.rs)
+    pub osd_bright: bool,
     pub screen_off_after: u32,
     pub dnd: bool,
     pub notif_timeout: u32,
@@ -605,6 +607,7 @@ impl Default for Settings {
             greet_numlock: true,
             lock_after: 10,
             lock_sleep: true,
+            osd_bright: true,
             screen_off_after: 15,
             dnd: false,
             notif_timeout: 7,

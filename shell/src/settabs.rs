@@ -444,7 +444,10 @@ pub(crate) fn tab_notif(ui: &mut Ui, st: &State, b: R) {
     if s.osd_pos != "center" {
         num_btn(ui, R::new(rx, y, half, 26), "от края", s.num("osd_offset"), "osd_offset");
     }
-    y += 40;
+    y += 36;
+    // яркость: подсветка ноутбука (bright.rs), у настольного монитора её нет
+    ui.toggle(R::new(rx, y, half, 40), "яркость на экране", "при смене подсветки ноутбука", s.osd_bright, Act::SBool("osd_bright"));
+    y += 50;
     y = title(ui, b.x, y, b.w, "сервер");
     ui.toggle(R::new(lx, y, b.w, 40), "сервер уведомлений yami", "выкл — mako, dunst и т.п. (после перезапуска шелла)", s.agent_notif, Act::SBool("agent_notif"));
 }

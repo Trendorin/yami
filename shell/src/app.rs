@@ -154,6 +154,8 @@ pub enum Msg {
     Bt(net::BtState),
     /// индикатор приватности: кто пишет микрофон, кто держит камеру, кто смотрит трансляцию
     Mic(Vec<String>),
+    /// яркость подсветки 0..1 сменилась (bright.rs)
+    Bright(f32),
     Camera(Vec<String>),
     CastWho(u64, String),
     /// прицел niri: app-id выбранного окна (пусто — отменили)
@@ -251,6 +253,8 @@ pub struct State {
     /// индикатор приватности (privacy.rs): кто пишет микрофон, кто держит камеру, у каких потоков
     /// PipeWire уже спрошено, кто смотрит
     pub mic: Vec<String>,
+    /// доля яркости экрана (ноутбук; None — подсветки нет или ещё не менялась)
+    pub bright: Option<f32>,
     pub camera: Vec<String>,
     pub cast_asked: Vec<(u64, u32)>,
     pub audio: audio::AudioState,
@@ -481,6 +485,7 @@ impl State {
             osd: None,
             curtain: None,
             mic: vec![],
+            bright: None,
             camera: vec![],
             cast_asked: vec![],
             audio: audio::AudioState::default(),
@@ -702,6 +707,7 @@ pub fn run() {
     audio::spawn(tx.clone());
     media::spawn(tx.clone());
     net::spawn_bt(tx.clone());
+    crate::bright::spawn(tx.clone());
     app.sleep_ack = Some(crate::sleep::spawn(tx.clone()));
     app.write_palette();
     crate::prefs::write_style(&app.st.set);

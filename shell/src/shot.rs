@@ -95,6 +95,7 @@ const TARGETS: &[&str] = &[
     "curtain",
     "curtain:badge",
     "osd:curtain",
+    "osd:bright",
     "settings:shots",
     "settings:windows",
     "settings:dock",
@@ -594,7 +595,8 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             crate::notif::size(st, &mut res.fonts)
         }
         "osd" => {
-            st.osd = Some((if arg == "curtain" { "curtain" } else { "volume" }, Instant::now()));
+            st.osd = Some((match arg { "curtain" => "curtain", "bright" => "bright", _ => "volume" }, Instant::now()));
+            st.bright = Some(0.65);
             if arg == "curtain" {
                 st.curtain = Some(Default::default());
             }

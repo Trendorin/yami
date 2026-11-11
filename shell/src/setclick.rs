@@ -109,6 +109,7 @@ impl App {
                     "anim_close" => s.anim_close = !s.anim_close,
                     "scanlines" => s.scanlines = !s.scanlines,
                     "lock_sleep" => s.lock_sleep = !s.lock_sleep,
+                    "osd_bright" => s.osd_bright = !s.osd_bright,
                     "icon_pixel" => s.icon_pixel = !s.icon_pixel,
                     "icon_tint" => s.icon_tint = !s.icon_tint,
                     "stacking" => {

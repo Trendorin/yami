@@ -17,6 +17,7 @@ mod displays;
 mod audio;
 mod bar;
 mod bartab;
+mod bright;
 mod bttab;
 mod sleep;
 mod camera;

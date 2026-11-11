@@ -125,6 +125,12 @@ impl App {
                 let tab = self.st.modal == Some(Modal::Settings) && self.st.stab == "bt";
                 self.dirty_where(|k| matches!(k, SKind::Popup | SKind::Bar) || (widget && matches!(k, SKind::Widget(_))) || (tab && *k == SKind::Modal));
             }
+            Msg::Bright(v) => {
+                self.st.bright = Some(v);
+                if self.st.set.osd_bright {
+                    self.show_osd("bright");
+                }
+            }
             Msg::Mic(v) => {
                 // модуль убрали, пока нить спрашивала — не показывать
                 let v = if crate::audio::WANT_REC.load(std::sync::atomic::Ordering::Relaxed) { v } else { vec![] };

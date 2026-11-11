@@ -293,6 +293,7 @@ the screen-share picker and automount belong to [yami-agents](#yami-agents).
 | `notifMax`, `notifHistory` | `4`, `50` | cards on screen at once; how many the history keeps |
 | `notifPos` | `"top-right"` | where the cards appear: `top-right`, `top-left`, `top`, `bottom-right`, `bottom-left`, `bottom` (settings → notifications); they keep clear of the bar and the dock |
 | `osdPos` | `"bottom"` | the volume and brightness OSD: `bottom`, `top` (under the bar) or `center` |
+| `osdBright` | `true` | show the OSD when the laptop backlight changes (keys, `brightnessctl`, the firmware); a desktop monitor has no backlight and nothing runs for it |
 | `notifOffset`, `osdOffset` | `10`, `64` | distance of the notification cards and of the OSD from their screen edge, px (0–400); next to the bar it is counted from the bar |
 | `notifImages` | `true` | pictures in cards (icons and previews; at most 1024², files ≤ 16 MB) |
 | `notifCast` | `false` | notifications show in recordings and streams; off: viewers never see them (yami-niri ≥ `.5` simply leaves them out, other niri blacks them out) |

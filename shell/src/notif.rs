@@ -227,6 +227,12 @@ pub fn draw_osd(ui: &mut Ui, st: &State, w: i32, _h: i32) {
         let v = if a.muted { "тишина".to_string() } else { format!("{}%", (a.volume * 100.0).round()) };
         ui.text_right(PX, R::new(12, 8, fr.w - 24, 20), &v, if a.muted { t.text_faint } else { t.text });
         ui.cv.gauge(R::new(12, 34, fr.w - 24, 10), 20, if a.muted { 0.0 } else { a.volume as f32 }, if a.volume > 1.0 { t.ember } else { t.red }, t.surface_hi.lerp(t.border, 0.45), 2);
+    } else if kind == "bright" {
+        let v = st.bright.unwrap_or(0.0);
+        ui.cv.icon("sun", 12, 11, 2, t.red);
+        ui.text_in(PX, R::new(34, 8, 120, 20), "яркость", t.text_dim);
+        ui.text_right(PX, R::new(12, 8, fr.w - 24, 20), &format!("{}%", (v * 100.0).round()), t.text);
+        ui.cv.gauge(R::new(12, 34, fr.w - 24, 10), 20, v, t.red, t.surface_hi.lerp(t.border, 0.45), 2);
     } else if kind == "curtain" {
         let on = st.curtain.is_some();
         ui.cv.icon(if on { "lock" } else { "eye" }, 12, 11, 2, t.red);
