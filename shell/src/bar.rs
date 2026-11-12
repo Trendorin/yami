@@ -1231,7 +1231,7 @@ impl App {
     pub fn mk_bar(&mut self, out: &str) {
         use smithay_client_toolkit::shell::wlr_layer::{KeyboardInteractivity, Layer};
         let p = self.bar_place(out);
-        let id = self.mk(SKind::Bar, out, Layer::Top, "yami-bar", p.anchor, p.size, p.margin, H, KeyboardInteractivity::None);
+        let id = self.mk(SKind::Bar, out, Layer::Top, "yami-bar", p.anchor, p.size, p.margin, p.excl, KeyboardInteractivity::None);
         if let Some(s) = self.surfs.get_mut(&id) {
             s.anchor_side = p.key;
             // mk считает угол по отступам сверху и слева, а у нижнего и правого бара они с другой стороны
@@ -1253,7 +1253,9 @@ impl App {
             "right" => (Anchor::RIGHT | Anchor::TOP | Anchor::BOTTOM, (side, m, side, 0), (th, 0), (ow - m - th, side)),
             _ => (Anchor::TOP | Anchor::LEFT | Anchor::RIGHT, (m, side, 0, side), (0, th), (side, m)),
         };
-        BarPlace { anchor, margin, size, origin, key }
+        // нижний и правый: тень лежит между плашкой и краем, окна встают до самой плашки
+        let excl = if matches!(self.st.set.bar_pos.as_str(), "bottom" | "right") { th } else { H };
+        BarPlace { anchor, margin, size, origin, key, excl }
     }
 
     /// форма бара сменилась (настройки, размер монитора): поверхность меняется на месте, не
@@ -1272,7 +1274,7 @@ impl App {
             s.layer.set_anchor(p.anchor);
             s.layer.set_size(p.size.0 as u32, p.size.1 as u32);
             s.layer.set_margin(p.margin.0, p.margin.1, p.margin.2, p.margin.3);
-            s.layer.set_exclusive_zone(H);
+            s.layer.set_exclusive_zone(p.excl);
             s.layer.commit();
             s.margin = p.origin;
             s.applied = p.origin;
@@ -1323,14 +1325,14 @@ impl App {
         if self.st.bar_hidden || !self.bar_on(out) {
             return (0, 0, 0, 0);
         }
+        // от края экрана до дальней стороны плашки: у нижнего и правого бара между ними ещё её тень
+        let Some(b) = self.bar_rect(out) else { return (0, 0, 0, 0) };
         let (ow, oh) = self.output_size(out);
-        let s = &self.st.set;
-        let span = geo(s, if vert(s) { oh } else { ow }).0 + H;
-        match s.bar_pos.as_str() {
-            "bottom" => (0, 0, span, 0),
-            "left" => (0, 0, 0, span),
-            "right" => (0, span, 0, 0),
-            _ => (span, 0, 0, 0),
+        match self.st.set.bar_pos.as_str() {
+            "bottom" => (0, 0, oh - b.y, 0),
+            "left" => (0, 0, 0, b.right()),
+            "right" => (0, ow - b.x, 0, 0),
+            _ => (b.bottom(), 0, 0, 0),
         }
     }
 
@@ -1341,12 +1343,14 @@ impl App {
         }
         let (ow, oh) = self.output_size(out);
         let s = &self.st.set;
-        let (m, side, _) = geo(s, if vert(s) { oh } else { ow });
+        let (m, side, th) = geo(s, if vert(s) { oh } else { ow });
+        // плашка рисуется в начале поверхности, тень (th - H) — после неё: справа и снизу
+        let sh = th - H;
         Some(match s.bar_pos.as_str() {
-            "bottom" => R::new(side, oh - m - H, ow - 2 * side, H),
-            "left" => R::new(m, side, H, oh - 2 * side),
-            "right" => R::new(ow - m - H, side, H, oh - 2 * side),
-            _ => R::new(side, m, ow - 2 * side, H),
+            "bottom" => R::new(side, oh - m - th, ow - 2 * side - sh, H),
+            "left" => R::new(m, side, H, oh - 2 * side - sh),
+            "right" => R::new(ow - m - th, side, H, oh - 2 * side - sh),
+            _ => R::new(side, m, ow - 2 * side - sh, H),
         })
     }
 }
@@ -1359,6 +1363,8 @@ struct BarPlace {
     size: (i32, i32),
     origin: (i32, i32),
     key: String,
+    /// исключённая зона от своего края (без отступа: его niri прибавляет сам)
+    excl: i32,
 }
 
 /// бар на экране out (barOutputs = list, present — экраны сейчас): список пуст — везде; ни одного
