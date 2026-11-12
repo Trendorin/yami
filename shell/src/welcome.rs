@@ -618,7 +618,9 @@ impl App {
 
     /// ход установки из нити wizinst
     pub fn on_install(&mut self, e: Ev) {
-        let Some(w) = self.st.welcome.as_mut() else { return };
+        // мастер, закрытый на время установки, ждёт в welcome_parked: её ход доходит и туда
+        let parked = self.st.welcome.is_none();
+        let Some(w) = (if parked { self.st.welcome_parked.as_mut() } else { self.st.welcome.as_mut() }) else { return };
         match e {
             Ev::Step(k, n, t) => w.inst.step = Some((k, n, t)),
             Ev::Line(s) => {
@@ -629,7 +631,9 @@ impl App {
             Ev::WrongPassword => {
                 w.inst.running = false;
                 w.inst.wrong = true;
-                self.st.field_focus = Some("w_pass");
+                if !parked {
+                    self.st.field_focus = Some("w_pass");
+                }
             }
             Ev::NeedsPassword(p) => w.inst.pass = p,
             Ev::Done(r) => {
