@@ -37,7 +37,7 @@ do_snapshot() {
   mkdir -p "$d/files" || return 1
   snapshot_list >"$d/paths"
   while read -r cls p; do
-    [[ -e $p ]] || continue
+    [[ -e $p || -L $p ]] || continue
     mkdir -p "$d/files${p%/*}" && snap_copy "$p" "$d/files$p" || return 1
   done <"$d/paths"
   # what was installed, for the list of rollback points
