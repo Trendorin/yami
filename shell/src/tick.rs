@@ -81,6 +81,10 @@ impl App {
             if self.st.modal == Some(Modal::Settings) || self.st.rss == 0.0 {
                 self.st.rss = crate::sys::self_mem_mb();
             }
+            // вкладка скриншотов показывает файл yami-shot: он мог поменять его сам
+            if self.st.modal == Some(Modal::Settings) && self.st.shot_cfg.fresh() {
+                self.dirty(&SKind::Modal);
+            }
             // плеер во всплывашке: время и полоса позиции идут (с эквалайзером их двигают его кадры)
             if crate::popups::shows_player(&self.st) && self.st.media.playing() && !crate::popups::shows_viz(&self.st) {
                 self.dirty(&SKind::Popup);

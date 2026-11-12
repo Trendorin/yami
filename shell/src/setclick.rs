@@ -100,6 +100,7 @@ impl App {
             }
             Act::SBool(k) if k.starts_with("shot_") => {
                 // настройки скриншотов — файл yami-shot, а не настройки шелла
+                self.st.shot_cfg.fresh();
                 let c = &mut self.st.shot_cfg;
                 match *k {
                     "shot_copy" => c.copy = !c.copy,
@@ -277,6 +278,7 @@ impl App {
                     self.renew_notif(SKind::Osd);
                 }
                 "shot_confirm" => {
+                    self.st.shot_cfg.fresh();
                     let c = &mut self.st.shot_cfg;
                     c.confirm = if c.confirm == "instant" { "space" } else { "instant" }.into();
                     c.save();
@@ -407,6 +409,7 @@ impl App {
                     self.settings_changed();
                 }
                 "shot_delay" => {
+                    self.st.shot_cfg.fresh();
                     let c = &mut self.st.shot_cfg;
                     c.delay = match c.delay {
                         3 => 5,
@@ -509,6 +512,7 @@ impl App {
                 }
                 "shot_dir_apply" => {
                     let p = self.st.shot_field.text.trim().to_string();
+                    self.st.shot_cfg.fresh();
                     self.st.shot_cfg.dir = p;
                     self.st.shot_cfg.save();
                     self.st.field_focus = None;
