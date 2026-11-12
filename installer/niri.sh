@@ -16,10 +16,15 @@ fork_after() {
     return 0
   fi
   ((!BUILD_FAILED)) || return 0
-  if ((UPDATE || REPAIR)); then
-    # an update builds it only when the patch series moved and nothing else failed
+  if ((UPDATE || REPAIR || APPLY)); then
+    # an update (and the first-run setup, which lists it again when it is already there) builds it only
+    # when it is missing or its patch series moved, and nothing else failed
     ((${#FAILED[@]} == 0)) && fork_stale || return 0
-    say "$(t "yami-niri: новая серия патчей — сборка (5–25 минут)" "yami-niri: a new patch series, building (5–25 minutes)" "yami-niri: nova série de patches, compilando (5–25 minutos)")"
+    if [[ -x $HOME/.local/lib/yami-niri/current/niri ]]; then
+      say "$(t "yami-niri: новая серия патчей — сборка (5–25 минут)" "yami-niri: a new patch series, building (5–25 minutes)" "yami-niri: nova série de patches, compilando (5–25 minutos)")"
+    else
+      printf '\n  %s%s%s\n\n' "$T" "$(t "сборка yami-niri — 5–25 минут, вывод прямо здесь:" "building yami-niri takes 5–25 minutes, output below:" "compilar o yami-niri leva de 5 a 25 minutos; saída abaixo:")" "$R"
+    fi
   else
     printf '\n  %s%s%s\n\n' "$T" "$(t "сборка yami-niri — 5–25 минут, вывод прямо здесь:" "building yami-niri takes 5–25 minutes, output below:" "compilar o yami-niri leva de 5 a 25 minutos; saída abaixo:")" "$R"
   fi
