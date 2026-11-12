@@ -260,7 +260,7 @@ status() { # [ver]
     *) say "yami $v: $(t "здесь не делался" "not made here")" ;;
   esac
   where() { # dir ref
-    here="$(git -C "$1" rev-parse -q --verify "$2" >/dev/null && t "здесь" "here" || t "нет" "no")"
+    here="$(git -C "$1" rev-parse -q --verify "$2" >/dev/null 2>&1 && t "здесь" "here" || t "нет" "no")"
     out="$(git -C "$1" ls-remote origin "$2" 2>/dev/null | awk 'NR == 1 { print "GitHub" }' || true)"
     printf '  %-12s %-18s %-6s %s\n' "${1##*/}" "${2#refs/tags/}" "$here" "${out:-—}"
   }
