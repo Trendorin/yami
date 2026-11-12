@@ -100,9 +100,13 @@ fn archive_hash(repo: &Path, rev: &str) -> Result<String, String> {
             return Err(format!("{}: {f} uses export-subst, its GitHub tarball cannot be hashed here", repo.display()));
         }
     }
-    let tmp = std::env::temp_dir().join(format!("yami-nar-{}-{rev}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&tmp);
-    std::fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
+    // своя новая папка 0700, не предсказуемое имя в /tmp (его мог бы занять кто-то другой)
+    let n = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(0);
+    let tmp = std::env::temp_dir().join(format!("yami-nar-{}-{n:08x}", std::process::id()));
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new().mode(0o700).create(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    }
     let ok = Command::new("sh").arg("-c").arg("git -C \"$1\" archive --format=tar \"$2\" | tar -x -C \"$3\"").args(["sh"]).arg(repo).arg(rev).arg(&tmp).status().is_ok_and(|s| s.success());
     let r = if ok { nar_hash(&tmp) } else { Err(format!("git archive {rev} in {}", repo.display())) };
     let _ = std::fs::remove_dir_all(&tmp);
