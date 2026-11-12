@@ -100,6 +100,10 @@ fn our_include(cfg: &Path) -> String {
             Err(_) => target.display().to_string(),
         };
         include(&p)
+    } else if std::fs::symlink_metadata(config_path()).is_ok_and(|m| m.file_type().is_symlink()) {
+        // niri до 26.04 без «~»: относительный путь считался бы от настоящего файла, а niri грузит ссылку
+        // (stow, репозиторий настроек) и ищет его от неё — полный путь верен при любом раскладе
+        include(&target.display().to_string())
     } else {
         include(&relative(cfg.parent().unwrap_or(Path::new("/")), &target))
     }
