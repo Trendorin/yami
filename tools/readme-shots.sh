@@ -11,7 +11,8 @@
 # the updates tab, a plain bar (no tray, night light or Bluetooth: they show your programs and
 # devices) and the apps listed in ~/.config/yami/shots-hide (desktop ids, one per line; a local
 # file, never in the repository) hidden from the launcher; it puts the workspace, language,
-# do-not-disturb, wallpaper, names, widgets, bar, the log and those apps back after.
+# do-not-disturb, wallpaper, names, widgets, bar, the weather city (an empty field in the pictures), the log
+# and those apps back after.
 # Refuses while a game or a fullscreen window has focus. Needs niri, grim.
 # Usage: tools/readme-shots.sh
 set -euo pipefail
@@ -50,6 +51,8 @@ lang0="$(yami config get lang)"
 dnd0="$(yami config get dnd)"
 names0="$(yami config get audioNames)"
 wall0="$(yami config get wallpaper)"
+# the weather city is where you live: an empty field on the services tab
+city0="$(yami config get weatherCity)"
 widgets0="$(yami config get widgets)"
 bar0=("$(yami config get barLeft)" "$(yami config get barCenter)" "$(yami config get barRight)")
 apps_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
@@ -67,6 +70,7 @@ restore() {
   yami config set dnd "$dnd0" >/dev/null
   yami config set audioNames "$names0" >/dev/null
   yami config set wallpaper "$wall0" >/dev/null
+  yami config set weatherCity "$city0" >/dev/null
   yami config set widgets "$widgets0" >/dev/null
   yami config set barLeft "${bar0[0]}" >/dev/null
   yami config set barCenter "${bar0[1]}" >/dev/null
@@ -116,6 +120,7 @@ yami config set dnd true >/dev/null
 yami config set wallpaper '""' >/dev/null
 # the network widget names the interface: a temperature graph in its place, same spot and size
 yami config set widgets "$(dev widgets-no-net "$widgets0")" >/dev/null
+yami config set weatherCity '""' >/dev/null
 # a plain bar: what the README is about, nothing of this machine
 yami config set barLeft '["launcher", "sep", "workspaces"]' >/dev/null
 yami config set barCenter '["tasks"]' >/dev/null
