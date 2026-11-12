@@ -69,8 +69,12 @@ m_fetch() {
   if [[ -d $dir/.git ]]; then
     git -C "$dir" fetch --quiet --tags origin >&2 || return 1
   else
+    # the folder may hold the module's files from the ready binaries (prebuilt_module), not a checkout:
+    # the clone goes next to it and takes its place only when it is complete
     mkdir -p "${dir%/*}"
-    git clone --quiet --filter=blob:none "$YAMI_MODULES_URL/$repo.git" "$dir" >&2 || return 1
+    rm -rf -- "$dir.new"
+    git clone --quiet --filter=blob:none "$YAMI_MODULES_URL/$repo.git" "$dir.new" >&2 || { rm -rf -- "$dir.new"; return 1; }
+    rm -rf -- "$dir" && mv -- "$dir.new" "$dir" || return 1
   fi
   # тег — только по полному имени, а дальше по номерам объектов: голое имя «v3.0.0» подходит и ветке
   # (свежий клон получает ветку по умолчанию с сервера как свою), а `git checkout ИМЯ` берёт ветку
