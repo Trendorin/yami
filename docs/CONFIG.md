@@ -329,7 +329,7 @@ installer writes them to `~/.local/state/yami/packages-needed`; `yami update nee
 
 | Key | Default | Meaning |
 |---|---|---|
-| `updateCheck`, `updateEvery` | `true`, `24` | check by itself every N hours (only a check and a card: installing is your click) |
+| `updateCheck`, `updateEvery` | `true`, `6` | check by itself at login and every N hours (only a check and a card: installing is your click) |
 | `updateChannel` | `"release"` | `release` (tags) or `main` (every commit) |
 | `updateVerify` | `"auto"` | `auto`: once the installed version has keys in `keys/allowed_signers`, only tags signed by them install; `require`: never unsigned; `off`: no check |
 | `updateRepo` | `""` | another repository URL; empty: where the install came from |

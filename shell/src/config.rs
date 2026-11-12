@@ -695,7 +695,7 @@ impl Default for Settings {
             audio_names: Default::default(),
             portal_files: true,
             update_check: true,
-            update_every: 24,
+            update_every: 6,
             update_channel: "release".into(),
             update_verify: "auto".into(),
             update_repo: String::new(),

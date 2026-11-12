@@ -380,7 +380,7 @@ yami update                   # what is new; apply | list | to X.Y.Z | rollback 
 
 ## Updates
 
-Settings → updates (or `yami update`) checks the repository once a day and shows a card when a
+Settings → updates (or `yami update`) checks the repository at login and every 6 hours and shows a card when a
 release is out; installing is always your click. The updater keeps its own clone in
 `~/.local/share/yami/src` and installs the new version with `install.sh --update` (ready binaries where they fit, else a build)
 (settings kept, no sudo). Nothing changes until every part has built, a failed update puts everything back by
