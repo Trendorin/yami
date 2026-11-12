@@ -401,7 +401,10 @@ impl App {
 
     /// своя карточка в обход D-Bus: короткое сообщение от самого шелла
     pub fn toast_note(&mut self, summary: &str, body: &str) {
-        let n = crate::dbus::Incoming { id: 9_000_000 + (self.st.started.elapsed().as_millis() % 1_000_000) as u32, app: "yami".into(), icon: String::new(), summary: crate::i18n::tr(summary).into(), body: crate::i18n::tr(body).into(), actions: vec![], urgency: 1, image: None, timeout: -1 };
+        // свои номера по кругу 9 500 000…9 999 999: не совпадают друг с другом и с карточкой обновления (update.rs NOTE_ID)
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let id = 9_500_000 + NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 500_000;
+        let n = crate::dbus::Incoming { id, app: "yami".into(), icon: String::new(), summary: crate::i18n::tr(summary).into(), body: crate::i18n::tr(body).into(), actions: vec![], urgency: 1, image: None, timeout: -1 };
         self.on_notif(n);
     }
 
