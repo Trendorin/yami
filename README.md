@@ -22,10 +22,11 @@ https://github.com/user-attachments/assets/1bdd1250-d04c-4993-b66f-0dc29b4512a5
 <img src=".github/assets/clean.png" width="100%" alt="The yami desktop as it is: the bar, the clock, CPU and music widgets on the pixel wallpaper">
 
 **yami** (闇, "darkness") turns the [niri](https://github.com/YaLTeR/niri) Wayland compositor into a
-finished desktop: dark graphite, one accent colour, crisp unantialiased pixel fonts. Its own
-shell, **yami-shell**, draws the bar, launcher, dock, notifications, lock screen, widgets and
-settings itself, in Rust and shared memory, in one ~6 MB binary that uses **about 15 MB of RAM**.
-Files, images, the login screen and every other app follow the same palette.
+finished desktop: dark graphite, one accent colour, crisp pixel fonts. Its shell, **yami-shell**,
+draws the bar, launcher, dock, notifications, lock screen, widgets and settings itself, in Rust with no
+toolkit, and idles at **about 15 MB of RAM**. The file manager, image viewer, player, screenshots and
+login screen are modules of their own: take the whole desktop, or only the pieces your own setup needs.
+Every app follows the same palette, and updates arrive signed (as ready binaries on x86_64).
 
 <img src=".github/assets/features-en.png" width="100%" alt="What is inside: a ~15 MB shell, one accent for everything, our own login screen, made for games, files, viewer and player, screenshots, a curtain for streams, signed updates, any distribution, eight languages">
 
