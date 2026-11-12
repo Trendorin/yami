@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: arch, image: "archlinux:latest", prep: "pacman -Sy --noconfirm --needed bash sudo" }
+          - { name: arch, image: "archlinux:latest", prep: "pacman -Syu --noconfirm --needed bash sudo" }
           - { name: fedora, image: "fedora:latest", prep: "dnf -q -y install bash sudo findutils util-linux shadow-utils" }
           - { name: debian, image: "debian:trixie", prep: "apt-get update -q && apt-get install -y -q bash sudo" }
           - { name: ubuntu, image: "ubuntu:24.04", prep: "apt-get update -q && apt-get install -y -q bash sudo" }
