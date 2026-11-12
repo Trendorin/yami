@@ -419,6 +419,15 @@ run_steps() {
     step "$i"
     W_DONE=$((W_DONE + ${STEPS_W[$i]}))
     ((${#FAILED[@]} > nf)) || continue
+    # first the steps that change what the session starts from: with a rollback point the run puts it
+    # back (do_install_bins is fatal too, but a swap that stopped half way has already changed something)
+    if step_critical "$cmd" && ((!DRY)) && declare -F snapshot_restore >/dev/null && [[ -s $CACHE/snapshot-now ]]; then
+      if snapshot_restore; then
+        warn "$(t "вернул всё как было до этого запуска: программы и конфиги" "everything is back as it was before this run: programs and configs" "tudo voltou como estava antes desta execução: programas e configurações")"
+      fi
+      BUILD_FAILED=1
+      break
+    fi
     if step_fatal "$cmd"; then
       # the binaries are swapped in only after every build has passed: nothing has changed yet
       BUILD_FAILED=1
@@ -427,13 +436,6 @@ run_steps() {
       else
         warn "$(t "не вышло — ничего не изменилось; поправь причину и запусти установку снова" "it failed and nothing changed; fix the cause and run the install again" "falhou e nada mudou; corrija a causa e rode a instalação novamente")"
       fi
-      break
-    fi
-    if step_critical "$cmd" && ((!DRY)) && declare -F snapshot_restore >/dev/null && [[ -s $CACHE/snapshot-now ]]; then
-      if snapshot_restore; then
-        warn "$(t "вернул всё как было до этого запуска: программы и конфиги" "everything is back as it was before this run: programs and configs" "tudo voltou como estava antes desta execução: programas e configurações")"
-      fi
-      BUILD_FAILED=1
       break
     fi
   done
