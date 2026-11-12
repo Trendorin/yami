@@ -7,10 +7,13 @@
 //   yami-dev i18n-add КОД ФАЙЛ [ПАПКА]   вписать переводы «номер<TAB>текст» в таблицу языка
 //   yami-dev readme-art [#акцент]       картинки README
 //   yami-dev changelog ВЕРСИЯ           «Unreleased» становится выпуском
+//   yami-dev nar-hash ПАПКА             sha256 архива NAR (как у nix)
+//   yami-dev flake-lock [МОДУЛИ]        flake.lock: модули по их тегам, без nix
 //   yami-dev shots …                    помощники tools/readme-shots.sh
 
 mod art;
 mod docs;
+mod flake;
 mod i18n;
 mod shots;
 #[path = "../../src/recolor_data.rs"]
@@ -38,9 +41,11 @@ fn main() {
         Some("i18n-add") => i18n::add(rest),
         Some("readme-art") => art::run(rest),
         Some("changelog") => docs::changelog(rest),
+        Some("nar-hash") => flake::run_nar(rest),
+        Some("flake-lock") => flake::run_lock(rest),
         Some("shots") => shots::run(rest),
         _ => {
-            eprintln!("yami-dev: check-docs [-v] | check-i18n [DIR…] | i18n-todo CODE [DIR|installer] | i18n-add CODE FILE [DIR|installer] | readme-art [#accent] | changelog VERSION | shots …");
+            eprintln!("yami-dev: check-docs [-v] | check-i18n [DIR…] | i18n-todo CODE [DIR|installer] | i18n-add CODE FILE [DIR|installer] | readme-art [#accent] | changelog VERSION | nar-hash DIR | flake-lock [MODULES] | shots …");
             2
         }
     });
