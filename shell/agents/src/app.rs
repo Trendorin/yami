@@ -71,6 +71,8 @@ pub enum Msg {
     /// зашифрованный диск открыт или нет
     Unlocked(String, Result<String, String>),
     Reload,
+    /// занятых не осталось: пора ли exec, решает try_reload
+    Idle,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -163,6 +165,12 @@ pub fn run(look: Look, cfg: crate::cfg::Cfg, lock: Option<std::fs::File>) -> i32
     let Ok(mut ev) = EventLoop::<'static, App>::try_new() else { return 1 };
     let handle = ev.handle();
     let (tx, rx) = channel::channel::<Msg>();
+    {
+        let t = tx.clone();
+        crate::reload::on_idle(move || {
+            let _ = t.send(Msg::Idle);
+        });
+    }
     let _ = handle.insert_source(rx, |e, _, app: &mut App| {
         if let channel::Event::Msg(m) = e {
             app.on_msg(m);
@@ -258,6 +266,7 @@ impl App {
             Msg::Reload => {
                 self.reload_wanted = true;
             }
+            Msg::Idle => {}
         }
         self.try_reload();
     }

@@ -22,7 +22,20 @@ impl Busy {
 }
 impl Drop for Busy {
     fn drop(&mut self) {
-        BUSY.fetch_sub(1, Ordering::SeqCst);
+        // последний занятый ушёл (показ экрана кончился в нити zbus): отложенный --reload ждать больше нечего
+        if BUSY.fetch_sub(1, Ordering::SeqCst) == 1 {
+            if let Some(w) = WAKE.lock().ok().as_ref().and_then(|w| w.as_ref()) {
+                w();
+            }
+        }
+    }
+}
+
+/// разбудить главный цикл, когда занятых не осталось (он и решает, пора ли exec)
+static WAKE: std::sync::Mutex<Option<Box<dyn Fn() + Send>>> = std::sync::Mutex::new(None);
+pub fn on_idle(f: impl Fn() + Send + 'static) {
+    if let Ok(mut w) = WAKE.lock() {
+        *w = Some(Box::new(f));
     }
 }
 
