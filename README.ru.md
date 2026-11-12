@@ -214,7 +214,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Trendorin/yami/main/install.
 
 На x86_64 с glibc 2.34 или новее (Ubuntu 22.04, Debian 12, Fedora 35 и всё новее) выпуск ставит готовые бинарники
 с проверенной подписью: без компилятора, за несколько минут. На остальных системах собирает из исходников. Где в
-дистрибутиве ещё нет niri 26.04 или новее (Debian 13), niri и xwayland-satellite один раз собираются из исходников:
+дистрибутиве ещё нет niri 26.04 или новее (Debian 13, Ubuntu 26.04), niri и xwayland-satellite один раз собираются из исходников:
 нужен компилятор и около получаса. Пакеты для
 Arch, Debian, Fedora, Gentoo и Nix: [docs/PACKAGING.ru.md](docs/PACKAGING.ru.md).
 

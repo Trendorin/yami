@@ -209,7 +209,7 @@ or from a checkout: `git clone https://github.com/Trendorin/yami yami && yami/in
 
 On x86_64 with glibc 2.34 or newer (Ubuntu 22.04, Debian 12, Fedora 35 and everything newer) a release installs
 ready binaries with a checked signature: no compiler, a few minutes. Anywhere else it builds from source. Where the
-distribution has no niri 26.04 or newer yet (Debian 13), niri and xwayland-satellite are built once from source: a
+distribution has no niri 26.04 or newer yet (Debian 13, Ubuntu 26.04), niri and xwayland-satellite are built once from source: a
 compiler and about half an hour. Packages for
 Arch, Debian, Fedora, Gentoo and Nix: [docs/PACKAGING.md](docs/PACKAGING.md).
 
