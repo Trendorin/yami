@@ -42,11 +42,12 @@ pub fn want(on: bool, tx: &Sender<Msg>) {
     }
     let tx = tx.clone();
     let ok = std::thread::Builder::new().name("camera".into()).spawn(move || {
-        // want(true) между выходом из watch и снятием RUNNING вернулся бы ни с чем: нить забирает его сама
+        // want(true) между выходом из watch и снятием RUNNING вернулся бы ни с чем: нить забирает его сама.
+        // Огонёк гаснет, пока RUNNING ещё у этой нити: новая не успеет прислать своё раньше этого
         while watch(&tx) {
+            let _ = tx.send(Msg::Camera(vec![]));
             RUNNING.store(false, Ordering::SeqCst);
             if !WANT.load(Ordering::SeqCst) || RUNNING.swap(true, Ordering::SeqCst) {
-                let _ = tx.send(Msg::Camera(vec![]));
                 return;
             }
         }
