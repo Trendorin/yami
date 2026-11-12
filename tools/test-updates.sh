@@ -521,6 +521,14 @@ t_prebuilt() { # a release with ready binaries: no compiler, signature first, ev
   machine
   nocheck "a stranger's signature is refused" first_install --yes
   nocheck "  no shell landed" exists "$H/.local/bin/yami-shell"
+  # a correctly signed list that does not name the archive (another release's list, say)
+  rm -rf "$bad"; cp -a "$rel" "$bad"
+  sed -i 's/yami-3\.1\.0-x86_64-linux\.tar\.gz/yami-3.0.0-x86_64-linux.tar.gz/' "$bad/SHA256SUMS"
+  rm -f "$bad/SHA256SUMS.sig"
+  ssh-keygen -q -Y sign -f "$WORK/key" -n yami-release "$bad/SHA256SUMS" </dev/null
+  machine
+  nocheck "an archive its signed list does not name is refused" first_install --yes
+  nocheck "  no shell landed" exists "$H/.local/bin/yami-shell"
   SANDBOX_ENV=()
 }
 t_askpass() { # the first-run setup's way in: no terminal, the password through SUDO_ASKPASS

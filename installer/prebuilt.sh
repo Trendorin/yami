@@ -75,7 +75,12 @@ prebuilt_verify() { # folder
       return 1
     fi
   fi
-  (cd "$d" && sha256sum -c --ignore-missing --quiet SHA256SUMS) || { echo "the ready binaries do not match their checksum"; return 1; }
+  # the archive's own line, compared by hand: `sha256sum -c --ignore-missing` passes an archive the list
+  # does not name at all, and busybox's sha256sum knows no such flag
+  local want got
+  want="$(awk -v f="$PREBUILT_ASSET" '$2 == f || $2 == "*" f || $2 == "./" f { print $1; exit }' "$d/SHA256SUMS")"
+  got="$(sha256sum "$d/$PREBUILT_ASSET" 2>/dev/null | cut -d' ' -f1)"
+  [[ -n $want && $want == "$got" ]] || { echo "the ready binaries do not match their checksum"; return 1; }
 }
 prebuilt_fetch() {
   local dl="$CACHE/prebuilt-dl" ex="$CACHE/prebuilt"
