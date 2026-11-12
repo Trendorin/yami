@@ -133,6 +133,17 @@ pub fn start(modules: Vec<String>, lang: String, mut password: String, tx: callo
             if !ok {
                 return send(Ev::Done(Err(crate::tf!("нет исходников yami и не удалось их скачать: проверь интернет", "the yami sources are gone and could not be downloaded: check the internet", "os fontes do yami sumiram e não foi possível baixá-los: verifique a internet"))));
             }
+            // свежий клон стоит на main: модули ставятся от той версии, что стоит (её коммит, иначе её тег),
+            // а не от новее — её modules.lock и установщик могут ждать другой шелл
+            let st = crate::update::installed();
+            let hex = !st.commit.is_empty() && st.commit.chars().all(|c| c.is_ascii_hexdigit());
+            let want = [if hex { st.commit.clone() } else { String::new() }, if st.version.is_empty() { String::new() } else { format!("refs/tags/v{}", st.version) }];
+            for w in want.iter().filter(|w| !w.is_empty()) {
+                let at = Command::new("git").arg("-C").arg(&src).args(["-c", "advice.detachedHead=false", "checkout", "-q", "--detach", w]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
+                if at.is_ok_and(|s| s.success()) {
+                    break;
+                }
+            }
         }
         let mut c = Command::new("bash");
         c.arg(&script).args(["--apply", &modules.join(" ")]);
