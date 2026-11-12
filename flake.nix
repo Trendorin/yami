@@ -37,7 +37,8 @@
       ];
       forAll = f: lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
       version = lib.fileContents ./VERSION;
-      # only what the build reads: a change to docs, CI or the installer does not rebuild yami
+      # only what the build reads: a change to docs, CI or the installer does not rebuild yami. keys/: the
+      # release keys are compiled into the shell (update.rs), so a check never trusts a file it is handed
       src = lib.fileset.toSource {
         root = ./.;
         fileset = lib.fileset.unions [
@@ -45,6 +46,7 @@
           ./VERSION
           ./config
           ./fonts
+          ./keys
           (lib.fileset.difference ./shell (lib.fileset.maybeMissing ./shell/target))
         ];
       };
