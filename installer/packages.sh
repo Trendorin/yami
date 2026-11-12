@@ -10,7 +10,8 @@
 # the shell (its automount, yami-agents); files — yami-files' thumbnails and archives; play — libmpv for yami-play; shot — text
 # and QR from screenshots; look — the Qt/GTK theme; games — GameMode, MangoHud; login — greetd for
 # yami-greet (agreety: the text fallback); nirisrc — to build niri itself (and xwayland-satellite with it:
-# a distribution without a recent niri usually lacks it too; families whose names are not checked yet leave it out)
+# a distribution without a recent niri usually lacks it too; families whose names are not checked yet leave it out:
+# checked on Arch, Fedora and Debian)
 packages_for_family() {
 case "$FAM" in
   arch)
@@ -44,7 +45,8 @@ case "$FAM" in
     P_shot=(tesseract tesseract-langpack-eng tesseract-langpack-rus zbar)
     P_login=(greetd)
     P_nirisrc=(git clang libudev-devel libgbm-devel libxkbcommon-devel wayland-devel libinput-devel dbus-devel systemd-devel
-      libseat-devel pipewire-devel pango-devel cairo-gobject-devel libdisplay-info-devel) ;;
+      libseat-devel pipewire-devel pango-devel cairo-gobject-devel libdisplay-info-devel libxcb-devel xcb-util-cursor-devel
+      xorg-x11-server-Xwayland) ;;
   debian)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
     P_base=(polkitd gnome-keyring pipewire pipewire-pulse wireplumber pulseaudio-utils network-manager bluez
