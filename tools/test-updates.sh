@@ -648,6 +648,9 @@ t_release() { # the owner's release: made here, taken back, made again, publishe
   g -C "$SRC/yami-view" commit -q -am "view: a change for 3.1.0"
   local before
   before="$(refs_now)"
+  check "--check says it is ready" rel --check 3.1.0
+  check "  nothing changed" test "$(refs_now)" = "$before"
+  nocheck "--check refuses a version that is not newer" rel --check 2.0.0
   check "the release is made here" rel 3.1.0
   check "  its tag is signed by the release key" g -C "$y" -c gpg.ssh.allowedSignersFile="$y/keys/allowed_signers" tag -v v3.1.0
   check "  VERSION is 3.1.0" test "$(cat "$y/VERSION")" = 3.1.0

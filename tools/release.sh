@@ -6,6 +6,7 @@
 #   tools/release.sh X.Y.Z             make it here, then ask «publish now?»
 #   tools/release.sh --push X.Y.Z      publish a release made here (now or later)
 #   tools/release.sh --status [X.Y.Z]  what of it is here, what is on GitHub
+#   tools/release.sh --check X.Y.Z     is everything ready for it (nothing is changed)
 #   tools/release.sh --undo X.Y.Z      take back a release made here and not published
 #   tools/release.sh --publish X.Y.Z   the GitHub release of a pushed tag again (notes, binaries)
 #   tools/release.sh --keygen          make the signing key and trust it in keys/allowed_signers
@@ -290,24 +291,51 @@ modcargo() { # dir, cargo arguments…
     CARGO_NET_GIT_FETCH_WITH_CLI=true cargo "$@")
 }
 
-make_release() { # ver
-  local v=$1 cur
-  ver_ok "$v" || die "$(t "как: tools/release.sh X.Y.Z (--help)" "usage: tools/release.sh X.Y.Z (--help)")"
+# everything a release needs, checked without changing anything: every problem at once (--check, and
+# the start of a release, which stops on any of them)
+preflight() { # ver
+  local v=$1 cur bad=0 repo tag d k
+  no() { printf '  \e[31m✕\e[0m %s\n' "$*"; bad=1; }
+  ok() { printf '  \e[32m✓\e[0m %s\n' "$*"; }
   cur="$(cat VERSION)"
-  newer "$v" "$cur" || die "$(t "$v не новее $cur" "$v is not newer than $cur")"
-  [[ "$(git rev-parse --abbrev-ref HEAD)" == main ]] || die "$(t "выпуск — только с main" "release from main only")"
-  [[ -z "$(git status --porcelain --untracked-files=no)" ]] || die "$(t "есть незакоммиченные правки" "uncommitted changes")"
-  git rev-parse -q --verify "refs/tags/v$v" >/dev/null && die "$(t "тег v$v уже есть" "tag v$v exists")"
-  [[ ! -f "$(state_file "$v")" ]] || die "$(t "выпуск $v уже начат здесь: tools/release.sh --status $v (или --undo $v)" "release $v is begun here: tools/release.sh --status $v (or --undo $v)")"
-  local repo tag d
+  if ! ver_ok "$v"; then no "$(t "как: tools/release.sh X.Y.Z (--help)" "usage: tools/release.sh X.Y.Z (--help)")"; return 1; fi
+  newer "$v" "$cur" && ok "$cur → $v" || no "$(t "$v не новее $cur" "$v is not newer than $cur")"
+  [[ "$(git rev-parse --abbrev-ref HEAD)" == main ]] && ok "main" || no "$(t "выпуск — только с main" "release from main only")"
+  [[ -z "$(git status --porcelain --untracked-files=no)" ]] && ok "$(t "дерево чистое" "the tree is clean")" || no "$(t "есть незакоммиченные правки" "uncommitted changes")"
+  ! git rev-parse -q --verify "refs/tags/v$v" >/dev/null || no "$(t "тег v$v уже есть" "tag v$v exists")"
+  [[ ! -f "$(state_file "$v")" ]] || no "$(t "выпуск $v уже начат здесь: tools/release.sh --status $v (или --undo $v)" "release $v is begun here: tools/release.sh --status $v (or --undo $v)")"
   while read -r repo tag; do
     d="$MODS/$repo"
-    [[ -d $d/.git ]] || die "$(t "нет модуля" "no module") $d"
-    [[ -z "$(git -C "$d" status --porcelain --untracked-files=no)" ]] || die "$repo: $(t "незакоммиченные правки" "uncommitted changes")"
-    [[ "$(git -C "$d" rev-parse --abbrev-ref HEAD)" == main ]] || die "$repo: $(t "не на main" "not on main")"
+    if [[ ! -d $d/.git ]]; then no "$(t "нет модуля" "no module") $d"; continue; fi
+    [[ -z "$(git -C "$d" status --porcelain --untracked-files=no)" ]] || no "$repo: $(t "незакоммиченные правки" "uncommitted changes")"
+    [[ "$(git -C "$d" rev-parse --abbrev-ref HEAD)" == main ]] || no "$repo: $(t "не на main" "not on main")"
   done < <(modules)
-  git ls-remote origin HEAD >/dev/null 2>&1 || die "$(t "GitHub не отвечает: нужно знать, что там уже есть" "GitHub does not answer: the release needs to know what is there")"
-  dev check-docs >/dev/null || dev check-docs || die "$(t "документы EN и RU расходятся (yami-dev check-docs)" "the EN and RU docs differ (yami-dev check-docs)")"
+  ok "$(t "модули" "modules"): $(modules | wc -l)"
+  git ls-remote origin HEAD >/dev/null 2>&1 && ok "GitHub" || no "$(t "GitHub не отвечает: нужно знать, что там уже есть" "GitHub does not answer: the release needs to know what is there")"
+  dev check-docs >/dev/null 2>&1 && ok "$(t "документы EN и RU" "the EN and RU docs")" || no "$(t "документы EN и RU расходятся (yami-dev check-docs)" "the EN and RU docs differ (yami-dev check-docs)")"
+  local f h
+  for f in CHANGELOG.md:Unreleased CHANGELOG.ru.md:"Не выпущено"; do
+    h="${f#*:}"
+    awk -v h="## $h" '$0 == h { on = 1; next } on && /^## / { exit } on && /^- / { n++ } END { exit !n }' "${f%%:*}" ||
+      no "$(t "в «$h» (${f%%:*}) пусто" "«$h» in ${f%%:*} is empty")"
+  done
+  k="$(git config user.signingkey || true)"
+  k="${k/#\~/$HOME}"
+  if [[ -z $k ]]; then no "$(t "нет ключа подписи: tools/release.sh --keygen" "no signing key: tools/release.sh --keygen")"
+  elif [[ ! -f ${k%.pub} || ! -f ${k%.pub}.pub ]]; then no "$(t "ключа нет на диске" "the key is not on disk"): ${k%.pub}"
+  elif ! grep -qF "$(cut -d' ' -f2 "${k%.pub}.pub")" "$KEYS"; then no "$(t "ключа нет в $KEYS" "the key is not in $KEYS")"
+  else ok "$(t "ключ выпуска" "the release key"): ${k%.pub}"; fi
+  # the ready binaries: tools/dist.sh links against an old glibc with clang and lld
+  for f in clang ld.lld b2sum sha512sum ssh-keygen; do command -v "$f" >/dev/null || no "$(t "нет программы" "missing program") $f (tools/dist.sh)"; done
+  gh_ok && ok "gh" || printf '  \e[33m!\e[0m %s\n' "$(t "gh не вошёл: нужен только для публикации (gh auth login)" "gh is not logged in: needed only to publish (gh auth login)")"
+  return "$bad"
+}
+
+make_release() { # ver
+  local v=$1 cur repo tag d
+  cur="$(cat VERSION)"
+  head_ "$(t "проверка" "checks")"
+  preflight "$v" || die "$(t "выпуск не начат: поправь то, что выше" "the release did not start: fix what is above")"
   key_init
 
   mkdir -p "$STATE_DIR"
@@ -459,6 +487,7 @@ case ${1:-} in
   --push) ver_ok "${2:-}" || die "tools/release.sh --push X.Y.Z"; STATE="$(state_file "$2")"; push_release "$2" ;;
   --undo) ver_ok "${2:-}" || die "tools/release.sh --undo X.Y.Z"; undo "$2" ;;
   --status) status "${2:-}" ;;
+  --check) ver_ok "${2:-}" || die "tools/release.sh --check X.Y.Z"; head_ "yami $2: $(t "готово ли всё к выпуску" "is everything ready for the release")"; if preflight "$2"; then say "$(t "можно: tools/release.sh $2" "ready: tools/release.sh $2")"; else exit 1; fi ;;
   --publish)
     ver_ok "${2:-}" || die "tools/release.sh --publish X.Y.Z"
     gh_ok || die "$(t "gh не вошёл: gh auth login" "gh is not logged in: gh auth login")"
