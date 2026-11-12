@@ -17,7 +17,7 @@
 
 </div>
 
-https://github.com/user-attachments/assets/1bdd1250-d04c-4993-b66f-0dc29b4512a5
+https://github.com/user-attachments/assets/d5cbbf36-4591-4cba-adb6-3eda963a2db0
 
 <img src=".github/assets/clean.png" width="100%" alt="Рабочий стол yami как есть: бар, часы, виджеты процессора и музыки на пиксельных обоях">
 
