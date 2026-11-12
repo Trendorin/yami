@@ -36,26 +36,33 @@ fn users() -> Vec<String> {
 
 /// индикатор камеры в баре (или нет); нить запускается по первому требованию
 pub fn want(on: bool, tx: &Sender<Msg>) {
-    WANT.store(on, Ordering::Relaxed);
-    if !on || RUNNING.swap(true, Ordering::Relaxed) {
+    WANT.store(on, Ordering::SeqCst);
+    if !on || RUNNING.swap(true, Ordering::SeqCst) {
         return;
     }
     let tx = tx.clone();
     let ok = std::thread::Builder::new().name("camera".into()).spawn(move || {
-        watch(&tx);
-        RUNNING.store(false, Ordering::Relaxed);
-        let _ = tx.send(Msg::Camera(vec![]));
+        // want(true) между выходом из watch и снятием RUNNING вернулся бы ни с чем: нить забирает его сама
+        while watch(&tx) {
+            RUNNING.store(false, Ordering::SeqCst);
+            if !WANT.load(Ordering::SeqCst) || RUNNING.swap(true, Ordering::SeqCst) {
+                let _ = tx.send(Msg::Camera(vec![]));
+                return;
+            }
+        }
+        RUNNING.store(false, Ordering::SeqCst);
     });
     if ok.is_err() {
-        RUNNING.store(false, Ordering::Relaxed);
+        RUNNING.store(false, Ordering::SeqCst);
     }
 }
 
-fn watch(tx: &Sender<Msg>) {
+/// true — вышла, потому что больше не нужна; false — inotify нет или шелл уходит
+fn watch(tx: &Sender<Msg>) -> bool {
     // SAFETY: inotify — обычный fd этой нити; читается и закрывается только здесь
     let fd = unsafe { libc::inotify_init1(libc::IN_CLOEXEC) };
     if fd < 0 {
-        return;
+        return false;
     }
     let mut watched: Vec<String> = vec![];
     let mut last: Option<Vec<String>> = None;
@@ -73,7 +80,8 @@ fn watch(tx: &Sender<Msg>) {
         let u = if watched.is_empty() { vec![] } else { users() };
         if last.as_ref() != Some(&u) {
             if tx.send(Msg::Camera(u.clone())).is_err() {
-                break;
+                unsafe { libc::close(fd) };
+                return false;
             }
             last = Some(u);
         }
@@ -90,4 +98,5 @@ fn watch(tx: &Sender<Msg>) {
         }
     }
     unsafe { libc::close(fd) };
+    true
 }
