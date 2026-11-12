@@ -269,25 +269,38 @@ pub fn snapshots() -> Vec<(PathBuf, String)> {
 
 /// вернуть из точки отката то, что сгенерировано (G): бинари и конфиги; своё (U) — настройки, раскладка
 /// экранов, user.kdl — человек мог поменять после обновления, их не трогаем. Файла, которого в точке
-/// не было (модуль поставлен обновлением), быть не должно
+/// не было (модуль поставлен обновлением), быть не должно. Ссылка возвращается ссылкой (установщик
+/// копирует их как есть, `cp -a`); один неудачный файл не останавливает остальные — ошибка в конце
 fn snapshot_back(d: &Path) -> std::io::Result<()> {
     let list = std::fs::read_to_string(d.join("paths"))?;
+    let mut res = Ok(());
     for line in list.lines() {
         let Some(("G", p)) = line.split_once(' ') else { continue };
         let target = Path::new(p);
         let src = d.join(format!("files{p}"));
-        if src.exists() {
+        let one = || -> std::io::Result<()> {
+            let Ok(m) = std::fs::symlink_metadata(&src) else {
+                return if std::fs::symlink_metadata(target).is_ok() { std::fs::remove_file(target) } else { Ok(()) };
+            };
             if let Some(dir) = target.parent() {
                 std::fs::create_dir_all(dir)?;
             }
             let tmp = PathBuf::from(format!("{p}.yami-new"));
-            std::fs::copy(&src, &tmp)?;
-            std::fs::rename(&tmp, target)?;
-        } else if target.exists() {
-            std::fs::remove_file(target)?;
+            let _ = std::fs::remove_file(&tmp);
+            if m.file_type().is_symlink() {
+                std::os::unix::fs::symlink(std::fs::read_link(&src)?, &tmp)?;
+            } else {
+                std::fs::copy(&src, &tmp)?;
+            }
+            std::fs::rename(&tmp, target)
+        };
+        if let Err(e) = one() {
+            if res.is_ok() {
+                res = Err(e);
+            }
         }
     }
-    Ok(())
+    res
 }
 
 /// откат возможен: есть точка отката или прошлые бинари
@@ -333,7 +346,11 @@ pub fn rollback() -> Result<String, String> {
         if older(&ver, &from) {
             snapshot_settings(&from);
         }
-        snapshot_back(&d).map_err(|e| e.to_string())?;
+        if let Err(e) = snapshot_back(&d) {
+            // вернулось всё, что смогло (бинари в их числе): шелл — на них; точка отката остаётся для повтора
+            restart_shell();
+            return Err(e.to_string());
+        }
         if older(&ver, "3.0.0") {
             crate::dirs::back_to_old();
         }
