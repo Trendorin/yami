@@ -18,7 +18,97 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "yami-files": "yami-files",
+        "yami-greet": "yami-greet",
+        "yami-play": "yami-play",
+        "yami-shot": "yami-shot",
+        "yami-view": "yami-view"
+      }
+    },
+    "yami-files": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794499345,
+        "narHash": "sha256-tetstsMWDcBenvx0WLzLCAV1BsIZIq7gcHj6TujOxXw=",
+        "owner": "Trendorin",
+        "repo": "yami-files",
+        "rev": "e0406845a55fee698fa1abf6b842eab1aa98f429",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Trendorin",
+        "ref": "v3.0.0",
+        "repo": "yami-files",
+        "type": "github"
+      }
+    },
+    "yami-greet": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794499338,
+        "narHash": "sha256-dQhG7HhBurMca4rjQjnQwIzMGKeCu3ju0hYtrlnKbaY=",
+        "owner": "Trendorin",
+        "repo": "yami-greet",
+        "rev": "d14c6c85efdfcdb3efc4b543d5aced4c391a4475",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Trendorin",
+        "ref": "v3.0.0",
+        "repo": "yami-greet",
+        "type": "github"
+      }
+    },
+    "yami-play": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794499338,
+        "narHash": "sha256-ecHWNXbqKQhbN4gZjALu8F6e42Qb2si4vq605AH8/Kk=",
+        "owner": "Trendorin",
+        "repo": "yami-play",
+        "rev": "24548f3ff666c9f143bc121caa6d5e84ddd1ee7f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Trendorin",
+        "ref": "v3.0.0",
+        "repo": "yami-play",
+        "type": "github"
+      }
+    },
+    "yami-shot": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794499338,
+        "narHash": "sha256-QJDiSajBzH4tgUILcAFqxueIMQyp7A6RNnsR2Gp38eA=",
+        "owner": "Trendorin",
+        "repo": "yami-shot",
+        "rev": "b9a6f67eec2754b1228c5f5e16d35584be3900a7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Trendorin",
+        "ref": "v3.0.0",
+        "repo": "yami-shot",
+        "type": "github"
+      }
+    },
+    "yami-view": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794499338,
+        "narHash": "sha256-BArN00AvfmnmWEzATvi7BnMeBN7RWH1LKn4m33f88+A=",
+        "owner": "Trendorin",
+        "repo": "yami-view",
+        "rev": "803406b3ec20fb870178dd7b68dde72593d4bc3a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Trendorin",
+        "ref": "v3.0.0",
+        "repo": "yami-view",
+        "type": "github"
       }
     }
   },

@@ -2,7 +2,7 @@
 # Updates and modules are the package manager's: stage.sh --managed leaves the mark the shell looks for.
 pkgbase=yami-bin
 pkgname=(yami-shell-bin yami-files-bin yami-view-bin yami-play-bin yami-shot-bin yami-greet-bin)
-pkgver=2.7.0
+pkgver=3.0.0
 pkgrel=1
 pkgdesc='Lightweight pixel-art Wayland desktop for the niri compositor'
 arch=(x86_64)
@@ -10,7 +10,7 @@ url='https://github.com/Trendorin/yami'
 license=(MIT)
 options=(!strip !debug)
 source=("https://github.com/Trendorin/yami/releases/download/v$pkgver/yami-$pkgver-x86_64-linux.tar.gz")
-sha256sums=('SKIP') # tools/release.sh writes it
+sha256sums=('eb90484e17f052deb025bb33645cf50276ccdeb8d1a15601634ace47713f9200') # tools/release.sh writes it
 
 _put() { cd "yami-$pkgver-x86_64-linux" && ./stage.sh --prefix /usr --destdir "$pkgdir" --managed --only "$1"; }
 

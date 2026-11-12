@@ -9,6 +9,8 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 
 ## Unreleased
 
+## 3.0.0
+
 - A new release shows up sooner: the shell looks for one a minute after login and then every 6 hours (`updateEvery`, was every 24); installing stays your click.
 - The installer stops at once, changing nothing, when the system's package index is older than its mirrors (an Arch or CachyOS not upgraded for a while) and says to update first, instead of trying each package alone for minutes and calling the base ready without niri. Where it builds niri from source (Debian 13, Ubuntu 26.04), it builds xwayland-satellite too, so X11 apps such as Steam open, and no longer leaves 2 GB of the build behind.
 - yami-files: the file dialog of every app passes a name with a line break in it and the filter you picked; a pipe or a device file no longer hangs the window or a copy; undo never puts a file back over one made again in its place, and undoing a folder copied into an existing one leaves what was there before; mount and unmount reach the right drive when the list changed meanwhile, and a drive whose label holds « at » opens its own folder; a question from a running copy waits until the open dialog closes instead of replacing it; deleting a file for good no longer drops a trash record of another one.

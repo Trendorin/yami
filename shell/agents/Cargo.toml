@@ -1,6 +1,6 @@
 [package]
 name = "yami-agents"
-version = "2.7.0"
+version = "3.0.0"
 edition = "2021"
 description = "The yami desktop's services: polkit password window, screen-share picker and portal, drive and phone automount"
 license = "MIT"

@@ -4,7 +4,7 @@
 %global __brp_strip %{nil}
 
 Name:           yami
-Version:        2.7.0
+Version:        3.0.0
 Release:        1%{?dist}
 Summary:        Lightweight pixel-art Wayland desktop for the niri compositor
 License:        MIT
