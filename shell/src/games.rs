@@ -15,8 +15,21 @@ fn user_ids(s: &str) -> Vec<String> {
     s.split([',', ' ']).map(|x| x.trim()).filter(|x| !x.is_empty()).map(String::from).collect()
 }
 
-fn regex_escape(s: &str) -> String {
+pub(crate) fn regex_escape(s: &str) -> String {
     s.chars().map(|c| if r"\.+*?()|[]{}^$#".contains(c) { format!("\\{c}") } else { c.to_string() }).collect()
+}
+
+/// app-id из поля настроек → регулярки для правил niri: «steam*» — все app-id с этим началом,
+/// остальное — буквально. Одна «*» легла бы на все окна — пропускается
+pub(crate) fn id_regexes(s: &str) -> Vec<String> {
+    user_ids(s)
+        .iter()
+        .filter_map(|u| match u.strip_suffix('*') {
+            Some("") => None,
+            Some(p) => Some(format!("^{}", regex_escape(p))),
+            None => Some(format!("^{}$", regex_escape(u))),
+        })
+        .collect()
 }
 
 /// это игра? (по app-id)
@@ -24,7 +37,7 @@ pub fn is_game(set: &crate::config::Settings, app_id: &str) -> bool {
     app_id.starts_with("steam_app_")
         || app_id == "gamescope"
         || user_ids(&set.game_apps).iter().any(|u| match u.strip_suffix('*') {
-            Some(p) => app_id.starts_with(p),
+            Some(p) => !p.is_empty() && app_id.starts_with(p),
             None => app_id == u,
         })
 }
@@ -40,11 +53,7 @@ pub fn kdl(set: &crate::config::Settings, yami: bool, l: &mut Vec<String>) {
         for id in GAME_IDS {
             l.push(format!("    match app-id=r#\"{id}\"#"));
         }
-        for u in user_ids(&set.game_apps) {
-            let re = match u.strip_suffix('*') {
-                Some(p) => format!("^{}", regex_escape(p)),
-                None => format!("^{}$", regex_escape(&u)),
-            };
+        for re in id_regexes(&set.game_apps) {
             l.push(format!("    match app-id=r#\"{re}\"#"));
         }
         if set.game_fullscreen {

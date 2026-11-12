@@ -1123,12 +1123,12 @@ impl Settings {
             l.push("}".into());
             l.push(String::new());
         }
-        let extra: Vec<&str> = self.float_apps.split([',', ' ']).map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        let extra = crate::games::id_regexes(&self.float_apps);
         if !extra.is_empty() {
             l.push("// your own floating apps (settings → windows)".into());
             l.push("window-rule {".into());
-            for id in extra {
-                l.push(format!("    match app-id=r#\"^{}$\"#", id.replace('"', "").replace('.', "\\.")));
+            for re in extra {
+                l.push(format!("    match app-id=r#\"{re}\"#"));
             }
             l.push("    open-floating true".into());
             size(l, self.float_w, self.float_h);
@@ -1196,14 +1196,16 @@ impl Settings {
     /// программы из castHide (настройки → окна): зрители трансляций видят на их месте чёрное, у тебя на
     /// экране всё как обычно; снимки экрана их видят — это не трансляция
     fn cast_hide_kdl(&self, l: &mut Vec<String>) {
-        let ids: Vec<&str> = self.cast_hide.split([',', ' ']).map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-        if ids.is_empty() {
+        // как в правилах игр: «steam*» — все app-id с этим началом, остальное — буквально; одна «*»
+        // спрятала бы все окна — пропускается (и правило без match тоже: оно легло бы на все окна)
+        let res = crate::games::id_regexes(&self.cast_hide);
+        if res.is_empty() {
             return;
         }
         l.push("// hidden from screen sharing (settings → windows): black for viewers, as usual on your screen".into());
         l.push("window-rule {".into());
-        for id in ids {
-            l.push(format!("    match app-id=r#\"^{}$\"#", id.replace('"', "").replace('.', "\\.")));
+        for re in res {
+            l.push(format!("    match app-id=r#\"{re}\"#"));
         }
         l.push("    block-out-from \"screencast\"".into());
         l.push("}".into());
@@ -1266,6 +1268,13 @@ mod tests {
         // кавычки и точка с запятой из чужого файла не доходят до конфига niri
         assert!(!k.contains("spawn \"sh\"") && !rule.contains(';'), "{k}");
         assert!(!load("{}").fx_kdl(0, false).contains("hidden from screen sharing"));
+        // «*» в конце — начало app-id, одиночная «*» и прочие знаки регулярок — буквально (иначе niri отверг бы весь rules.kdl)
+        let mut s = load(r#"{"castHide": "steam*, *, a+b"}"#);
+        s.sanitize();
+        let k = s.fx_kdl(0, false);
+        assert!(k.contains(r##"match app-id=r#"^steam"#"##), "{k}");
+        assert!(k.contains(r##"match app-id=r#"^a\+b$"#"##), "{k}");
+        assert!(!k.contains(r##"r#"^"#"##) && !k.contains(r##"^*$"##), "{k}");
     }
 
     #[test]
