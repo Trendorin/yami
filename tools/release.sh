@@ -23,8 +23,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 MODS="${YAMI_MODULES_DIR:-$ROOT/../yami-modules}"
-# shellcheck source=/dev/null
-[[ -f $MODS/env.sh ]] && . "$MODS/env.sh"
+# git here talks to the real GitHub. yami-modules/env.sh, sourced in the shell this runs from, would point
+# github.com at the working copies: the release would check and push them instead (cargo: modcargo below)
+unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
 OWNER="${YAMI_RELEASE_OWNER:-Trendorin}"
 # tools/test-updates.sh (scenario «release») swaps these for stand-ins: the binaries, the tree check
 DIST="${YAMI_RELEASE_DIST:-$ROOT/tools/dist.sh}"
@@ -196,7 +197,8 @@ github_release() { # ver [--draft]
 about() { awk 'NR > 3 && NF { p = p (p ? " " : "") $0; next } p { exit } END { print p }' "$1" | sed -E 's/\[([^]]*)\]\([^)]*\)/\1/g; s/([.!?]) .*/\1/' | cut -c1-300; }
 remote_has() { # dir ref object: the ref is on origin and is that object
   local got
-  got="$(git -C "$1" ls-remote origin "$2" 2>/dev/null | awk 'NR == 1 { print $1 }')"
+  # no origin yet (a module before its first --push): not there; a failing git must not end the script here
+  got="$(git -C "$1" ls-remote origin "$2" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)"
   [[ -n $got ]] || return 1
   [[ $got == "$3" ]] || die "$(t "$2 на GitHub не тот, что здесь (${got:0:8} против ${3:0:8})" "$2 on GitHub is not the one here (${got:0:8} vs ${3:0:8})")"
 }
@@ -259,7 +261,7 @@ status() { # [ver]
   esac
   where() { # dir ref
     here="$(git -C "$1" rev-parse -q --verify "$2" >/dev/null && t "здесь" "here" || t "нет" "no")"
-    out="$(git -C "$1" ls-remote origin "$2" 2>/dev/null | awk 'NR == 1 { print "GitHub" }')"
+    out="$(git -C "$1" ls-remote origin "$2" 2>/dev/null | awk 'NR == 1 { print "GitHub" }' || true)"
     printf '  %-12s %-18s %-6s %s\n' "${1##*/}" "${2#refs/tags/}" "$here" "${out:-—}"
   }
   where "$ROOT" "refs/tags/v$v"
@@ -277,6 +279,15 @@ px_ver() { sed -n 's/^version = "\(.*\)"/\1/p' shell/px/Cargo.toml | head -n1; }
 px_of() { grep -A2 '^name = "yami-px"$' "$1/Cargo.lock" 2>/dev/null | sed -n 's/.*#\([0-9a-f]*\)".*/\1/p'; }
 crate_ver() { # file version: only the [package] version (the file's first `version =` line)
   sed -i "0,/^version = \".*\"/s//version = \"$2\"/" "$1"
+}
+# cargo in a module: it takes yami-px by its tag from github.com/<owner>/yami, and this release's tag is not
+# there before --push, so cargo (and only cargo) reads that address from this repository. Nothing else of
+# the owner's goes through cargo in a module, so the prefix catches only yami-px
+modcargo() { # dir, cargo arguments…
+  local d=$1
+  shift
+  (cd "$d" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="url.$ROOT.insteadOf" GIT_CONFIG_VALUE_0="https://github.com/$OWNER/yami" \
+    CARGO_NET_GIT_FETCH_WITH_CLI=true cargo "$@")
 }
 
 make_release() { # ver
@@ -355,7 +366,7 @@ make_release() { # ver
     # built against another yami-px: take this one
     if [[ -f $d/Cargo.lock && -n "$(px_of "$d")" && "$(px_of "$d")" != "$pxc" ]]; then
       sed -i "s|\(yami-px = {[^}]*tag = \"\)px-v[^\"]*\"|\1$pxt\"|" "$d/Cargo.toml"
-      (cd "$d" && cargo update -q -p yami-px)
+      modcargo "$d" update -q -p yami-px
       [[ "$(px_of "$d")" == "$pxc" ]] || die "$repo: $(t "не взял" "did not take") $pxt"
       git -C "$d" add Cargo.toml Cargo.lock
       git -C "$d" commit -q -m "take yami-px $pxt"
@@ -370,7 +381,7 @@ make_release() { # ver
         cv="$(sed -n 's/^version = "\(.*\)"/\1/p' "$d/Cargo.toml" | head -n1)"
         if [[ $cv != "$v" ]]; then
           crate_ver "$d/Cargo.toml" "$v"
-          (cd "$d" && cargo update -q -p "$repo" --offline)
+          modcargo "$d" update -q -p "$repo" --offline
           git -C "$d" add Cargo.toml Cargo.lock
           git -C "$d" commit -q -m "release: $v"
         fi

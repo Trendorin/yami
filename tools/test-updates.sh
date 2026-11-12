@@ -617,6 +617,14 @@ t_release() { # the owner's release: made here, taken back, made again, publishe
   machine
   first_install --yes
   check "a machine on 3.0.0 with yami-view" apply view
+  # as on the owner's machine: origin is GitHub over https and the modules have no remote yet. git reaches
+  # the fake GitHub by a rule of the fake HOME that is shorter than env.sh's: were env.sh to leak into the
+  # release's git, its rule would win and the release would talk to the working copies instead
+  mkdir -p "$WORK/gh-root"
+  ln -sfn "$GH" "$WORK/gh-root/Trendorin"
+  git config --file "$H/.gitconfig" url."file://$WORK/gh-root/".insteadOf "https://github.com/"
+  g -C "$y" remote set-url origin https://github.com/Trendorin/yami.git
+  for m in "${MODULES[@]}"; do git -C "$SRC/$m" remote remove origin 2>/dev/null || true; done
   # one module changed since its tag, the others not
   printf '\n' >>"$SRC/yami-view/README.md"
   g -C "$SRC/yami-view" commit -q -am "view: a change for 3.1.0"
@@ -641,7 +649,13 @@ t_release() { # the owner's release: made here, taken back, made again, publishe
   check "  every HEAD and tag as before" test "$(refs_now)" = "$before"
   check "  the tree is clean" test -z "$(git -C "$y" status --porcelain --untracked-files=no)"
   check "made again" rel 3.1.0
+  # the first time a module has no repository on GitHub at all: --push makes it
+  local niri_tag
+  niri_tag="$(gh_ref yami-niri refs/tags/v3.0.0)"
+  rm -rf "$GH/yami-niri.git"
   check "published with --push" rel --push 3.1.0
+  check "  a module new to GitHub got its repository, main and tag" sh -c "grep -q 'gh repo create Trendorin/yami-niri' '$WORK/gh-releases.log' && test '$(g -C "$SRC/yami-niri" rev-parse refs/tags/v3.0.0)' = '$niri_tag' && git -C '$GH/yami-niri.git' rev-parse -q --verify refs/heads/main >/dev/null && test \"\$(git -C '$GH/yami-niri.git' rev-parse refs/tags/v3.0.0)\" = '$niri_tag'"
+  check "  every module knows its GitHub now" sh -c "for m in ${MODULES[*]}; do git -C '$SRC'/\$m remote get-url origin | grep -qx \"https://github.com/Trendorin/\$m.git\" || exit 1; done"
   check "  the module's tag is on GitHub" test "$(gh_ref yami-view refs/tags/v3.1.0)" = "$(g -C "$SRC/yami-view" rev-parse refs/tags/v3.1.0)"
   check "  and its main" test "$(gh_ref yami-view refs/heads/main)" = "$(g -C "$SRC/yami-view" rev-parse 'v3.1.0^{commit}')"
   check "  the shell's tag and main" test "$(gh_ref yami refs/heads/main)" = "$(g -C "$y" rev-parse 'v3.1.0^{commit}')"
