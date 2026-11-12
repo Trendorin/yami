@@ -44,13 +44,16 @@ pub fn real_trash(t: &Path) -> bool {
     own_dir(t) && own_dir(&t.join("files")) && (std::fs::symlink_metadata(&info).is_err() || own_dir(&info))
 }
 
-/// корзина для p и корень его диска (None — домашняя)
-fn trash_for(p: &Path) -> Option<(PathBuf, Option<PathBuf>)> {
-    let ht = home_trash();
+/// корзина для p и корень его диска (None — домашняя); ht — домашняя корзина в папке данных data
+fn trash_for(p: &Path, ht: &Path, data: &Path) -> Option<(PathBuf, Option<PathBuf>)> {
+    let ht = ht.to_path_buf();
     let _ = std::fs::create_dir_all(&ht);
-    let hdev = std::fs::metadata(crate::paths::data_dir()).ok()?.dev();
+    let hdev = std::fs::metadata(data).ok()?.dev();
     let pdev = std::fs::symlink_metadata(p).ok()?.dev();
     if hdev == pdev {
+        // у новой учётной записи корзины ещё нет: files и info делаются здесь, иначе запись не создать
+        let _ = std::fs::create_dir_all(ht.join("files"));
+        let _ = std::fs::create_dir_all(ht.join("info"));
         return Some((ht, None));
     }
     let top = topdir(p)?;
@@ -96,7 +99,11 @@ pub enum PutErr {
 
 /// в корзину; Ok — путь в корзине. Занятое имя — «имя (2)»
 pub fn put(p: &Path) -> Result<PathBuf, PutErr> {
-    let (t, top) = trash_for(p).ok_or(PutErr::NoTrash)?;
+    put_in(p, &home_trash(), &crate::paths::data_dir())
+}
+
+fn put_in(p: &Path, ht: &Path, data: &Path) -> Result<PathBuf, PutErr> {
+    let (t, top) = trash_for(p, ht, data).ok_or(PutErr::NoTrash)?;
     let files = t.join("files");
     let info = t.join("info");
     let name = p.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
@@ -143,7 +150,28 @@ pub fn put(p: &Path) -> Result<PathBuf, PutErr> {
 
 #[cfg(test)]
 mod tests {
-    use super::real_trash;
+    use super::{put_in, real_trash};
+
+    /// у новой учётной записи корзины нет совсем: первое удаление делает её само; одинаковые имена
+    /// не затирают друг друга, запись о файле лежит рядом
+    #[test]
+    fn the_first_file_makes_the_home_trash() {
+        let d = crate::paths::private_tmp("trash-home").unwrap();
+        let data = d.join("share");
+        std::fs::create_dir_all(&data).unwrap();
+        let ht = data.join("Trash");
+        let a = d.join("note.txt");
+        std::fs::write(&a, b"one").unwrap();
+        let got = put_in(&a, &ht, &data).ok().expect("into a trash that did not exist");
+        assert_eq!(got, ht.join("files/note.txt"));
+        assert!(!a.exists() && std::fs::read(&got).unwrap() == b"one");
+        let info = std::fs::read_to_string(ht.join("info/note.txt.trashinfo")).unwrap();
+        assert!(info.starts_with("[Trash Info]\nPath=") && info.contains("DeletionDate="), "{info}");
+        std::fs::write(&a, b"two").unwrap();
+        assert_eq!(put_in(&a, &ht, &data).ok(), Some(ht.join("files/note (2).txt")));
+        assert!(ht.join("info/note (2).txt.trashinfo").is_file() && std::fs::read(&got).unwrap() == b"one");
+        let _ = std::fs::remove_dir_all(&d);
+    }
 
     /// корзина на принесённом диске, собранная из ссылок, — не корзина: то, на что она указывает, не
     /// показывается «файлами в корзине» и не удаляется её очисткой
