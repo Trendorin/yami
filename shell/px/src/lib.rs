@@ -13,6 +13,7 @@ pub mod paths;
 pub mod style;
 pub mod theme;
 pub mod time;
+pub mod trash;
 pub mod ui;
 
 /// время «1:05» или «1:02:03» (плееры: шелл, yami-play)
