@@ -47,7 +47,8 @@ summary_install() {
     note "inputs.yami.url = \"github:Trendorin/yami\";"
     note "imports = [ yami.nixosModules.default ];  programs.yami.enable = true;"
   fi
-  niri_ok || ((DRY)) || on fork || warn "$(t "нужен niri {} или новее — поставь его или запусти без --no-fork" "niri {} or newer is required: install it or rerun without --no-fork" "niri {} ou superior é necessário: instale ou execute novamente sem --no-fork" "$NIRI_MIN")"
+  # a run that stopped (the reason is above) did not get to niri: the hint would only mislead
+  niri_ok || ((DRY || BUILD_FAILED)) || on fork || warn "$(t "нужен niri {} или новее — поставь его или запусти без --no-fork" "niri {} or newer is required: install it or rerun without --no-fork" "niri {} ou superior é necessário: instale ou execute novamente sem --no-fork" "$NIRI_MIN")"
 
   if ((${#FAILED[@]})) && ((BUILD_FAILED)); then
     printf '\n  %s%s%s\n' "$T" "$(t "Запусти установщик снова: продолжу с того же места." "Run the installer again: it continues from where it stopped." "Rode o instalador novamente: ele continua de onde parou.")" "$R"
