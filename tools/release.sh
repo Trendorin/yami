@@ -30,7 +30,8 @@ unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
 OWNER="${YAMI_RELEASE_OWNER:-Trendorin}"
 # tools/test-updates.sh (scenario «release») swaps these for stand-ins: the binaries, the tree check
 DIST="${YAMI_RELEASE_DIST:-$ROOT/tools/dist.sh}"
-CHECK="${YAMI_RELEASE_CHECK:-$ROOT/tools/check.sh --fast}"
+# YAMI_RELEASE_CHECK: a command line for the stand-in (no spaces in it); the real one by its path, which may hold one
+run_check() { if [[ -n ${YAMI_RELEASE_CHECK:-} ]]; then $YAMI_RELEASE_CHECK; else "$ROOT/tools/check.sh" --fast; fi; }
 RU=0
 case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in ru*) RU=1 ;; esac
 t() { if ((RU)); then printf '%s' "$1"; else printf '%s' "$2"; fi; }
@@ -460,7 +461,7 @@ make_release() { # ver
   say "PKGBUILD, yami.spec, yami-bin-$v.ebuild + Manifest"
 
   head_ "tools/check.sh"
-  $CHECK >"$STATE_DIR/check.log" 2>&1 || { tail -n 20 "$STATE_DIR/check.log"; die "tools/check.sh"; }
+  run_check >"$STATE_DIR/check.log" 2>&1 || { tail -n 20 "$STATE_DIR/check.log"; die "tools/check.sh"; }
   say "check: all good"
 
   git add VERSION CHANGELOG.md CHANGELOG.ru.md modules.lock flake.nix flake.lock shell/Cargo.lock "${crates[@]}"
