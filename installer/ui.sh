@@ -289,7 +289,7 @@ explain() {
     *"no such version in its repository"*) t "у модуля нет нужной версии: похоже, выпуск ещё публикуется; подожди и запусти снова" "a module does not have the needed version: the release may still be going out; wait and run again" "falta a versão necessária de um módulo: a publicação pode estar em andamento; aguarde e rode novamente" ;;
     *"signature does not check out"*) t "подпись модуля не сошлась, ничего не поставлено: запусти установку заново; если повторится — напиши автору" "a module's signature did not match, nothing was installed: run again; if it repeats, tell the author" "a assinatura de um módulo não confere, nada foi instalado: rode novamente; se repetir, avise o autor" ;;
     *"unable to lock database"* | *"Could not get lock"* | *"could not get lock"* | *"is locked by another"*) t "сейчас работает другой менеджер пакетов: дождись его и запусти снова" "another package manager is running: wait for it and run again" "outro gerenciador de pacotes está em execução: aguarde e rode novamente" ;;
-    *"failed retrieving file"* | *"404  Not Found"* | *"Failed to fetch"*) t "база пакетов устарела: обнови систему и запусти снова (Arch: sudo pacman -Syu)" "the package index is out of date: update the system and run again (Arch: sudo pacman -Syu)" "o índice de pacotes está desatualizado: atualize o sistema e rode novamente (Arch: sudo pacman -Syu)" ;;
+    *"failed retrieving file"* | *"404  Not Found"* | *"Failed to fetch"* | *"Status code: 404"*) t "база пакетов устарела: обнови систему и запусти снова (Arch: sudo pacman -Syu)" "the package index is out of date: update the system and run again (Arch: sudo pacman -Syu)" "o índice de pacotes está desatualizado: atualize o sistema e rode novamente (Arch: sudo pacman -Syu)" ;;
     *"Could not resolve host"* | *"Temporary failure in name resolution"* | *"Failed to connect"* | *"Network is unreachable"* | *"Connection timed out"* | *"unable to access"*) t "нет интернета или GitHub недоступен: проверь сеть и запусти снова" "no internet or GitHub is unreachable: check the network and run again" "sem internet ou GitHub indisponível: verifique a rede e rode novamente" ;;
     *"signal: 9"* | *"SIGKILL"* | *"Cannot allocate memory"* | *"out of memory"*) t "не хватило памяти на сборку: закрой тяжёлые программы и запусти снова (CARGO_BUILD_JOBS=1 — медленнее, но надёжнее)" "not enough memory for the build: close heavy apps and run again (CARGO_BUILD_JOBS=1 is slower but safer)" "memória insuficiente para compilar: feche programas pesados e rode novamente (CARGO_BUILD_JOBS=1 é mais lento, porém mais seguro)" ;;
     *"ssh-keygen"*) t "нет ssh-keygen, подпись не проверить: поставь openssh и запусти снова" "ssh-keygen is missing, signatures cannot be checked: install openssh and run again" "ssh-keygen ausente, assinaturas não podem ser verificadas: instale o openssh e rode novamente" ;;
@@ -400,7 +400,7 @@ step() { # index
   printf '\e[?25h'
 }
 # a failure of one of these stops the run; steps before the swap changed nothing
-step_fatal() { case $1 in do_fetch_modules | do_build_* | do_prebuilt_bins | do_install_bins) return 0 ;; *) return 1 ;; esac; }
+step_fatal() { case $1 in do_fetch_modules | do_build_* | do_prebuilt_bins | do_install_bins) return 0 ;; pkgs) [[ -e $CACHE/packages-stale ]] ;; *) return 1 ;; esac; }
 # these change what the session starts from: a failure here puts the snapshot back
 step_critical() { case $1 in do_install_bins | do_niri_config | do_refresh) return 0 ;; *) return 1 ;; esac; }
 run_steps() {

@@ -199,7 +199,18 @@ pkgs() {
   (($#)) || return 0
   pm_install "$@" && return 0
   # usually one name this release does not have (Alpine: cliphist, qt6ct): drop what the
+  local n0
+  rm -f -- "$CACHE/packages-stale"
+  n0="$(wc -l <"$LOG" 2>/dev/null || echo 0)"
   # repositories lack and try the rest at once again; one by one only if that fails too
+  # the mirrors no longer have the files this index names: it is older than they are (Arch and CachyOS
+  # sync it only with a full upgrade, which is the user's to run). One by one would fail the same way
+  # for many minutes and leave half a desktop: stop here, nothing is installed (explain says what to do)
+  if tail -n +"$((n0 + 1))" "$LOG" 2>/dev/null | grep -qE 'failed retrieving file|404 +Not Found|Failed to fetch|Status code: 404'; then
+    : >"$CACHE/packages-stale"
+    echo "the package index is out of date"
+    return 1
+  fi
   local p have=() good=0
   if pkg_avail_known; then
     for p; do

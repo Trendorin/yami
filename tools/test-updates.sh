@@ -61,7 +61,16 @@ args=("$@")
 [[ ${args[0]:-} == -A ]] && { args=("${args[@]:1}"); echo "askpass" >>"$HOME/root.log"; }
 [[ ${args[0]:-} == -k || ${args[0]:-} == -n ]] && exit 0
 if [[ ${args[0]:-} == bash && ${args[1]:-} == -c ]]; then
-  while IFS= read -r p && IFS= read -r c; do echo "root: $c" >>"$HOME/root.log"; echo 0; done
+  while IFS= read -r p && IFS= read -r c; do
+    echo "root: $c" >>"$HOME/root.log"
+    # a package index older than the mirrors (an Arch not upgraded for a while): what pacman says then
+    if [[ -e $HOME/stale-index && $c == *"pacman -S"* ]]; then
+      echo "error: failed retrieving file 'niri-26.04-1-x86_64.pkg.tar.zst' from mirror.example : The requested URL returned error: 404" >>"/proc/$p/fd/2"
+      echo 1
+    else
+      echo 0
+    fi
+  done
   exit 0
 fi
 exit 0
@@ -347,6 +356,15 @@ t_full() {
 t_failures() {
   local before
   reset_world
+  # the package index is older than the mirrors: the first install stops at the packages, says what to
+  # do and changes nothing (it used to try every package alone for many minutes, then call the base ready)
+  machine
+  : >"$H/stale-index"
+  nocheck "a stale package index stops the first install" first_install --yes
+  rm -f "$H/stale-index"
+  check "  it says to update the system first" contains "$(log_for "$SCEN")" "sudo pacman -Syu"
+  check "  one package transaction, not one per package" sh -c "grep -c 'root: .*pacman -S' '$H/root.log' | grep -qx 1"
+  nocheck "  nothing was installed" exists "$H/.local/bin/yami-shell"
   machine
   first_install --yes --full
   publish 3.1.0
