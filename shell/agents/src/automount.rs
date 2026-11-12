@@ -259,8 +259,11 @@ fn owned(c: &mut Command) -> &mut Command {
 /// заперт ли экран: шелл yami ставит метку; у остальных спрашиваем logind
 fn session_locked() -> bool {
     if let Some(d) = std::env::var_os("XDG_RUNTIME_DIR") {
-        if std::path::PathBuf::from(d).join("yami-locked").exists() {
-            return true;
+        // в метке — сокет niri, под которым заперли: метка другого (прошлого) niri не в счёт
+        if let Ok(s) = std::fs::read_to_string(std::path::PathBuf::from(d).join("yami-locked")) {
+            if s.is_empty() || std::env::var("NIRI_SOCKET").map_or(true, |n| n == s) {
+                return true;
+            }
         }
     }
     let Ok(id) = std::env::var("XDG_SESSION_ID") else { return false };
