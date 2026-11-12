@@ -10,7 +10,7 @@ url='https://github.com/Trendorin/yami'
 license=(MIT)
 options=(!strip !debug)
 source=("https://github.com/Trendorin/yami/releases/download/v$pkgver/yami-$pkgver-x86_64-linux.tar.gz")
-sha256sums=('SKIP') # release: tools/release.sh prints the sum, `updpkgsums` writes it
+sha256sums=('SKIP') # tools/release.sh writes it
 
 _put() { cd "yami-$pkgver-x86_64-linux" && ./stage.sh --prefix /usr --destdir "$pkgdir" --managed --only "$1"; }
 

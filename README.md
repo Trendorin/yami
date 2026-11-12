@@ -399,7 +399,8 @@ For maintainers:
 
 ```sh
 tools/release.sh --keygen     # once: an ssh signing key, trusted in keys/allowed_signers (commit it)
-tools/release.sh 2.1.0        # CHANGELOG «Unreleased» → 2.1.0 (both languages), versions, check.sh, signed tag, push
+tools/release.sh 3.1.0        # made and signed here first (changelog, versions, modules, binaries, packages), then «publish now?»
+tools/release.sh --undo 3.1.0 # takes back a release made here and not published
 ```
 
 Updates come from this repository over HTTPS; set `updateRepo` to follow a fork instead.
@@ -485,7 +486,7 @@ log in, `~/.local/lib/yami-niri/yami-niri.sh off`.
 | `tools/check-modules.sh [NAME…]` | every module next to this repository: no warnings, tests, translations, every state in both looks and every language, every text fits |
 | `yami-greet shot -o DIR`, `yami-greet --demo` | the login screen offscreen in each state; `--demo` runs it without greetd (password `yami`) inside a nested niri |
 | `yami-dev readme-art`, `tools/readme-shots.sh` | the README's logo and cards; real screenshots of your session (empty workspace, plain device names, everything put back) |
-| `tools/release.sh X.Y.Z` | cut a release: changelog, versions, check, signed tag, push (`--keygen` once for the key) |
+| `tools/release.sh X.Y.Z` | a release: everything made and signed here first (changelog, versions, the changed modules' tags, binaries, packages), then one question before it is published; `--push`, `--status`, `--undo`, `--keygen` once for the key |
 | `tools/deploy.sh` | build, install to `~/.local/bin` and restart the running shell (refuses while a game has focus); `--modules` adds the modules next to this repository, `--modules-only` installs only them |
 
 ## Thanks

@@ -6,6 +6,7 @@
 # (root commands are never run, so the root half of the login screen is checked by what it was asked).
 # The sources are this working tree and the modules next to it, edits included.
 #   tools/test-updates.sh [--list] [scenario …]     all of them by default; logs in $YAMI_TEST_DIR/logs
+# The scenario «release» runs tools/release.sh itself (make, --undo, make, --push) with a stand-in gh.
 # yami-niri is a stub (a real build is 5–25 minutes and 4 GB); needs a packaged niri for `niri validate`.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -531,6 +532,144 @@ t_prebuilt() { # a release with ready binaries: no compiler, signature first, ev
   nocheck "  no shell landed" exists "$H/.local/bin/yami-shell"
   SANDBOX_ENV=()
 }
+# ── the release itself: tools/release.sh against the fake GitHub ────────────
+# gh as the release needs it: repositories are bare ones in $GH_REPOS, releases folders in $GH_STORE
+# (a «.draft» file while a draft). Publishing a release whose tag is not on GitHub yet fails, as it would
+make_gh() {
+  mkdir -p "$WORK/rel-shims"
+  cat >"$WORK/rel-shims/gh" <<'SH'
+#!/bin/bash
+echo "gh $*" >>"$GH_STORE.log"
+mkdir -p "$GH_STORE"
+tag_on_gh() { [[ -n "$(git -C "$GH_REPOS/yami.git" tag -l "$1")" ]]; }
+files() { # what is left after the options
+  while (($#)); do
+    case $1 in --title | --notes | --target | --json | --jq | --description) shift ;; --*) ;; *) printf '%s\n' "$1" ;; esac
+    shift
+  done
+}
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "repo view") [[ -d $GH_REPOS/${3#*/}.git ]] ;;
+  "repo create") git init -q --bare -b main "$GH_REPOS/${3#*/}.git" ;;
+  "release view")
+    [[ -d $GH_STORE/$3 ]] || exit 1
+    [[ $* == *--json* ]] && { if [[ -f $GH_STORE/$3/.draft ]]; then printf 'draft'; else printf 'public'; fi; printf ', %s files\n' "$(ls "$GH_STORE/$3" | wc -l)"; }
+    exit 0 ;;
+  "release create")
+    t=$3; shift 3
+    [[ $* == *--draft* ]] || [[ $t == installs ]] || tag_on_gh "$t" || { echo "tag $t is not on GitHub" >&2; exit 1; }
+    mkdir -p "$GH_STORE/$t"
+    [[ $* == *--draft* ]] && touch "$GH_STORE/$t/.draft"
+    files "$@" | while read -r f; do cp -- "$f" "$GH_STORE/$t/"; done ;;
+  "release edit")
+    [[ -d $GH_STORE/$3 ]] || exit 1
+    if [[ $* == *--draft=false* ]]; then tag_on_gh "$3" || { echo "tag $3 is not on GitHub" >&2; exit 1; }; rm -f "$GH_STORE/$3/.draft"; fi ;;
+  "release upload")
+    t=$3; shift 3
+    [[ -d $GH_STORE/$t ]] || exit 1
+    files "$@" | while read -r f; do cp -- "$f" "$GH_STORE/$t/"; done ;;
+  *) echo "gh stub: $*" >&2; exit 1 ;;
+esac
+SH
+  # the binaries: named as tools/dist.sh names them, a signed SHA256SUMS over them (the real build is tested
+  # by tools/dist.sh itself and the «prebuilt» scenario)
+  cat >"$WORK/rel-shims/dist-stub" <<'SH'
+#!/bin/bash
+set -e
+v=$(cat VERSION) key=
+while (($#)); do [[ $1 == --sign ]] && key=$2; shift; done
+mkdir -p dist
+printf 'yami %s archive\n' "$v" >"dist/yami-$v-x86_64-linux.tar.gz"
+for p in shell files view play shot greet; do printf 'deb %s\n' "$p" >"dist/yami-${p}_${v}_amd64.deb"; done
+for m in files view play shot; do printf 'bin %s\n' "$m" >"dist/yami-$m"; done
+cd dist
+sha256sum "yami-$v-x86_64-linux.tar.gz" ./*.deb yami-files yami-view yami-play yami-shot >SHA256SUMS
+ssh-keygen -q -Y sign -f "$key" -n yami-release SHA256SUMS </dev/null
+echo "  yami-shell         1 KiB  glibc 2.34"
+SH
+  chmod +x "$WORK/rel-shims"/*
+  # env.sh as next to the real modules: git and cargo take github.com/Trendorin/* from the working copies
+  printf 'export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="url.file://%s/.insteadOf" GIT_CONFIG_VALUE_0="https://github.com/Trendorin/"\nexport CARGO_NET_GIT_FETCH_WITH_CLI=true\n' "$SRC" >"$SRC/env.sh"
+}
+rel() { # release.sh arguments…: the owner's run, from the working copies, against the fake GitHub
+  env -i -C "$SRC/yami" HOME="$H" USER=tester LANG=en_US.UTF-8 TERM=dumb \
+    PATH="$WORK/rel-shims:$REAL_HOME/.cargo/bin:/usr/bin:/bin" \
+    CARGO_HOME="$REAL_HOME/.cargo" RUSTUP_HOME="$REAL_HOME/.rustup" CARGO_TARGET_DIR="$WORK/target-dev" \
+    GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+    YAMI_MODULES_DIR="$SRC" YAMI_RELEASE_DIST="$WORK/rel-shims/dist-stub" YAMI_RELEASE_CHECK=true \
+    GH_STORE="$WORK/gh-releases" GH_REPOS="$GH" \
+    bash "$SRC/yami/tools/release.sh" "$@" </dev/null >>"$(log_for "$SCEN")" 2>&1
+}
+# every HEAD and tag of the working copies: what --undo must give back exactly
+refs_now() { local r; for r in yami "${MODULES[@]}"; do printf '%s ' "$r"; git -C "$SRC/$r" for-each-ref --format='%(refname)=%(objectname)' refs/heads refs/tags | tr '\n' ' '; echo; done; }
+gh_ref() { git -C "$GH/$1.git" rev-parse -q --verify "$2" 2>/dev/null; }
+t_release() { # the owner's release: made here, taken back, made again, published; a machine updates to it
+  reset_world
+  make_gh
+  rm -rf "$WORK/gh-releases" "$WORK/gh-releases.log"
+  local y="$SRC/yami" m
+  g -C "$y" config user.signingkey "$WORK/key.pub"
+  # the world is at 3.0.0: the changelog's newest section says so
+  sed -i 's/^## 2\.7\.0$/## 3.0.0/' "$y/CHANGELOG.md" "$y/CHANGELOG.ru.md"
+  g -C "$y" commit -q -am "changelog at 3.0.0" && push yami
+  # a machine on 3.0.0 with yami-view, to update once the release is out
+  machine
+  first_install --yes
+  check "a machine on 3.0.0 with yami-view" apply view
+  # one module changed since its tag, the others not
+  printf '\n' >>"$SRC/yami-view/README.md"
+  g -C "$SRC/yami-view" commit -q -am "view: a change for 3.1.0"
+  local before
+  before="$(refs_now)"
+  check "the release is made here" rel 3.1.0
+  check "  its tag is signed by the release key" g -C "$y" -c gpg.ssh.allowedSignersFile="$y/keys/allowed_signers" tag -v v3.1.0
+  check "  VERSION is 3.1.0" test "$(cat "$y/VERSION")" = 3.1.0
+  check "  the changed module got 3.1.0" g -C "$SRC/yami-view" -c gpg.ssh.allowedSignersFile="$y/keys/allowed_signers" tag -v v3.1.0
+  check "  and its crate the version" grep -q '^version = "3.1.0"' "$SRC/yami-view/Cargo.toml"
+  nocheck "  an unchanged one did not" g -C "$SRC/yami-files" rev-parse -q --verify refs/tags/v3.1.0
+  check "  modules.lock names both" sh -c "grep -qx 'yami-view v3.1.0' '$y/modules.lock' && grep -qx 'yami-files v3.0.0' '$y/modules.lock'"
+  check "  the flake takes the new tag" grep -q 'github:Trendorin/yami-view/v3.1.0' "$y/flake.nix"
+  check "  flake.lock pins it with its hash" sh -c "grep -A12 '\"yami-view\": {' '$y/flake.lock' | grep -q '\"ref\": \"v3.1.0\"' && grep -c narHash '$y/flake.lock' | grep -qx 6"
+  check "  PKGBUILD carries the archive's sum" grep -q "sha256sums=('$(sha256sum "$y/dist/yami-3.1.0-x86_64-linux.tar.gz" | cut -d' ' -f1)')" "$y/packaging/arch/PKGBUILD"
+  check "  the ebuild and its Manifest" sh -c "test -f '$y/packaging/gentoo/yami-bin-3.1.0.ebuild' && grep -q '^DIST yami-3.1.0-x86_64-linux.tar.gz ' '$y/packaging/gentoo/Manifest'"
+  check "  the spec" grep -q '^Version: *3.1.0$' "$y/packaging/fedora/yami.spec"
+  check "  the release commit has the archive's time" test "$(g -C "$y" log -1 --format=%ct v3.1.0)" -gt 0
+  nocheck "  nothing reached GitHub" sh -c "git -C '$GH/yami.git' tag -l v3.1.0 | grep -q . || git -C '$GH/yami-view.git' tag -l v3.1.0 | grep -q ."
+  check "  --status runs" rel --status 3.1.0
+  check "taken back with --undo" rel --undo 3.1.0
+  check "  every HEAD and tag as before" test "$(refs_now)" = "$before"
+  check "  the tree is clean" test -z "$(git -C "$y" status --porcelain --untracked-files=no)"
+  check "made again" rel 3.1.0
+  check "published with --push" rel --push 3.1.0
+  check "  the module's tag is on GitHub" test "$(gh_ref yami-view refs/tags/v3.1.0)" = "$(g -C "$SRC/yami-view" rev-parse refs/tags/v3.1.0)"
+  check "  and its main" test "$(gh_ref yami-view refs/heads/main)" = "$(g -C "$SRC/yami-view" rev-parse 'v3.1.0^{commit}')"
+  check "  the shell's tag and main" test "$(gh_ref yami refs/heads/main)" = "$(g -C "$y" rev-parse 'v3.1.0^{commit}')"
+  check "  the release is public with its binaries" sh -c "test ! -e '$WORK/gh-releases/v3.1.0/.draft' && test -s '$WORK/gh-releases/v3.1.0/SHA256SUMS.sig' && test -s '$WORK/gh-releases/v3.1.0/yami-3.1.0-x86_64-linux.tar.gz'"
+  check "  it was a draft until the tag was there" sh -c "grep -n 'release create v3.1.0 --draft' '$WORK/gh-releases.log' | grep -q ."
+  nocheck "  --undo refuses a published release" rel --undo 3.1.0
+  # the published release, installed as any user gets it
+  check "the machine updates to it" update
+  check "  the shell is 3.1.0" is_ver yami-shell 3.1.0
+  check "  yami-view is 3.1.0" is_ver yami-view 3.1.0
+  check "  niri accepts the config" niri_ok
+  # the next one changes yami-px, whose tag is public by now: it never moves, a new patch version comes
+  printf '\n// a change for 3.2.0\n' >>"$y/shell/px/src/lib.rs"
+  # 3.1.0 took «Unreleased» with it: the next release has its own lines
+  perl -0pi -e 's/^## Unreleased\n\n/## Unreleased\n\n- yami-px: a change.\n\n/m' "$y/CHANGELOG.md"
+  perl -0pi -e 's/^## Не выпущено\n\n/## Не выпущено\n\n- yami-px: изменение.\n\n/m' "$y/CHANGELOG.ru.md"
+  g -C "$y" commit -q -am "px: a change for 3.2.0"
+  before="$(refs_now)"
+  check "a release with a changed yami-px" rel 3.2.0
+  check "  yami-px gets the next patch version, signed" g -C "$y" -c gpg.ssh.allowedSignersFile="$y/keys/allowed_signers" tag -v px-v3.0.1
+  check "  the public px tag stays where it was" test "$(g -C "$y" rev-parse refs/tags/px-v3.0.0)" = "$(gh_ref yami refs/tags/px-v3.0.0)"
+  for m in yami-files yami-view yami-play yami-shot yami-greet; do
+    check "  $m takes it and gets 3.2.0" sh -c "grep -q 'tag = \"px-v3.0.1\"' '$SRC/$m/Cargo.toml' && git -C '$SRC/$m' rev-parse -q --verify refs/tags/v3.2.0 >/dev/null && grep -qx '$m v3.2.0' '$y/modules.lock'"
+  done
+  check "  yami-niri (no yami-px) keeps its tag" grep -qx 'yami-niri v3.0.0' "$y/modules.lock"
+  check "taken back with --undo" rel --undo 3.2.0
+  check "  every HEAD and tag as before" test "$(refs_now)" = "$before"
+}
 t_askpass() { # the first-run setup's way in: no terminal, the password through SUDO_ASKPASS
   reset_world
   machine
@@ -616,7 +755,7 @@ t_migrate() { # the real previous release (2.7.0, one repository) updates to thi
   check "  yami doctor runs" sh -c "'$H/.local/bin/yami-shell' doctor >/dev/null 2>&1; [ \$? -le 1 ]"
 }
 
-SCENARIOS=(base prebuilt pieces standalone module-files module-view module-play module-shot module-login module-games module-fork full failures repair privacy askpass tty migrate)
+SCENARIOS=(base prebuilt release pieces standalone module-files module-view module-play module-shot module-login module-games module-fork full failures repair privacy askpass tty migrate)
 run_scenario() {
   SCEN=$1
   : >"$(log_for "$SCEN")"
@@ -624,6 +763,7 @@ run_scenario() {
   case $1 in
     base) t_base ;;
     prebuilt) t_prebuilt ;;
+    release) t_release ;;
     pieces) t_pieces ;;
     standalone) t_standalone ;;
     module-*) t_module "${1#module-}" ;;

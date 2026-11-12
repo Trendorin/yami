@@ -73,7 +73,8 @@ Please do not post it in public issues: send a [private report on GitHub](https:
   someone who gains push access to the repository still cannot ship an update. A signature only
   counts with a matching principal (`gpg.minTrustLevel=fully`, and «No principal matched» is
   refused even where an old git would exit 0). Releases are cut
-  with `tools/release.sh`, which refuses to make an unsigned tag once keys exist.
+  with `tools/release.sh`, which signs every tag it makes (the shell's, each module's, yami-px's) and
+  the checksums, and stops when one of the signatures does not check out against that file.
 - Ready binaries: a release's archive is used only when `SHA256SUMS.sig` checks out against
   `keys/allowed_signers` of the tag being installed (namespace `yami-release`) and the archive
   matches its own line in `SHA256SUMS`; a missing or foreign signature stops the install before anything changes.
