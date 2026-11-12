@@ -32,6 +32,9 @@ while (($#)); do
   shift
 done
 VER="$(cat "$ROOT/VERSION")"
+# the time stamped on every file of the archives: SOURCE_DATE_EPOCH (tools/release.sh builds them before
+# the release commit and gives that commit the same time), else the last commit. Same tree, same bytes
+EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "$ROOT" log -1 --format=%ct)}"
 ARCH=x86_64
 [[ "$(uname -m)" == "$ARCH" ]] || { echo "dist: only $ARCH for now" >&2; exit 1; }
 NAME="yami-$VER-$ARCH-linux"
@@ -109,13 +112,18 @@ make_sysroot() {
 
 # ── build ───────────────────────────────────────────────────────────────────
 host_glibc="$(getconf GNU_LIBC_VERSION | awk '{print $2}')"
+# the crates' sources sit in the builder's home (~/.cargo): their paths in panic messages are mapped to
+# /cargo, so the binaries name no home folder and come out the same on any machine
+flags=("--remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo")
 ENVS=()
 if ((SYSROOT)) && ver_gt "$host_glibc" "$GLIBC_MAX"; then
   make_sysroot
-  flags=(-C linker=clang -C "link-arg=--target=x86_64-linux-gnu" -C "link-arg=--sysroot=$SYS" -C link-arg=-fuse-ld=lld)
-  ENVS=("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS=${flags[*]}" "CC=clang" "CFLAGS=--target=x86_64-linux-gnu --sysroot=$SYS"
+  flags+=(-C linker=clang -C "link-arg=--target=x86_64-linux-gnu" -C "link-arg=--sysroot=$SYS" -C link-arg=-fuse-ld=lld)
+  ENVS=("CC=clang" "CFLAGS=--target=x86_64-linux-gnu --sysroot=$SYS"
     "PKG_CONFIG_SYSROOT_DIR=$SYS" "PKG_CONFIG_LIBDIR=$SYS/usr/lib/x86_64-linux-gnu/pkgconfig:$SYS/usr/share/pkgconfig" "PKG_CONFIG_ALLOW_CROSS=1")
 fi
+# one flag per field (\x1f): a path may hold spaces. With --target they reach only what goes into the result
+ENVS+=("CARGO_ENCODED_RUSTFLAGS=$(IFS=$'\x1f'; printf '%s' "${flags[*]}")")
 # --target: build scripts and proc-macros stay on the host's own libraries, only the result uses the sysroot
 build() { # the crate's Cargo.toml, cargo arguments
   env ${ENVS[@]+"${ENVS[@]}"} cargo build --release --locked --target x86_64-unknown-linux-gnu --target-dir "$TARGET" --manifest-path "$@"
@@ -166,7 +174,7 @@ mkdir -p "$T/modules/yami-shot" "$T/modules/yami-greet"
 cp -a "$MODS/yami-greet/fonts" "$MODS/yami-greet/greet-session" "$MODS/yami-greet/install-system.sh" "$T/modules/yami-greet/"
 mkdir -p "$OUT"
 ARCHIVE="$NAME.tar.gz"
-tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$(git -C "$ROOT" log -1 --format=%ct)" -C "$STAGE" -cf - "$NAME" | gzip -n9 >"$OUT/$ARCHIVE"
+tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$EPOCH" -C "$STAGE" -cf - "$NAME" | gzip -n9 >"$OUT/$ARCHIVE"
 
 # ── .deb: built by hand (ar + tar), so any system can make them ─────────────
 make_deb() { # package, stage.sh target
@@ -181,7 +189,7 @@ make_deb() { # package, stage.sh target
     printf 'Section: x11\nPriority: optional\nHomepage: https://github.com/Trendorin/yami\nDescription: %s, part of the yami desktop for niri\n' "$pkg"
   } >"$ctl/control"
   (cd "$dir" && find . -type f -printf '%P\0' | LC_ALL=C sort -z | xargs -0 md5sum) >"$ctl/md5sums"
-  local tars=(--sort=name --owner=0 --group=0 --numeric-owner --mtime="@$(git -C "$ROOT" log -1 --format=%ct)")
+  local tars=(--sort=name --owner=0 --group=0 --numeric-owner --mtime="@$EPOCH")
   tar "${tars[@]}" -C "$ctl" -cJf "$ctl/control.tar.xz" control md5sums
   tar "${tars[@]}" -C "$dir" -cJf "$ctl/data.tar.xz" .
   printf '2.0\n' >"$ctl/debian-binary"
