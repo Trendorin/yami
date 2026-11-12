@@ -9,7 +9,8 @@
 # tools, with the base; drives — udisks2 and gvfs (drives, phones, network shares), with yami-files or
 # the shell (its automount, yami-agents); files — yami-files' thumbnails and archives; play — libmpv for yami-play; shot — text
 # and QR from screenshots; look — the Qt/GTK theme; games — GameMode, MangoHud; login — greetd for
-# yami-greet (agreety: the text fallback); nirisrc — to build niri itself
+# yami-greet (agreety: the text fallback); nirisrc — to build niri itself (and xwayland-satellite with it:
+# a distribution without a recent niri usually lacks it too; families whose names are not checked yet leave it out)
 packages_for_family() {
 case "$FAM" in
   arch)
@@ -26,7 +27,8 @@ case "$FAM" in
     P_games=(gamemode mangohud)
     P_shot=(tesseract tesseract-data-eng tesseract-data-rus zbar)
     P_login=(greetd greetd-agreety)
-    P_nirisrc=(git clang pkgconf libinput libxkbcommon mesa libdisplay-info seatd pango cairo pipewire systemd-libs) ;;
+    P_nirisrc=(git clang pkgconf libinput libxkbcommon mesa libdisplay-info seatd pango cairo pipewire systemd-libs
+      libxcb xcb-util-cursor xorg-xwayland) ;;
   fedora)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
     P_base=(polkit gnome-keyring pipewire pipewire-pulseaudio wireplumber pulseaudio-utils NetworkManager bluez
@@ -58,7 +60,7 @@ case "$FAM" in
     P_shot=(tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus zbar-tools)
     P_login=(greetd)
     P_nirisrc=(git clang libudev-dev libgbm-dev libxkbcommon-dev libegl1-mesa-dev libwayland-dev libinput-dev libdbus-1-dev
-      libsystemd-dev libseat-dev libpipewire-0.3-dev libpango1.0-dev libdisplay-info-dev) ;;
+      libsystemd-dev libseat-dev libpipewire-0.3-dev libpango1.0-dev libdisplay-info-dev libxcb1-dev libxcb-cursor-dev xwayland) ;;
   suse)
     P_niri=(niri xwayland-satellite xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
     P_base=(polkit gnome-keyring pipewire pipewire-pulseaudio wireplumber pulseaudio-utils NetworkManager bluez
@@ -197,12 +199,10 @@ pm_install() {
 # not install a single package failed: the package manager itself is in trouble (see explain)
 pkgs() {
   (($#)) || return 0
-  pm_install "$@" && return 0
-  # usually one name this release does not have (Alpine: cliphist, qt6ct): drop what the
   local n0
   rm -f -- "$CACHE/packages-stale"
   n0="$(wc -l <"$LOG" 2>/dev/null || echo 0)"
-  # repositories lack and try the rest at once again; one by one only if that fails too
+  pm_install "$@" && return 0
   # the mirrors no longer have the files this index names: it is older than they are (Arch and CachyOS
   # sync it only with a full upgrade, which is the user's to run). One by one would fail the same way
   # for many minutes and leave half a desktop: stop here, nothing is installed (explain says what to do)
@@ -211,6 +211,8 @@ pkgs() {
     echo "the package index is out of date"
     return 1
   fi
+  # usually one name this release does not have (Alpine: cliphist, qt6ct): drop what the
+  # repositories lack and try the rest at once again; one by one only if that fails too
   local p have=() good=0
   if pkg_avail_known; then
     for p; do

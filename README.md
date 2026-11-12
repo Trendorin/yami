@@ -29,7 +29,7 @@ Files, images, the login screen and every other app follow the same palette.
 
 <img src=".github/assets/features-en.png" width="100%" alt="What is inside: a ~15 MB shell, one accent for everything, our own login screen, made for games, files, viewer and player, screenshots, a curtain for streams, signed updates, any distribution, eight languages">
 
-Install on any of eight distributions with one command, built from source:
+Install on any of eight distributions with one command:
 
 ```sh
 bash <(curl -fsSL https://raw.githubusercontent.com/Trendorin/yami/main/install.sh)
@@ -208,7 +208,9 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Trendorin/yami/main/install.
 or from a checkout: `git clone https://github.com/Trendorin/yami yami && yami/install.sh`.
 
 On x86_64 with glibc 2.34 or newer (Ubuntu 22.04, Debian 12, Fedora 35 and everything newer) a release installs
-ready binaries with a checked signature: no compiler, a few minutes. Anywhere else it builds from source. Packages for
+ready binaries with a checked signature: no compiler, a few minutes. Anywhere else it builds from source. Where the
+distribution has no niri 26.04 or newer yet (Debian 13), niri and xwayland-satellite are built once from source: a
+compiler and about half an hour. Packages for
 Arch, Debian, Fedora, Gentoo and Nix: [docs/PACKAGING.md](docs/PACKAGING.md).
 
 It installs only the base: niri, the shell, a terminal and what the desktop cannot start without. Run it as
@@ -380,7 +382,7 @@ yami update                   # what is new; apply | list | to X.Y.Z | rollback 
 
 Settings → updates (or `yami update`) checks the repository once a day and shows a card when a
 release is out; installing is always your click. The updater keeps its own clone in
-`~/.local/share/yami/src`, builds the new version from source with `install.sh --update`
+`~/.local/share/yami/src` and installs the new version with `install.sh --update` (ready binaries where they fit, else a build)
 (settings kept, no sudo). Nothing changes until every part has built, a failed update puts everything back by
 itself, and `yami update rollback` returns the programs and configs from before the last update. Channels:
 **releases** (`vX.Y.Z` tags) or **every commit** of `main`. The tab shows a small console with the

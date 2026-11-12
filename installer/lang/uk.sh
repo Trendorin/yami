@@ -188,4 +188,6 @@ TR=(
   ["niri: restored"]="niri: відновлено"
   ["done. shell settings are kept in"]="готово. налаштування оболонки лишилися в"
   ["palette «{}»: the shell, wallpaper and the chosen programs"]="палітра «{}»: оболонка, шпалери й вибрані програми"
+  ["xwayland-satellite from source if missing (X11 apps: Steam, games)"]="xwayland-satellite з вихідного коду, якщо його немає (програми X11: Steam, ігри)"
+  ["without xwayland-satellite, X11 apps (Steam, many games) do not open: install it once your distribution has it"]="без xwayland-satellite програми X11 (Steam, багато ігор) не відкриються: встанови його, щойно він зʼявиться в дистрибутиві"
 )

@@ -6,7 +6,24 @@
 
 plan_niri() {
   on core && add "$(t "niri {}+ из исходников, если пакет старее" "niri {}+ from source if the package is older" "niri {}+ compilado se o pacote for mais antigo" "$NIRI_MIN")" do_niri_source
+  # a distribution without a recent niri usually lacks xwayland-satellite too: built with the same tools
+  if on core && ((!APPLY)) && ! niri_will_do; then
+    add "$(t "xwayland-satellite из исходников, если его нет (программы X11: Steam, игры)" "xwayland-satellite from source if missing (X11 apps: Steam, games)" "xwayland-satellite compilado se faltar (apps X11: Steam, jogos)")" do_xwls_source
+  fi
   return 0
+}
+# X11 programs (Steam, most games) run in niri through xwayland-satellite, which starts Xwayland from the
+# distribution. Only where its libraries are installed (packages.sh P_nirisrc): elsewhere the summary says so
+do_xwls_source() {
+  command -v xwayland-satellite >/dev/null && return 99
+  pkg-config --exists xcb-cursor 2>/dev/null || { echo "xwayland-satellite: the xcb-cursor library to build it is missing"; return 99; }
+  [[ -n $SU || $EUID == 0 ]] || return 1
+  need_rust || return 1
+  local src="$CACHE/xwayland-satellite-$XWLS_TAG"
+  [[ -d $src/.git ]] || git clone --depth 1 --branch "$XWLS_TAG" https://github.com/Supreeeme/xwayland-satellite.git "$src" || return 1
+  cargo build --release --locked --manifest-path "$src/Cargo.toml" --target-dir "$CACHE/target-xwls" || return 1
+  $SU install -Dm755 "$CACHE/target-xwls/release/xwayland-satellite" /usr/local/bin/xwayland-satellite || return 1
+  rm -rf -- "$CACHE/target-xwls" "$src"
 }
 # after the steps: yami-niri is built last (minutes of output, nothing waits on it)
 fork_after() {
@@ -72,6 +89,8 @@ do_niri_source() {
     sed 's|/usr/bin/niri|/usr/local/bin/niri|g' "$src/resources/niri.service" | $SU tee /etc/systemd/user/niri.service >/dev/null
     $SU install -Dm644 "$src/resources/niri-shutdown.target" /etc/systemd/user/niri-shutdown.target
   fi
+  # the build is 2 GB in the cache and no use once niri is in place: a newer niri is a build of its own
+  [[ -x /usr/local/bin/niri ]] && rm -rf -- "$CACHE/target-niri" "$src"
 }
 
 # update: yami-niri only when the patch series moved (5–25 min), else the built one stays

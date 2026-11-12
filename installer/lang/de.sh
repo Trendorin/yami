@@ -188,4 +188,6 @@ TR=(
   ["niri: restored"]="niri: wiederhergestellt"
   ["done. shell settings are kept in"]="fertig. die Shell-Einstellungen bleiben in"
   ["palette «{}»: the shell, wallpaper and the chosen programs"]="Palette „{}“: die Shell, der Hintergrund und die gewählten Programme"
+  ["xwayland-satellite from source if missing (X11 apps: Steam, games)"]="xwayland-satellite aus dem Quellcode, falls er fehlt (X11-Apps: Steam, Spiele)"
+  ["without xwayland-satellite, X11 apps (Steam, many games) do not open: install it once your distribution has it"]="ohne xwayland-satellite öffnen sich X11-Apps (Steam, viele Spiele) nicht: installiere es, sobald deine Distribution es hat"
 )

@@ -22,9 +22,21 @@ summary_install() {
   else
     printf '  %s%s%s %s%s %s%s\n' "$OK" "$(t "готово." "done." "concluído.")" "$R" "$D" "$(t "лог:" "log:" "registro:")" "$LOG" "$R"
   fi
+  # what was built here instead (niri, xwayland-satellite) is not missing
+  local miss="" p
   if [[ -s $MISSING_F ]]; then
-    warn "$(t "эти пакеты не поставились (нет в репозиториях или конфликтуют)" "these packages did not install (not in the repositories or in conflict)" "estes pacotes não foram instalados (fora dos repositórios ou em conflito)") ($OS_NAME): $(sort -u "$MISSING_F" | tr '\n' ' ')"
+    while read -r p; do
+      [[ $p == *niri && $p != *portal* ]] && niri_ok && continue
+      [[ $p == *xwayland-satellite ]] && command -v xwayland-satellite >/dev/null && continue
+      miss+="$p "
+    done < <(sort -u "$MISSING_F")
+  fi
+  if [[ -n $miss ]]; then
+    warn "$(t "эти пакеты не поставились (нет в репозиториях или конфликтуют)" "these packages did not install (not in the repositories or in conflict)" "estes pacotes não foram instalados (fora dos repositórios ou em conflito)") ($OS_NAME): $miss"
     note "$(t "шелл работает и без них; поставь аналоги вручную, если нужно" "the shell works without them; install equivalents by hand if needed" "o shell funciona sem eles; instale equivalentes manualmente, se necessário")"
+  fi
+  if ((!DRY)) && niri_ok && ! command -v xwayland-satellite >/dev/null; then
+    note "$(t "без xwayland-satellite не откроются программы X11 (Steam, многие игры): поставь его, когда он появится в дистрибутиве" "without xwayland-satellite, X11 apps (Steam, many games) do not open: install it once your distribution has it" "sem o xwayland-satellite, apps X11 (Steam, muitos jogos) não abrem: instale-o quando sua distribuição o tiver")"
   fi
   if [[ -s $STATE/packages-needed ]] && ((!DRY)); then
     warn "$(t "для выбранного не хватает пакетов — одна команда (или настройки → обновления):" "the chosen components miss packages; one command (or settings → updates):" "faltam pacotes para os componentes escolhidos; um comando (ou configurações → atualizações):")"

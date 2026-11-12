@@ -91,6 +91,8 @@ LOG="$CACHE/install.log"
 MISSING_F="$CACHE/missing-packages"
 RUST_MIN="1.89"
 NIRI_TAG="v26.04"
+# xwayland-satellite, built with niri where the distribution has neither (installer/niri.sh)
+XWLS_TAG="v0.8.3"
 # ext-background-effect (blur only under the shell panels, not their shadow margins) and the
 # config syntax need niri 26.04 or newer
 NIRI_MIN="26.04"

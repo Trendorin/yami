@@ -237,6 +237,7 @@ step_weight() {
     do_build_module) echo 10 ;;
     do_build_greet) echo 8 ;;
     do_niri_source) echo 60 ;;
+    do_xwls_source) echo 8 ;;
     pkgs) echo 24 ;;
     do_fetch_modules | pm_refresh) echo 4 ;;
     *) echo 1 ;;
