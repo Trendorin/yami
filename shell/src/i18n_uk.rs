@@ -231,6 +231,7 @@ const UK: &[(&str, &str)] = &[
     ("apply someone's: yami theme import FILE or LINK", "застосувати чужу: yami theme import ФАЙЛ або ПОСИЛАННЯ"),
     ("apps", "програми"),
     ("apps / clipboard history", "програми / історія буфера"),
+    ("apps with the text typed in: ?setting, /file, >command", "програми з уже набраним текстом: ?налаштування, /файл, >команда"),
     ("apps and services", "програми та служби"),
     ("apps button", "кнопка програм"),
     ("apps in the palette colours", "програми в кольорах палітри"),

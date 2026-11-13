@@ -231,6 +231,7 @@ const PL: &[(&str, &str)] = &[
     ("apply someone's: yami theme import FILE or LINK", "zastosuj cudzy: yami theme import PLIK lub LINK"),
     ("apps", "aplikacje"),
     ("apps / clipboard history", "aplikacje / historia schowka"),
+    ("apps with the text typed in: ?setting, /file, >command", "aplikacje z wpisanym już tekstem: ?ustawienie, /plik, >polecenie"),
     ("apps and services", "aplikacje i usługi"),
     ("apps button", "przycisk aplikacji"),
     ("apps in the palette colours", "aplikacje w kolorach palety"),

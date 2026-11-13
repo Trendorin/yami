@@ -13,6 +13,20 @@ use smithay_client_toolkit::shell::{
 
 impl App {
     // ── модальные панели: лаунчер, питание, настройки ───────────────────────
+    /// лаунчер с уже набранным запросом (`msg launcher ТЕКСТ`: `?тема`, `/отчёт`, `>htop`); открытый
+    /// не закрывается, запрос в нём заменяется
+    pub fn launcher_with(&mut self, q: &str) {
+        if self.st.modal != Some(Modal::Launcher) || self.st.launcher.clip {
+            self.toggle_modal(Modal::Launcher, false);
+        }
+        if self.st.modal != Some(Modal::Launcher) {
+            return;
+        }
+        self.st.launcher.field.set(q);
+        self.launcher_typed();
+        self.dirty(&SKind::Modal);
+    }
+
     pub fn toggle_modal(&mut self, m: Modal, clip: bool) {
         if self.st.locked {
             return;

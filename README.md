@@ -433,7 +433,7 @@ yami-shell binds list                  # keybindings: id, keys, action
   line brings `~/.config/yami/niri/yami.kdl`: the shell's keys (`binds.kdl`), window rules, blur and
   games (`rules.kdl`), colours and cursor, screens (`outputs.kdl`) and yami's niri look (`base.kdl`),
   each switched in settings → system → niri.
-- **IPC**: `yami-shell msg <command>`, where the command is one of `launcher`, `clipboard`,
+- **IPC**: `yami-shell msg <command>`, where the command is one of `launcher`, `launcher TEXT` (with TEXT typed in; `?`, `/` and `>` too), `clipboard`,
   `power`, `settings`, `lock`, `bar`, `stacking`, `minimize`, `restore`, `edit`, `reload`,
   `restart`, `quit`, `settings TAB`, `profile` (next power profile), `popup cal|sound|media|net|bt|sys|profile|tray`, `screenshot [area|window|screen]`,
   `walls` (the wallpaper picker), `wallpaper [PATH]` (no path: the generated pixel wallpaper), `curtain [on|off]` (privacy curtain), `cast-hide` (click a window: its app turns black in screen sharing, or visible again), `night` (night light on/off),

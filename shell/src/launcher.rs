@@ -667,21 +667,27 @@ impl App {
             _ => {
                 let mods = self.mods;
                 if App::edit_field(&mut self.st.launcher.field, e, &mods) {
-                    self.st.launcher.cur = 0;
-                    self.st.launcher.scroll = 0;
-                    let q = self.st.launcher.field.text.trim().to_string();
-                    if !self.st.launcher.clip && q.starts_with('/') {
-                        let rest = q[1..].trim().to_lowercase();
-                        if rest != self.st.launcher.files.0 {
-                            find_files(self.tx.clone(), self.st.launcher.fgen.clone(), rest);
-                        }
-                    }
-                    self.st.launcher.refresh(&self.st.apps, &self.st.niri.wins);
+                    self.launcher_typed();
                 }
             }
         }
         self.st.launcher.keep_visible();
         self.dirty(&SKind::Modal);
+    }
+
+    /// запрос поменялся (набрали или пришёл `msg launcher ТЕКСТ`): список с начала, `/` ищет файлы
+    pub fn launcher_typed(&mut self) {
+        let l = &mut self.st.launcher;
+        l.cur = 0;
+        l.scroll = 0;
+        let q = l.field.text.trim();
+        if !l.clip && q.starts_with('/') {
+            let rest = q[1..].trim().to_lowercase();
+            if rest != l.files.0 {
+                find_files(self.tx.clone(), l.fgen.clone(), rest);
+            }
+        }
+        l.refresh(&self.st.apps, &self.st.niri.wins);
     }
 }
 

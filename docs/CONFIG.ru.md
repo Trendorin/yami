@@ -57,6 +57,7 @@ yami clean [--dry-run]                    # удалить кэш сборки (
 yami version                              # каждая часть с установленным коммитом
 yami update [check|apply|list|to X.Y.Z|rollback|status|log|need]
 yami msg <command>                        # сырая команда шеллу (yami help msg)
+yami msg launcher TEXT                    # лаунчер с уже набранным текстом: ?настройка, /файл, >команда (для клавиши)
 yami-shell config list                    # каждый ключ = значение; * — то, что отличается от умолчания
 yami-shell config get dockPins
 yami-shell config set dockSide '"left"'   # ЗНАЧЕНИЕ — JSON; голое слово считается строкой

@@ -441,7 +441,7 @@ yami-shell binds list                  # клавиши: id, сочетание,
   Строка приносит `~/.config/yami/niri/yami.kdl`: клавиши шелла (`binds.kdl`), правила окон,
   размытие и игры (`rules.kdl`), цвета и курсор, экраны (`outputs.kdl`) и вид niri от yami
   (`base.kdl`); каждая часть включается в настройках → система → niri.
-- **IPC**: `yami-shell msg <команда>`, где команда — `launcher`, `clipboard`, `power`, `settings`,
+- **IPC**: `yami-shell msg <команда>`, где команда — `launcher`, `launcher ТЕКСТ` (с уже набранным текстом; `?`, `/` и `>` тоже), `clipboard`, `power`, `settings`,
   `lock`, `bar`, `stacking`, `minimize`, `restore`, `edit`, `reload`, `restart`, `quit`, `settings ВКЛАДКА`, `profile`
   (следующий профиль питания), `popup cal|sound|media|net|bt|sys|profile|tray`, `screenshot [area|window|screen]`,
   `walls` (выбор обоев), `wallpaper [ПУТЬ]` (без пути — пиксельные обои из палитры), `curtain [on|off]` (шторка для трансляций), `cast-hide` (щелчок по окну: его программа чёрная в трансляциях или снова видна), `night` (ночной свет вкл/выкл),

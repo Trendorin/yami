@@ -56,6 +56,7 @@ yami clean [--dry-run]                    # remove the build cache (yami-niri so
 yami version                              # every part with the installed commit
 yami update [check|apply|list|to X.Y.Z|rollback|status|log|need]
 yami msg <command>                        # raw shell command (yami help msg)
+yami msg launcher TEXT                    # the launcher with the text typed in: ?setting, /file, >command (for a key)
 yami-shell config list                    # every key = value; * marks what differs from the default
 yami-shell config get dockPins
 yami-shell config set dockSide '"left"'   # VALUE is JSON; a bare word is taken as a string
