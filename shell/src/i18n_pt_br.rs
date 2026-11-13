@@ -457,6 +457,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("integer scale — crisp pixels", "escala inteira — pixels nítidos"),
     ("interface (GTK, Qt)", "interface (GTK, Qt)"),
     ("its palette", "sua paleta"),
+    ("jack", "conexão de áudio"),
     ("kanji on wallpaper", "kanji no papel de parede"),
     ("keep", "manter"),
     ("keep the current look", "salvar a aparência atual"),

@@ -180,7 +180,7 @@ window-rule {
     match app-id=r#"^xdg-desktop-portal"#
     match app-id=r#"^yami-files-pick$"#
     match title=r#"^(Picture-in-Picture|Картинка в картинке)$"#
-    match title=r#"^(Open|Save|Открыть|Сохранить)( File| As| файл| как)?"#
+    match title=r#"^(Open|Save|Открыть|Сохранить)( File| As| файл| как)?$"#
     open-floating true
 }
 

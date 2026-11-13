@@ -23,8 +23,8 @@ t() {
 # the table of the chosen language (after L is set or changed); ru, en and pt-BR live in the t calls
 lang_load() {
   TR=()
+  # shellcheck source=/dev/null
   case $L in
-    # shellcheck source=/dev/null
     es | de | fr | uk | pl) [[ -f $ROOT/installer/lang/$L.sh ]] && . "$ROOT/installer/lang/$L.sh" ;;
   esac
   return 0

@@ -81,8 +81,21 @@ fn same_user(s: &UnixStream) -> bool {
 impl crate::app::App {
     // ── команды (IPC) ───────────────────────────────────────────────────────
     pub fn ipc(&mut self, cmd: &str) {
-        match cmd.trim() {
-            "launcher" => self.toggle_modal(Modal::Launcher, false),
+        let trimmed = cmd.trim();
+        if trimmed == "launcher" {
+            self.toggle_modal(Modal::Launcher, false);
+            return;
+        }
+        if let Some(rest) = trimmed.strip_prefix("launcher") {
+            let q = rest.trim();
+            if q.is_empty() {
+                self.toggle_modal(Modal::Launcher, false);
+            } else {
+                self.open_launcher_query(q);
+            }
+            return;
+        }
+        match trimmed {
             "night" => self.night_toggle(),
             "clipboard" => self.toggle_modal(Modal::Launcher, true),
             "power" => self.toggle_modal(Modal::Power, false),

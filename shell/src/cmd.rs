@@ -168,7 +168,8 @@ pub fn msg_ok(cmd: &str) -> bool {
     let head = w.next().unwrap_or("");
     let one = |w: &mut std::str::SplitWhitespace| w.next().is_none();
     match head {
-        "launcher" | "clipboard" | "power" | "lock" | "bar" | "stacking" | "minimize" | "restore" | "edit" | "reload" | "quit" | "ping" | "restart" | "profile" | "night" | "walls" | "cast-hide" => one(&mut w),
+        "launcher" => true,
+        "clipboard" | "power" | "lock" | "bar" | "stacking" | "minimize" | "restore" | "edit" | "reload" | "quit" | "ping" | "restart" | "profile" | "night" | "walls" | "cast-hide" => one(&mut w),
         "settings" => w.next().is_none_or(|t| crate::settings::find(t).is_some()) && one(&mut w),
         "welcome" => w.next().is_none_or(crate::welcome::has_step) && one(&mut w),
         "popup" => w.next().is_some_and(|k| crate::popups::KINDS.contains(&k)) && one(&mut w),
@@ -594,10 +595,10 @@ pub fn run(args: &[String], me: &str) -> i32 {
 mod tests {
     #[test]
     fn msg_commands() {
-        for ok in ["launcher", "popup cal", "popup media", "screenshot window 3", "screenshot", "settings keys", "wallpaper /a b.png", "wallpaper", "curtain on", "update-progress 1/3 x", "night"] {
+        for ok in ["launcher", "popup cal", "popup media", "screenshot window 3", "screenshot", "settings keys", "wallpaper /a b.png", "wallpaper", "curtain on", "launcher foo", "update-progress 1/3 x", "night"] {
             assert!(super::msg_ok(ok), "{ok}");
         }
-        for bad in ["cal", "popup foo", "screenshot win", "settings nope", "launcher now", "curtain maybe", ""] {
+        for bad in ["cal", "popup foo", "screenshot win", "settings nope", "curtain maybe", ""] {
             assert!(!super::msg_ok(bad), "{bad}");
         }
         // каждая команда, что вешается на клавиши, шеллу понятна

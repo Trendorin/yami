@@ -118,6 +118,7 @@ pub enum Act {
     SCtlTile(&'static str),
     VolMute,
     Sink(String),
+    SinkPort(String, String),
     /// микрофон по умолчанию (всплывашка звука, #10)
     Source(String),
     MicSlider,
