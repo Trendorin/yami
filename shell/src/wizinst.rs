@@ -138,9 +138,9 @@ pub fn start(modules: Vec<String>, lang: String, mut password: String, tx: callo
             let st = crate::update::installed();
             let hex = !st.commit.is_empty() && st.commit.chars().all(|c| c.is_ascii_hexdigit());
             let want = [if hex { st.commit.clone() } else { String::new() }, if st.version.is_empty() { String::new() } else { format!("refs/tags/v{}", st.version) }];
+            // оборванный переход откатывается сам (update::checkout): следующий вариант берётся с чистого дерева
             for w in want.iter().filter(|w| !w.is_empty()) {
-                let at = Command::new("git").arg("-C").arg(&src).args(["-c", "advice.detachedHead=false", "checkout", "-q", "--detach", w]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
-                if at.is_ok_and(|s| s.success()) {
+                if crate::update::checkout(&src, w).is_ok() {
                     break;
                 }
             }

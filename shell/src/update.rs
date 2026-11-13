@@ -292,6 +292,40 @@ pub(crate) fn ensure_clone(set: &Settings, st: &Stamp) -> Result<PathBuf, String
     Ok(dir)
 }
 
+/// перейти клоном dir на коммит target. checkout частичного клона сперва стирает файлы, которых нет в
+/// цели, и только потом качает новые: оборвалась сеть или процесс убит — HEAD прежний, дерево разобрано
+/// наполовину, и каждое следующее обновление видело в нём «правки» (так застревали на 2.7.0 → 3.0.0).
+/// Метка в .git на время перехода: неудачный переход возвращается к HEAD сразу, оборванный — в следующий раз
+pub(crate) fn checkout(dir: &Path, target: &str) -> Result<(), String> {
+    let mark = checkout_mark(dir);
+    let _ = std::fs::write(&mark, target);
+    let r = git(dir, &["-c", "advice.detachedHead=false", "checkout", "-q", "--detach", target]);
+    if r.is_ok() {
+        let _ = std::fs::remove_file(&mark);
+    } else {
+        checkout_undo(dir);
+    }
+    r.map(|_| ())
+}
+
+/// остатки оборванного checkout: файлы и индекс снова как в HEAD (файлы прежней версии уже в клоне).
+/// Только по метке: её ставит checkout над чистым деревом, так что правки человека не стираются.
+/// Убитый git мог оставить index.lock: при метке это его замок, сам git уже не работает
+pub(crate) fn checkout_undo(dir: &Path) {
+    let mark = checkout_mark(dir);
+    if !mark.exists() {
+        return;
+    }
+    let _ = std::fs::remove_file(dir.join(".git/index.lock"));
+    if git(dir, &["reset", "-q", "--hard"]).is_ok() {
+        let _ = std::fs::remove_file(&mark);
+    }
+}
+
+fn checkout_mark(dir: &Path) -> PathBuf {
+    dir.join(".git/yami-checkout")
+}
+
 pub(crate) fn has_commit(dir: &Path, c: &str) -> bool {
     !c.is_empty() && git(dir, &["cat-file", "-e", &format!("{c}^{{commit}}")]).is_ok()
 }
@@ -696,6 +730,50 @@ mod tests {
         assert_eq!(super::trusted_keys("# no keys yet\n\n", || "other ssh-ed25519 BBBB\n".into()), "other ssh-ed25519 BBBB\n");
         assert!(!super::has_keys("# only a comment\n   \n") && super::has_keys("# c\nme ssh-ed25519 AAAA\n"));
         assert_eq!(super::tag_ref("v3.0.0"), "refs/tags/v3.0.0");
+    }
+
+    /// checkout частичного клона без сети стирает файлы раньше, чем падает: дерево возвращается к HEAD;
+    /// остатки убитого посреди перехода (метка осталась) убирает следующий, а правки человека — никогда
+    #[test]
+    fn half_done_checkout_is_put_back() {
+        use super::{checkout, checkout_undo, git};
+        let d = yami_px::paths::private_tmp("yami-checkout").unwrap();
+        let (up, cl) = (d.join("up"), d.join("cl"));
+        std::fs::create_dir_all(&up).unwrap();
+        let commit = |m: &str| git(&up, &["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-qm", m]).unwrap();
+        git(&up, &["init", "-q", "-b", "main"]).unwrap();
+        git(&up, &["config", "uploadpack.allowFilter", "true"]).unwrap();
+        std::fs::write(up.join("keep"), "a").unwrap();
+        std::fs::write(up.join("gone"), "b").unwrap();
+        git(&up, &["add", "."]).unwrap();
+        commit("1");
+        git(&up, &["rm", "-q", "gone"]).unwrap();
+        std::fs::write(up.join("new"), "c").unwrap();
+        git(&up, &["add", "new"]).unwrap();
+        commit("2");
+        let target = git(&up, &["rev-parse", "HEAD"]).unwrap();
+        git(&up, &["checkout", "-q", "--detach", "HEAD~1"]).unwrap();
+        git(&d, &["clone", "-q", "--filter=blob:none", &format!("file://{}", up.display()), "cl"]).unwrap();
+        let head = git(&cl, &["rev-parse", "HEAD"]).unwrap();
+        let clean = || git(&cl, &["status", "--porcelain"]).unwrap().is_empty();
+        // сервер пропал: файл «new» не скачать, а «gone» git уже стёр
+        std::fs::rename(&up, d.join("away")).unwrap();
+        assert!(checkout(&cl, &target).is_err());
+        assert!(clean() && cl.join("gone").exists() && git(&cl, &["rev-parse", "HEAD"]).unwrap() == head);
+        // процесс убит посреди checkout: метка осталась
+        std::fs::write(cl.join(".git/yami-checkout"), &target).unwrap();
+        std::fs::remove_file(cl.join("gone")).unwrap();
+        checkout_undo(&cl);
+        assert!(clean() && !cl.join(".git/yami-checkout").exists());
+        // без метки это правка человека
+        std::fs::remove_file(cl.join("gone")).unwrap();
+        checkout_undo(&cl);
+        assert!(!clean());
+        git(&cl, &["checkout", "-q", "--", "gone"]).unwrap();
+        // сервер вернулся: переход проходит
+        std::fs::rename(d.join("away"), &up).unwrap();
+        assert!(checkout(&cl, &target).is_ok() && cl.join("new").exists() && !cl.join("gone").exists() && clean());
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

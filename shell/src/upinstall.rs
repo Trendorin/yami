@@ -120,12 +120,14 @@ pub fn install_tag(set: &Settings, want: &str) -> Result<String, String> {
 pub(crate) fn build_install(i: &Info) -> Result<(), String> {
     require_enabled()?;
     let dir = clone_dir();
+    // прошлый переход оборвался посреди checkout: это не правки, а его остатки
+    checkout_undo(&dir);
     if !git(&dir, &["status", "--porcelain", "--untracked-files=no"]).unwrap_or_default().is_empty() {
         return Err(crate::tf!("в {} есть правки — убери их, и обновлю", "{} has local edits: remove them and update again", "{} tem alterações locais: remova-as e atualize novamente", dir.display()));
     }
     let from = installed().version;
     progress(&crate::tf!("перехожу на {}", "switching to {}", "trocando para {}", i.reference));
-    git(&dir, &["-c", "advice.detachedHead=false", "checkout", "-q", "--detach", &i.target]).map_err(explain)?;
+    checkout(&dir, &i.target).map_err(explain)?;
     // прежние бинари и запись об установке — в сторону; точкой отката станут, только если установщик
     // бинари заменил: упавшая сборка не стирает прежнюю точку отката
     let stage = stage_dir();
