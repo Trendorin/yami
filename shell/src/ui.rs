@@ -118,6 +118,8 @@ pub enum Act {
     SCtlTile(&'static str),
     VolMute,
     Sink(String),
+    /// разъём выхода (выход, разъём): колонки или наушники одной карты
+    SinkPort(String, String),
     /// микрофон по умолчанию (всплывашка звука, #10)
     Source(String),
     MicSlider,

@@ -292,6 +292,7 @@ const PAIRS: &[(&str, &str)] = &[
     ("звук", "sound"),
     ("громкость", "volume"),
     ("выход", "output"),
+    ("разъём", "port"),
     ("вход", "input"),
     ("микрофон", "microphone"),
     ("микшер", "mixer"),

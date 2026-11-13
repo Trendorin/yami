@@ -911,6 +911,7 @@ const FR: &[(&str, &str)] = &[
     ("plug in the charger", "branche le chargeur"),
     ("plus", "plus"),
     ("polkit password window", "fenêtre de mot de passe polkit"),
+    ("port", "port"),
     ("portals", "portails"),
     ("position", "position"),
     ("power", "alimentation"),

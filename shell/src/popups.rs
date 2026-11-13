@@ -56,7 +56,8 @@ pub fn size(kind: &str, st: &State) -> (i32, i32) {
             let apps = st.audio.streams.len().min(6) as i32;
             let list = |n: usize| if n > 1 { n.min(5) as i32 * 26 + 30 } else { 0 };
             let media = if sound_media(st) { 170 } else { 0 };
-            (420, 44 + 56 + list(st.audio.sinks.len()) + 60 + list(st.audio.sources.len()) + if apps > 0 { 30 + apps * 46 } else { 0 } + media + 50)
+            let ports = sink_ports(st).map_or(0, |s| list(s.ports.len()));
+            (420, 44 + 56 + list(st.audio.sinks.len()) + ports + 60 + list(st.audio.sources.len()) + if apps > 0 { 30 + apps * 46 } else { 0 } + media + 50)
         }
         "media" => {
             let time = if st.media.length > 0.0 { 24 } else { 0 };
@@ -247,6 +248,11 @@ fn sound(ui: &mut Ui, st: &State, b: R) {
     ui.slider(R::new(b.x + 34, y, b.w - 34, 40), "громкость", a.volume.min(1.0) as f32, &v, 20, Act::VolSlider);
     y += 50;
     y = devices(ui, st, b, y, "выход", &a.sinks, &a.sink, Act::Sink);
+    // разъём того же выхода: колонки сзади или наушники спереди
+    if let Some(s) = sink_ports(st) {
+        let rows: Vec<(&str, String)> = s.ports.iter().map(|p| (p.name.as_str(), p.desc.clone())).collect();
+        y = pick(ui, b, y, "разъём", &rows, &s.port, |p| Act::SinkPort(s.name.clone(), p));
+    }
     // микрофон
     ui.button(R::new(b.x, y + 18, 26, 22), "", if a.mic_muted { "mute" } else { "mic" }, Tone::Ghost, a.mic_muted, true, Act::MicMute);
     let mv = if a.mic_muted { "выкл".to_string() } else { format!("{:.0}%", a.mic * 100.0) };
@@ -276,20 +282,31 @@ fn sound(ui: &mut Ui, st: &State, b: R) {
     ui.button(R::new(b.x, b.bottom() - 28, b.w, 28), "микшер pavucontrol", "speaker", Tone::Plain, false, true, Act::Pavu);
 }
 
-/// выбор устройства (выход или микрофон), когда их больше одного: не больше пяти строк
-fn devices(ui: &mut Ui, st: &State, b: R, mut y: i32, title: &str, list: &[crate::audio::Dev], cur: &str, act: fn(String) -> Act) -> i32 {
-    if list.len() < 2 {
+/// выбор устройства (выход или микрофон), когда их больше одного
+fn devices(ui: &mut Ui, st: &State, b: R, y: i32, title: &str, list: &[crate::audio::Dev], cur: &str, act: fn(String) -> Act) -> i32 {
+    let rows: Vec<(&str, String)> = list.iter().map(|d| (d.name.as_str(), crate::audio::label(&st.set, d))).collect();
+    pick(ui, b, y, title, &rows, cur, act)
+}
+
+/// выход по умолчанию, когда у него есть из чего выбрать разъём
+fn sink_ports(st: &State) -> Option<&crate::audio::Dev> {
+    st.audio.sinks.iter().find(|s| s.name == st.audio.sink).filter(|s| s.ports.len() > 1)
+}
+
+/// список «одно из» (имя, подпись), когда строк больше одной: не больше пяти
+fn pick(ui: &mut Ui, b: R, mut y: i32, title: &str, rows: &[(&str, String)], cur: &str, act: impl Fn(String) -> Act) -> i32 {
+    if rows.len() < 2 {
         return y;
     }
     let t = ui.t;
     ui.text_in(PX, R::new(b.x, y, b.w, 20), title, t.text_dim);
     y += 24;
-    for d in list.iter().take(5) {
-        let on = d.name == cur;
+    for (name, label) in rows.iter().take(5) {
+        let on = *name == cur;
         let r = R::new(b.x, y, b.w, 24);
-        ui.button(r, "", "", Tone::Ghost, on, true, act(d.name.clone()));
+        ui.button(r, "", "", Tone::Ghost, on, true, act(name.to_string()));
         ui.cv.fill(R::new(r.x + 8, r.cy() - 3, 6, 6), if on { t.ember } else { t.border });
-        ui.text_in(PX, R::new(r.x + 22, r.y, r.w - 26, r.h), &crate::audio::label(&st.set, d), if on { t.text_hi } else { t.text });
+        ui.text_in(PX, R::new(r.x + 22, r.y, r.w - 26, r.h), label, if on { t.text_hi } else { t.text });
         y += 26;
     }
     y + 6

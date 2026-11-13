@@ -555,14 +555,16 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                 st.set.dnd = true;
             }
             if arg == "sound" {
-                // два выхода и два микрофона: видны оба списка выбора (#10)
-                use crate::audio::{AudioState, Dev, Stream};
-                let dev = |n: &str, d: &str| Dev { name: n.into(), desc: d.into(), vol: 0.6, muted: false };
+                // два выхода и два микрофона: видны оба списка выбора (#10); у выхода два разъёма
+                use crate::audio::{AudioState, Dev, Port, Stream};
+                let dev = |n: &str, d: &str| Dev { name: n.into(), desc: d.into(), vol: 0.6, ..Default::default() };
+                let port = |n: &str, d: &str| Port { name: n.into(), desc: d.into() };
+                let card = Dev { ports: vec![port("analog-output-lineout", "Line Out"), port("analog-output-headphones", "Headphones")], port: "analog-output-lineout".into(), ..dev("speakers", "Built-in Audio Analog Stereo") };
                 st.audio = AudioState {
                     ready: true,
                     volume: 0.62,
                     sink: "speakers".into(),
-                    sinks: vec![dev("speakers", "Built-in Audio Analog Stereo"), dev("hdmi", "HDMI / DisplayPort")],
+                    sinks: vec![card, dev("hdmi", "HDMI / DisplayPort")],
                     source: "usb-mic".into(),
                     sources: vec![dev("built-in", "Built-in Audio Analog Stereo"), dev("usb-mic", "USB Microphone")],
                     mic: 0.8,

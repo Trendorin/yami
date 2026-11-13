@@ -17,6 +17,15 @@ pub struct Dev {
     pub desc: String,
     pub vol: f64,
     pub muted: bool,
+    /// разъёмы карты, куда сейчас можно переключиться (колонки, наушники), и выбранный
+    pub ports: Vec<Port>,
+    pub port: String,
+}
+
+#[derive(Clone, Default, Debug, PartialEq)]
+pub struct Port {
+    pub name: String,
+    pub desc: String,
 }
 
 #[derive(Clone, Default, Debug, PartialEq)]
@@ -70,7 +79,26 @@ fn dev(v: &Value) -> Dev {
         desc: v["description"].as_str().unwrap_or("").into(),
         vol: vol_of(v),
         muted: v["mute"].as_bool().unwrap_or(false),
+        ports: ports(v),
+        port: v["active_port"].as_str().unwrap_or("").into(),
     }
+}
+
+/// разъёмы без «not available» (наушники не воткнуты — их нет): выбирать есть из чего, только когда
+/// их два и больше. Выбранный остаётся, даже если пропал
+fn ports(v: &Value) -> Vec<Port> {
+    let on = v["active_port"].as_str().unwrap_or("");
+    let Some(a) = v["ports"].as_array() else { return vec![] };
+    a.iter()
+        .filter_map(|p| {
+            let name = p["name"].as_str().filter(|n| !n.is_empty())?;
+            if name != on && p["availability"].as_str() == Some("not available") {
+                return None;
+            }
+            let desc = p["description"].as_str().filter(|d| !d.is_empty() && *d != "(null)").unwrap_or(name);
+            Some(Port { name: name.into(), desc: desc.into() })
+        })
+        .collect()
 }
 
 /// как показывать устройство: своё имя из настроек (audioNames) или описание PipeWire
@@ -217,6 +245,9 @@ pub fn set_stream(idx: u32, v: f64) {
 }
 pub fn mute_stream(idx: u32) {
     run_pactl(vec!["set-sink-input-mute".into(), idx.to_string(), "toggle".into()]);
+}
+pub fn set_port(sink: &str, port: &str) {
+    run_pactl(vec!["set-sink-port".into(), sink.into(), port.into()]);
 }
 pub fn set_sink(name: &str) {
     run_pactl(vec!["set-default-sink".into(), name.into()]);
@@ -435,4 +466,21 @@ fn viz_thread(tx: Sender<Msg>) {
             }
         })
         .ok();
+}
+
+#[cfg(test)]
+mod tests {
+    /// наушники не воткнуты — выбирать не из чего; воткнуты — оба разъёма; выбранный виден всегда
+    #[test]
+    fn ports_you_can_pick() {
+        let sink = |head: &str, active: &str| serde_json::json!({"active_port": active, "ports": [
+            {"name": "analog-output-speaker", "description": "Speakers", "availability": "availability unknown"},
+            {"name": "analog-output-headphones", "description": "Headphones", "availability": head},
+            {"name": "hdmi-output-0", "description": "(null)", "availability": "available"}]});
+        let names = |v| super::ports(&v).into_iter().map(|p| p.desc).collect::<Vec<_>>();
+        assert_eq!(names(sink("not available", "analog-output-speaker")), ["Speakers", "hdmi-output-0"]);
+        assert_eq!(names(sink("available", "analog-output-speaker")), ["Speakers", "Headphones", "hdmi-output-0"]);
+        assert_eq!(names(sink("not available", "analog-output-headphones")), ["Speakers", "Headphones", "hdmi-output-0"]);
+        assert!(super::ports(&serde_json::json!({})).is_empty());
+    }
 }

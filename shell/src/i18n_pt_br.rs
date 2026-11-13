@@ -665,6 +665,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("plug in the charger", "conecte o carregador"),
     ("plus", "mais"),
     ("polkit password window", "janela de senha do polkit"),
+    ("port", "porta"),
     ("portals", "portais"),
     ("position", "posição"),
     ("power", "energia"),

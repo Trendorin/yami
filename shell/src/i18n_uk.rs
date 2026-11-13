@@ -911,6 +911,7 @@ const UK: &[(&str, &str)] = &[
     ("plug in the charger", "підключи зарядку"),
     ("plus", "плюс"),
     ("polkit password window", "вікно пароля polkit"),
+    ("port", "роз'єм"),
     ("portals", "портали"),
     ("position", "положення"),
     ("power", "живлення"),
