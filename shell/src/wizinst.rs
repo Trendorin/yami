@@ -217,15 +217,17 @@ mod tests {
     #[test]
     fn askpass_lives_in_its_folder() {
         let dir;
+        // не литерал: CodeQL принимал строку теста за зашитый пароль
+        let pass = std::process::id().to_string();
         {
-            let a = super::Askpass::start("secret").unwrap();
+            let a = super::Askpass::start(&pass).unwrap();
             dir = a.dir.clone();
             assert!(a.program().ends_with(super::ASKPASS_NAME));
             assert!(std::os::unix::fs::MetadataExt::mode(&std::fs::metadata(&dir).unwrap()) & 0o077 == 0);
             let s = super::UnixStream::connect(dir.join("askpass")).unwrap();
             let mut line = String::new();
             std::io::BufRead::read_line(&mut std::io::BufReader::new(s), &mut line).unwrap();
-            assert_eq!(line, "secret\n");
+            assert_eq!(line, format!("{pass}\n"));
         }
         assert!(!dir.exists());
     }
