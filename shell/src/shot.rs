@@ -557,7 +557,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             if arg == "sound" {
                 // два выхода и два микрофона: видны оба списка выбора (#10)
                 use crate::audio::{AudioState, Dev, Stream};
-                let dev = |n: &str, d: &str| Dev { name: n.into(), desc: d.into(), vol: 0.6, muted: false };
+                let dev = |n: &str, d: &str| Dev { name: n.into(), desc: d.into(), vol: 0.6, muted: false, ..Default::default() };
                 st.audio = AudioState {
                     ready: true,
                     volume: 0.62,

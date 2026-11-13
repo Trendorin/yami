@@ -1,0 +1,63 @@
+From 69091bfa4b35114dc58059861bc4ff07f464b67d Mon Sep 17 00:00:00 2001
+From: yami <yami@localhost>
+Date: Sun, 8 Nov 2026 00:28:54 -0300
+Subject: [PATCH] yami: type to search outside programs and in overview
+
+Typing printable characters outside of any active application window
+(empty workspace or unhandled desktop focus) or in the overview automatically
+opens the application search menu in yami-shell with the typed character,
+without triggering on modifiers like Ctrl/Alt/Super or navigation keys.
+---
+ src/input/mod.rs | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/src/input/mod.rs b/src/input/mod.rs
+index f1ad4932..93fd1a24 100644
+--- a/src/input/mod.rs
++++ b/src/input/mod.rs
+@@ -538,6 +538,42 @@ impl State {
+                         }
+                     }
+ 
++                    let is_outside = (this.niri.keyboard_focus.is_overview()
++                        || matches!(this.niri.keyboard_focus, crate::niri::KeyboardFocus::Layout { surface: None }))
++                        && !this.niri.is_locked()
++                        && !this.niri.screenshot_ui.is_open()
++                        && !this.niri.exit_confirm_dialog.is_open()
++                        && !this.niri.window_mru_ui.is_open();
++
++                    if is_outside && pressed && !mods.ctrl && !mods.alt && !mods.logo {
++                        let ucs = smithay::input::keyboard::xkb::keysym_to_utf32(modified);
++                        let c = char::from_u32(ucs)
++                            .or_else(|| raw.and_then(|r| char::from_u32(smithay::input::keyboard::xkb::keysym_to_utf32(r))));
++                        if let Some(c) = c {
++                            if !c.is_control() && !c.is_whitespace() {
++                                this.niri.suppressed_keys.insert(key_code);
++                                let query = c.to_string();
++                                let bind = Bind {
++                                    key: Key {
++                                        trigger: Trigger::Keysym(modified),
++                                        modifiers: Modifiers::empty(),
++                                    },
++                                    action: Action::Spawn(vec![
++                                        "yami-shell".into(),
++                                        "msg".into(),
++                                        format!("launcher {query}"),
++                                    ]),
++                                    repeat: false,
++                                    cooldown: None,
++                                    allow_when_locked: false,
++                                    allow_inhibiting: false,
++                                    hotkey_overlay_title: None,
++                                };
++                                return FilterResult::Intercept(Some(bind));
++                            }
++                        }
++                    }
++
+                     // Interaction with the active window, immediately update the active window's
+                     // focus timestamp without waiting for a possible pending MRU lock-in delay.
+                     this.niri.mru_apply_keyboard_commit();
+-- 
+2.56.0
+

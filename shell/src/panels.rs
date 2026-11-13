@@ -12,6 +12,30 @@ use smithay_client_toolkit::shell::{
 };
 
 impl App {
+    pub fn open_launcher_query(&mut self, query: &str) {
+        if self.st.locked {
+            return;
+        }
+        if self.st.modal == Some(Modal::Launcher) && !self.st.launcher.clip {
+            self.st.launcher.field.set(query);
+            self.st.launcher.cur = 0;
+            self.st.launcher.refresh(&self.st.apps, &self.st.niri.wins);
+            self.dirty(&SKind::Modal);
+            return;
+        }
+        self.close_all();
+        let out = self.focus_out();
+        let (w, h) = launcher::SIZE;
+        self.st.modal = Some(Modal::Launcher);
+        self.st.apps = icons::load_apps();
+        self.st.launcher.open(false, &self.st.apps, &self.st.niri.wins);
+        self.st.launcher.field.set(query);
+        self.st.launcher.cur = 0;
+        self.st.launcher.refresh(&self.st.apps, &self.st.niri.wins);
+        self.mk(SKind::Dim, &out, Layer::Overlay, "yami-dim", Anchor::all(), (0, 0), (0, 0, 0, 0), -1, KeyboardInteractivity::None);
+        self.mk(SKind::Modal, &out, Layer::Overlay, "yami-launcher", Anchor::empty(), (w, h + 12), (0, 0, 0, 0), -1, KeyboardInteractivity::Exclusive);
+    }
+
     // ── модальные панели: лаунчер, питание, настройки ───────────────────────
     pub fn toggle_modal(&mut self, m: Modal, clip: bool) {
         if self.st.locked {

@@ -12,9 +12,18 @@ use std::sync::mpsc;
 use std::sync::OnceLock;
 
 #[derive(Clone, Default, Debug, PartialEq)]
+pub struct Port {
+    pub name: String,
+    pub desc: String,
+    pub available: bool,
+}
+
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct Dev {
     pub name: String,
     pub desc: String,
+    pub ports: Vec<Port>,
+    pub active_port: String,
     pub vol: f64,
     pub muted: bool,
 }
@@ -68,6 +77,35 @@ fn dev(v: &Value) -> Dev {
     Dev {
         name: v["name"].as_str().unwrap_or("").into(),
         desc: v["description"].as_str().unwrap_or("").into(),
+        ports: v["ports"]
+            .as_array()
+            .map(|ports| {
+                ports
+                    .iter()
+                    .map(|p| {
+                        let name = p["name"].as_str().unwrap_or("");
+                        let desc = match name {
+                            "analog-output-headphones" => crate::tf!("Наушники — передняя панель", "Headphones — front", "Fones — frontal"),
+                            "analog-output-lineout" => crate::tf!("Колонки / линейный выход — задняя панель", "Speakers / line out — rear", "Caixas / saída de linha — traseira"),
+                            _ => {
+                                let d = p["description"].as_str().unwrap_or("");
+                                if d.is_empty() || d == "(null)" {
+                                    name.to_string()
+                                } else {
+                                    d.to_string()
+                                }
+                            }
+                        };
+                        Port {
+                            name: name.into(),
+                            desc,
+                            available: p["availability"].as_str() != Some("not available"),
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        active_port: v["active_port"].as_str().unwrap_or("").into(),
         vol: vol_of(v),
         muted: v["mute"].as_bool().unwrap_or(false),
     }
@@ -217,6 +255,9 @@ pub fn set_stream(idx: u32, v: f64) {
 }
 pub fn mute_stream(idx: u32) {
     run_pactl(vec!["set-sink-input-mute".into(), idx.to_string(), "toggle".into()]);
+}
+pub fn set_port(sink: &str, port: &str) {
+    run_pactl(vec!["set-sink-port".into(), sink.into(), port.into()]);
 }
 pub fn set_sink(name: &str) {
     run_pactl(vec!["set-default-sink".into(), name.into()]);
