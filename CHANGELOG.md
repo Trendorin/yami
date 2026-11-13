@@ -12,6 +12,7 @@ has its Russian line in CHANGELOG.ru.md: `tools/check.sh` checks that.
 - Updates: when the network broke off while switching to the new version, the updater's own copy of the sources was left half taken apart, and every later update refused with «has local edits» (an update to 3.0.0 could stay stuck this way). The switch now puts the copy back at once, and the leftovers of one cut short (a logout, a dead battery) are cleared by the next update. Stuck on an older version with that message: `git -C ~/.local/share/yami/src reset --hard`, then update again.
 - The sound popup switches the output's port (#37, by dznass-cmd): speakers or headphones of one sound card, right under the outputs, when the card has two that can play (headphones not plugged in are not offered).
 - `yami msg launcher TEXT` opens the launcher with TEXT already typed in (#37, by dznass-cmd): a key can open the settings search (`?`), files (`/`) or a command (`>`) right away.
+- Only file dialogs open floating by their title: a window called «OpenRGB» or a browser page «Save the date» stays tiled (#37, by dznass-cmd).
 
 ## 3.0.0
 

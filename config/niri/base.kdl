@@ -180,7 +180,8 @@ window-rule {
     match app-id=r#"^xdg-desktop-portal"#
     match app-id=r#"^yami-files-pick$"#
     match title=r#"^(Picture-in-Picture|Картинка в картинке)$"#
-    match title=r#"^(Open|Save|Открыть|Сохранить)( File| As| файл| как)?"#
+    // the whole title: a window named «OpenRGB» or a page «Save the date — Firefox» stays tiled
+    match title=r#"^(Open|Save|Открыть|Сохранить)( (File|Files|Folder|As|Image)| (файл|файлы|папку|как))?(…|\.\.\.)?$"#
     open-floating true
 }
 
