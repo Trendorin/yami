@@ -437,7 +437,7 @@ fn group(m: &str) -> i32 {
         "mode" => 2,
         "tray" => 3,
         "net" | "netspeed" | "bt" | "kb" | "cpu" | "ram" | "temp" | "bat" | "profile" | "night" | "privacy" => 4,
-        "vol" | "media" => 5,
+        "vol" | "bright" | "media" => 5,
         "clock" | "notif" | "settings" | "power" => 6,
         _ => 7,
     }
@@ -461,6 +461,7 @@ pub const ALL_MODULES: &[(&str, &str)] = &[
     ("disk", "диск"),
     ("weather", "погода"),
     ("vol", "звук"),
+    ("bright", "яркость"),
     ("bat", "батарея"),
     ("profile", "профиль питания"),
     ("night", "ночной свет"),

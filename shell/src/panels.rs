@@ -170,6 +170,7 @@ impl App {
         // модули бара рисуют, открыта ли их всплывашка (стрелка трея, календарь)
         self.dirty(&SKind::Bar);
         match kind {
+            "bright" => self.disp_open(),
             "net" => net::refresh_wifi(self.tx.clone()),
             "bt" => net::refresh_bt(self.tx.clone()),
             "profile" => crate::profile::refresh(None, self.tx.clone()),

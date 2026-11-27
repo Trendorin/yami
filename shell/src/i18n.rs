@@ -843,6 +843,7 @@ const PAIRS: &[(&str, &str)] = &[
     ("выбрать папку…", "choose a folder…"),
     ("папка", "folder"),
     ("яркость", "brightness"),
+    ("экран", "display"),
     ("яркость на экране", "brightness on screen"),
     ("при смене подсветки ноутбука", "when the laptop backlight changes"),
     ("панель управления — ПКМ по пустому месту бара", "control panel: right-click an empty spot on the bar"),

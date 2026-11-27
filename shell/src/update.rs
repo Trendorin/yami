@@ -391,12 +391,13 @@ pub(crate) fn check_into(set: &Settings, i: &mut Info) -> Result<(), String> {
 /// последние восемь выпусков с подписями (их проверяют ключи установленной версии)
 pub(crate) fn releases(dir: &Path, st: &Stamp, known: bool, policy: &str) -> Vec<Rel> {
     let Ok(tags) = git(dir, &["tag", "-l", "v[0-9]*", "--sort=-v:refname"]) else { return vec![] };
+    let keys = prepare_keys(dir, st, known, policy);
     tags.lines()
         .take(8)
         .map(|t| Rel {
             tag: t.to_string(),
             version: t.trim_start_matches('v').to_string(),
-            sig: verify(dir, st, known, policy, "verify-tag", &tag_ref(t)),
+            sig: verify_with(dir, &keys, "verify-tag", &tag_ref(t)),
             date: git(dir, &["log", "-1", "--format=%ct", &format!("{}^{{commit}}", tag_ref(t))]).ok().and_then(|d| d.parse().ok()).unwrap_or(0),
         })
         .collect()
@@ -462,21 +463,42 @@ pub(crate) fn signature(dir: &Path, st: &Stamp, i: &Info, known: bool, main: boo
 /// у сборки без ключей они берутся из клона: из коммита установленной версии, а нет его там — из
 /// того, что клон ставил последним
 pub(crate) fn verify(dir: &Path, st: &Stamp, known: bool, policy: &str, what: &str, obj: &str) -> String {
+    let keys = prepare_keys(dir, st, known, policy);
+    verify_with(dir, &keys, what, obj)
+}
+
+enum KeyFile {
+    Off,
+    NoKeys,
+    Bad,
+    Path(String),
+}
+
+fn prepare_keys(dir: &Path, st: &Stamp, known: bool, policy: &str) -> KeyFile {
     if policy == "off" {
-        return "off".into();
+        return KeyFile::Off;
     }
     let keys = trusted_keys(BUILT_KEYS, || {
         let base = if known { st.commit.clone() } else { "HEAD".into() };
         git(dir, &["show", &format!("{base}:{KEYS}")]).unwrap_or_default()
     });
     if !has_keys(&keys) {
-        return "nokeys".into();
+        return KeyFile::NoKeys;
     }
     let kf = crate::config::state_dir().join("update-keys");
     if crate::config::write_atomic(&kf, &(keys + "\n")).is_err() {
-        return "bad".into();
+        return KeyFile::Bad;
     }
-    let kfs = kf.to_string_lossy().to_string();
+    KeyFile::Path(kf.to_string_lossy().to_string())
+}
+
+fn verify_with(dir: &Path, keys: &KeyFile, what: &str, obj: &str) -> String {
+    let kfs = match keys {
+        KeyFile::Off => return "off".into(),
+        KeyFile::NoKeys => return "nokeys".into(),
+        KeyFile::Bad => return "bad".into(),
+        KeyFile::Path(p) => p,
+    };
     let o = Command::new("git")
         .arg("-C")
         .arg(dir)
@@ -511,7 +533,7 @@ pub fn sig_text(sig: &str) -> String {
         "" => "—".into(),
         s => {
             // 193045225+Trendorin@users.noreply.github.com → Trendorin
-            let who = s.trim_start_matches("good:");
+            let who = s.strip_prefix("good:").unwrap_or(s);
             let who = who.split('@').next().unwrap_or(who);
             let who = who.split_once('+').map(|(_, n)| n).unwrap_or(who);
             crate::tf!("подписано: {}", "signed: {}", "assinado: {}", who)
@@ -730,6 +752,10 @@ mod tests {
         assert_eq!(super::trusted_keys("# no keys yet\n\n", || "other ssh-ed25519 BBBB\n".into()), "other ssh-ed25519 BBBB\n");
         assert!(!super::has_keys("# only a comment\n   \n") && super::has_keys("# c\nme ssh-ed25519 AAAA\n"));
         assert_eq!(super::tag_ref("v3.0.0"), "refs/tags/v3.0.0");
+        assert!(super::sig_text("good:david@example.com").ends_with(": david"));
+        assert!(super::sig_text("good:oliver@example.com").ends_with(": oliver"));
+        assert!(super::sig_text("good:greg@example.com").ends_with(": greg"));
+        assert!(super::sig_text("good:193045225+Trendorin@users.noreply.github.com").ends_with(": Trendorin"));
     }
 
     /// checkout частичного клона без сети стирает файлы раньше, чем падает: дерево возвращается к HEAD;

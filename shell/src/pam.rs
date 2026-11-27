@@ -97,7 +97,7 @@ pub fn check(password: &str) -> bool {
         pam_end(h, r);
         // копия пароля для PAM — затереть
         let mut b = pass.into_bytes();
-        std::ptr::write_bytes(b.as_mut_ptr(), 0, b.len());
+        yami_px::ui::wipe_bytes(&mut b);
         r == PAM_SUCCESS
     }
 }

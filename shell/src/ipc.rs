@@ -149,6 +149,7 @@ impl crate::app::App {
             }
             // следующий профиль питания (для хоткея)
             "profile" => self.prof_step(1),
+            c if c.starts_with("bright ") => self.bright_cmd(&c["bright ".len()..]),
             c if c.starts_with("popup ") => {
                 let kind = crate::popups::KINDS.iter().copied().find(|k| *k == &c[6..]).unwrap_or("sys");
                 // из терминала или хоткея: у правого (бокового — у нижнего) конца бара

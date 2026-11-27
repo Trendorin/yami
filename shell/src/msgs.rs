@@ -127,8 +127,11 @@ impl App {
             }
             Msg::Bright(v, show) => {
                 self.st.bright = Some(v);
-                if self.st.popup_is("control") {
+                if self.st.popup_is("control") || self.st.popup_is("bright") {
                     self.dirty(&SKind::Popup);
+                }
+                if self.st.set.on_bar("bright") {
+                    self.dirty(&SKind::Bar);
                 }
                 // в панели управления ползунок и так на виду — OSD поверх лишний
                 if show && self.st.set.osd_bright && !self.st.popup_is("control") {

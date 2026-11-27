@@ -113,13 +113,12 @@ enum Out {
 
 /// один заход PAM через помощника: строки PAM_* туда-сюда до SUCCESS/FAILURE
 fn session(user: &str, cookie: &str, tx: &Sender<Msg>, rx: &mpsc::Receiver<Option<String>>) -> Out {
-    let (mut w, r): (Box<dyn Write>, Box<dyn std::io::Read>) = if let Ok(s) = std::os::unix::net::UnixStream::connect(SOCKET) {
+    if let Ok(mut s) = std::os::unix::net::UnixStream::connect(SOCKET) {
         let Ok(s2) = s.try_clone() else { return Out::Bad };
-        let mut w: Box<dyn Write> = Box::new(s);
-        if writeln!(w, "{user}\n{cookie}").is_err() {
+        if writeln!(s, "{user}\n{cookie}").is_err() {
             return Out::Bad;
         }
-        (w, Box::new(s2))
+        session_io(s, s2, cookie, tx, rx)
     } else {
         let Some(h) = helper() else { return Out::Bad };
         let Ok(mut ch) = std::process::Command::new(h).arg(user).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null()).spawn() else { return Out::Bad };
@@ -131,8 +130,11 @@ fn session(user: &str, cookie: &str, tx: &Sender<Msg>, rx: &mpsc::Receiver<Optio
         std::thread::spawn(move || {
             let _ = ch.wait();
         });
-        (Box::new(i), Box::new(o))
-    };
+        session_io(i, o, cookie, tx, rx)
+    }
+}
+
+fn session_io(mut w: impl Write, r: impl std::io::Read, cookie: &str, tx: &Sender<Msg>, rx: &mpsc::Receiver<Option<String>>) -> Out {
     let send = |e: Ev| {
         let _ = tx.send(Msg::Auth(e));
     };
@@ -383,5 +385,82 @@ impl App {
             }
         }
         self.dirty();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn id_entry(kind: &str, uid: Option<Value>) -> (String, HashMap<String, OwnedValue>) {
+        let mut d = HashMap::new();
+        if let Some(u) = uid {
+            d.insert("uid".into(), OwnedValue::try_from(u).unwrap());
+        }
+        (kind.into(), d)
+    }
+
+    #[test]
+    fn pick_prefers_current_user_and_rejects_invalid_identities() {
+        let me = unsafe { libc::getuid() };
+        let me_name = user_name(me).expect("current uid should resolve");
+
+        // Current user is preferred over an earlier entry (e.g. uid 0).
+        let ids = vec![id_entry("unix-user", Some(Value::U32(0))), id_entry("unix-user", Some(Value::U32(me)))];
+        assert_eq!(pick(&ids), Some(me_name.clone()));
+
+        // i32 uid values are also accepted.
+        let ids = vec![id_entry("unix-user", Some(Value::I32(me as i32)))];
+        assert_eq!(pick(&ids), Some(me_name));
+
+        // Non-unix-user, missing uid, wrong uid type, and empty list return None.
+        assert_eq!(pick(&[id_entry("unix-group", Some(Value::U32(me)))]), None);
+        assert_eq!(pick(&[id_entry("unix-user", None)]), None);
+        assert_eq!(pick(&[id_entry("unix-user", Some(Value::Str("root".into())))]), None);
+        assert_eq!(pick(&[]), None);
+    }
+
+    #[test]
+    fn session_io_parses_prompts_info_and_outcomes() {
+        let (tx, rx_msg) = calloop::channel::channel();
+
+        // Prompt with echo off followed by SUCCESS writes the password and returns Ok.
+        let (ptx, prx) = mpsc::channel();
+        ptx.send(Some("secret".into())).unwrap();
+        let mut out = Vec::new();
+        let res = session_io(&mut out, b"PAM_PROMPT_ECHO_OFF  Password: \nSUCCESS\n".as_slice(), "c1", &tx, &prx);
+        assert!(matches!(res, Out::Ok));
+        assert_eq!(out, b"secret\n");
+        match rx_msg.try_recv().unwrap() {
+            Msg::Auth(Ev::Prompt { cookie, prompt, echo }) => assert_eq!((cookie.as_str(), prompt.as_str(), echo), ("c1", "Password:", false)),
+            _ => panic!("expected Prompt event"),
+        }
+
+        // Info + FAILURE returns Bad.
+        let (_ptx, prx) = mpsc::channel();
+        let mut out = Vec::new();
+        let res = session_io(&mut out, b"PAM_ERROR_MSG  bad password \nFAILURE\n".as_slice(), "c2", &tx, &prx);
+        assert!(matches!(res, Out::Bad));
+        match rx_msg.try_recv().unwrap() {
+            Msg::Auth(Ev::Info { cookie, text }) => assert_eq!((cookie.as_str(), text.as_str()), ("c2", "bad password")),
+            _ => panic!("expected Info event"),
+        }
+
+        // Echo on with cancelled reply returns Cancel.
+        let (ptx, prx) = mpsc::channel();
+        ptx.send(None).unwrap();
+        let mut out = Vec::new();
+        let res = session_io(&mut out, b"PAM_PROMPT_ECHO_ON Code:\n".as_slice(), "c3", &tx, &prx);
+        assert!(matches!(res, Out::Cancel));
+        match rx_msg.try_recv().unwrap() {
+            Msg::Auth(Ev::Prompt { cookie, prompt, echo }) => assert_eq!((cookie.as_str(), prompt.as_str(), echo), ("c3", "Code:", true)),
+            _ => panic!("expected Prompt event"),
+        }
+
+        // Unknown lines and EOF without SUCCESS return Bad.
+        let (_ptx, prx) = mpsc::channel();
+        let mut out = Vec::new();
+        let res = session_io(&mut out, b"UNKNOWN something\n".as_slice(), "c4", &tx, &prx);
+        assert!(matches!(res, Out::Bad));
     }
 }

@@ -20,7 +20,7 @@ prebuilt_has() { # file
   local from
   from="$(prebuilt_where)"
   if [[ $from == *://* ]]; then
-    curl -fsSIL --proto '=https,file' --connect-timeout 5 --max-time 10 -o /dev/null "$from/$1" 2>/dev/null
+    curl -fsSIL --proto '=https,file' --proto-redir '=https' --connect-timeout 5 --max-time 10 -o /dev/null "$from/$1" 2>/dev/null
   else
     [[ -f $from/$1 ]]
   fi
@@ -29,7 +29,7 @@ prebuilt_get() { # file, where to put it
   local from
   from="$(prebuilt_where)"
   if [[ $from == *://* ]]; then
-    curl -fsSL --proto '=https,file' --connect-timeout 10 --retry 2 -o "$2" "$from/$1"
+    curl -fsSL --proto '=https,file' --proto-redir '=https' --connect-timeout 10 --retry 2 -o "$2" "$from/$1"
   else
     cp -- "$from/$1" "$2"
   fi

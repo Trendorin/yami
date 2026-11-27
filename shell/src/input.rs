@@ -201,6 +201,15 @@ impl App {
                 self.slider_set(key, from + f * (to - from));
             }
             Act::VolSlider => audio::set_volume(frac as f64 * 1.0),
+            Act::BrightSlider => {
+                let v = frac.max(0.01);
+                self.st.bright = Some(v);
+                crate::bright::set(v);
+                self.dirty(&SKind::Popup);
+                if self.st.set.on_bar("bright") {
+                    self.dirty(&SKind::Bar);
+                }
+            }
             // панель управления: ползунки стоят, клетки снизу вверх
             Act::CtlVol | Act::CtlBright => {
                 let fy = (1.0 - (y - zone.y as f64) / zone.h.max(1) as f64).clamp(0.0, 1.0) as f32;

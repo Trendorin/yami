@@ -69,6 +69,7 @@ impl App {
             Act::Launcher => self.toggle_modal(Modal::Launcher, button == RMB),
             Act::Plug(cmd) => App::sh(&cmd),
             Act::NightToggle => self.night_toggle(),
+            Act::NightManual => self.night_manual_toggle(),
             Act::ReplySend => self.reply_send(),
             Act::Power => self.toggle_modal(Modal::Power, false),
             Act::Settings => self.toggle_modal(Modal::Settings, false),
@@ -148,7 +149,7 @@ impl App {
             Act::CalMonth(d) => {
                 self.st.cal_month = if d == 0 { 0 } else { self.st.cal_month + d };
             }
-            Act::VolSlider | Act::MicSlider | Act::AppVol(_) | Act::CtlVol | Act::CtlBright => {}
+            Act::VolSlider | Act::MicSlider | Act::AppVol(_) | Act::CtlVol | Act::CtlBright | Act::BrightSlider => {}
             Act::BarBg => match button {
                 RMB => {
                     // у бокового бара панель встаёт напротив щелчка, а не у начала бара
@@ -290,6 +291,7 @@ impl App {
             Act::LockField => {}
             Act::Prof(p) => self.prof_set(p),
             Act::Disp(_) | Act::DispSel(_) | Act::DispDrag(_) => self.disp_click(&a),
+            Act::DispScale(s) => self.disp_scale(s),
             _ => {}
         }
         self.dirty_all();
@@ -305,6 +307,17 @@ impl App {
             Act::CtlBright => {
                 if let Some(v) = self.st.bright {
                     self.control_drag(&Act::CtlBright, (v + if up { 0.05 } else { -0.05 }).clamp(0.0, 1.0));
+                }
+            }
+            Act::BrightSlider | Act::Popup("bright") => {
+                if let Some(v) = self.st.bright {
+                    let v = (v + if up { 0.05 } else { -0.05 }).clamp(0.01, 1.0);
+                    self.st.bright = Some(v);
+                    crate::bright::set(v);
+                    self.dirty(&SKind::Popup);
+                    if self.st.set.on_bar("bright") {
+                        self.dirty(&SKind::Bar);
+                    }
                 }
             }
             Act::MicSlider | Act::MicMute => {

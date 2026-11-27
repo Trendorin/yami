@@ -151,6 +151,46 @@ pub fn spawn(tx: Sender<Msg>) {
     });
 }
 
+pub fn step_all(st: &mut crate::app::State, delta: f32) -> bool {
+    let Some(v) = st.bright else { return false };
+    let nv = (v + delta).clamp(0.01, 1.0);
+    st.bright = Some(nv);
+    set(nv);
+    true
+}
+
+impl crate::app::App {
+    pub fn bright_cmd(&mut self, arg: &str) {
+        let a = arg.trim();
+        let delta = match a {
+            "up" => Some(0.05),
+            "down" => Some(-0.05),
+            _ => a.trim_end_matches('%').parse::<f32>().ok().map(|n| n / 100.0),
+        };
+        let Some(d) = delta else { return };
+        let changed = if matches!(a, "up" | "down") || a.starts_with('+') || a.starts_with('-') {
+            step_all(&mut self.st, d)
+        } else if self.st.bright.is_some() {
+            let v = d.clamp(0.01, 1.0);
+            self.st.bright = Some(v);
+            set(v);
+            true
+        } else {
+            false
+        };
+        if changed {
+            if self.st.popup_is("bright") || self.st.popup_is("control") {
+                self.dirty(&crate::app::SKind::Popup);
+            } else if self.st.set.osd_bright {
+                self.show_osd("bright");
+            }
+            if self.st.set.on_bar("bright") {
+                self.dirty(&crate::app::SKind::Bar);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     /// хеш подсистемы, как его считает libudev (MurmurHash2, seed 0) — тот же, что в yami-agents
@@ -185,5 +225,13 @@ mod tests {
     fn devpath_from_message() {
         let m = b"libudev\0\xfe\xed\xca\xfe....ACTION=change\0DEVPATH=/devices/pci0000:00/0000:00:02.0/drm/card1/card1-eDP-1/intel_backlight\0SUBSYSTEM=backlight\0";
         assert_eq!(super::devpath(m).as_deref(), Some("/devices/pci0000:00/0000:00:02.0/drm/card1/card1-eDP-1/intel_backlight"));
+    }
+
+    #[test]
+    fn step_all_updates_sysfs() {
+        let mut st = crate::app::State::new(Default::default(), Default::default());
+        st.bright = Some(0.5);
+        assert!(super::step_all(&mut st, 0.05));
+        assert!((st.bright.unwrap() - 0.55).abs() < 0.001);
     }
 }

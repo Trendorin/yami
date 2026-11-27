@@ -366,10 +366,17 @@ impl<'a, 'b, A: Action> Ui<'a, 'b, A> {
     }
 }
 
-/// затереть строку нулями и очистить (пароли не остаются в отпущенной памяти)
+/// Zero out a byte slice with volatile writes so the compiler cannot elide it.
+pub fn wipe_bytes(b: &mut [u8]) {
+    for p in b.iter_mut() {
+        unsafe { std::ptr::write_volatile(p, 0) };
+    }
+}
+
+/// Zero out a string's buffer and clear it.
 pub fn wipe(s: &mut String) {
-    // SAFETY: нули — допустимый UTF-8
-    unsafe { std::ptr::write_bytes(s.as_mut_vec().as_mut_ptr(), 0, s.len()) };
+    // SAFETY: zero bytes are valid UTF-8.
+    wipe_bytes(unsafe { s.as_mut_vec() });
     s.clear();
 }
 

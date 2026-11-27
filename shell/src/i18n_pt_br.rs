@@ -614,6 +614,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("when the laptop backlight changes", "quando o brilho do notebook muda"),
     ("light theme", "tema claro"),
     ("control panel: right-click an empty spot on the bar", "painel de controle: botão direito num espaço vazio da barra"),
+    ("screen and monitor brightness", "brilho da tela e dos monitores"),
     ("brightness", "brilho"),
     ("or in a terminal: yami update", "ou no terminal: yami update"),
     ("or: yami-shell config list", "ou: yami-shell config list"),
