@@ -88,6 +88,14 @@ fn opt_u32(o: &HashMap<String, OwnedValue>, k: &str) -> Option<u32> {
     o.get(k).and_then(|v| u32::try_from(v).ok())
 }
 
+fn source_types(o: &HashMap<String, OwnedValue>) -> u32 {
+    opt_u32(o, "types").map(|t| t & SOURCES).filter(|t| *t != 0).unwrap_or(1)
+}
+
+fn cursor_mode(o: &HashMap<String, OwnedValue>) -> u32 {
+    opt_u32(o, "cursor_mode").filter(|c| CURSORS & c != 0).unwrap_or(2)
+}
+
 struct Started {
     mutter: OwnedObjectPath,
     node: u32,
@@ -171,8 +179,8 @@ impl ScreenCast {
     async fn select_sources(&self, _handle: ObjectPath<'_>, session_handle: ObjectPath<'_>, _app_id: &str, options: HashMap<String, OwnedValue>) -> (u32, HashMap<String, OwnedValue>) {
         let mut all = self.sessions.lock().unwrap();
         let Some(s) = all.get_mut(session_handle.as_str()) else { return (2, HashMap::new()) };
-        s.types = opt_u32(&options, "types").map(|t| t & SOURCES).filter(|t| *t != 0).unwrap_or(1);
-        s.cursor = opt_u32(&options, "cursor_mode").filter(|c| CURSORS & c != 0).unwrap_or(2);
+        s.types = source_types(&options);
+        s.cursor = cursor_mode(&options);
         (0, HashMap::new())
     }
 
@@ -233,5 +241,45 @@ impl ScreenCast {
     #[zbus(property, name = "version")]
     fn version(&self) -> u32 {
         5
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn opts(pairs: &[(&str, Value)]) -> HashMap<String, OwnedValue> {
+        pairs.iter().map(|(k, v)| ((*k).to_string(), OwnedValue::try_from(v.try_clone().unwrap()).unwrap())).collect()
+    }
+
+    #[test]
+    fn opt_u32_parses_valid_and_rejects_wrong_types() {
+        let m = opts(&[("ok", Value::U32(42)), ("signed", Value::I32(42)), ("text", Value::Str("42".into()))]);
+        assert_eq!(opt_u32(&m, "ok"), Some(42));
+        assert_eq!(opt_u32(&m, "signed"), None);
+        assert_eq!(opt_u32(&m, "text"), None);
+        assert_eq!(opt_u32(&m, "missing"), None);
+    }
+
+    #[test]
+    fn bitmask_filtering_for_sources_and_cursor_mode() {
+        // Missing or zero/unsupported source types fall back to monitor (1).
+        assert_eq!(source_types(&HashMap::new()), 1);
+        assert_eq!(source_types(&opts(&[("types", Value::U32(0))])), 1);
+        assert_eq!(source_types(&opts(&[("types", Value::U32(4))])), 1);
+        assert_eq!(source_types(&opts(&[("types", Value::Str("bad".into()))])), 1);
+
+        // Supported source bits (1 = monitor, 2 = window) are preserved and unsupported bits masked out.
+        assert_eq!(source_types(&opts(&[("types", Value::U32(1))])), 1);
+        assert_eq!(source_types(&opts(&[("types", Value::U32(2))])), 2);
+        assert_eq!(source_types(&opts(&[("types", Value::U32(1 | 2))])), 3);
+        assert_eq!(source_types(&opts(&[("types", Value::U32(2 | 4))])), 2);
+
+        // Cursor mode defaults to embedded (2) when missing, zero, or unsupported.
+        assert_eq!(cursor_mode(&HashMap::new()), 2);
+        assert_eq!(cursor_mode(&opts(&[("cursor_mode", Value::U32(0))])), 2);
+        assert_eq!(cursor_mode(&opts(&[("cursor_mode", Value::U32(8))])), 2);
+        assert_eq!(cursor_mode(&opts(&[("cursor_mode", Value::U32(1))])), 1);
+        assert_eq!(cursor_mode(&opts(&[("cursor_mode", Value::U32(4))])), 4);
     }
 }
