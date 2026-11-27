@@ -366,10 +366,18 @@ impl<'a, 'b, A: Action> Ui<'a, 'b, A> {
     }
 }
 
+/// затереть байты нулями (пароли не остаются в отпущенной памяти)
+pub fn wipe_bytes(b: &mut [u8]) {
+    for p in b.iter_mut() {
+        // SAFETY: p — допустимый указатель на элемент среза
+        unsafe { std::ptr::write_volatile(p, 0) };
+    }
+}
+
 /// затереть строку нулями и очистить (пароли не остаются в отпущенной памяти)
 pub fn wipe(s: &mut String) {
     // SAFETY: нули — допустимый UTF-8
-    unsafe { std::ptr::write_bytes(s.as_mut_vec().as_mut_ptr(), 0, s.len()) };
+    wipe_bytes(unsafe { s.as_mut_vec() });
     s.clear();
 }
 
