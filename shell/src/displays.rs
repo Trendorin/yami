@@ -11,6 +11,7 @@ use std::cell::Cell;
 use std::time::{Duration, Instant};
 
 const REVERT_S: u64 = 15;
+pub const PRESETS: &[f64] = &[1.0, 1.25, 1.5, 1.75, 2.0];
 const SCALES: &[f64] = &[1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
 const TRANSFORMS: &[&str] = &["normal", "90", "180", "270"];
 
@@ -297,6 +298,20 @@ fn bar_toggle(all: &[String], list: &[String], name: &str) -> Option<Vec<String>
     Some(if all.iter().all(|n| on.contains(n)) { vec![] } else { on })
 }
 
+pub fn target_output<'a>(outs: &'a [Out], name: Option<&str>, sel: usize) -> Option<&'a Out> {
+    name.filter(|n| !n.is_empty()).and_then(|n| outs.iter().find(|o| o.name == n)).or_else(|| outs.get(sel))
+}
+
+pub fn apply_scale(outs: &mut [Out], name: Option<&str>, sel: usize, scale: f64) -> bool {
+    let idx = name.filter(|n| !n.is_empty()).and_then(|n| outs.iter().position(|o| o.name == n)).or_else(|| (sel < outs.len()).then_some(sel));
+    let Some(o) = idx.and_then(|i| outs.get_mut(i)) else { return false };
+    if (o.scale - scale).abs() < 0.001 {
+        return false;
+    }
+    o.scale = scale;
+    true
+}
+
 impl App {
     /// бар на экране i: вкл/выкл. Список хранит экраны с баром; все — пустой список.
     /// Последний бар не убирается: без экранов из списка он и так вернулся бы на все
@@ -369,7 +384,12 @@ impl App {
                     }
                     "apply" => self.disp_apply(),
                     "keep" => {
-                        d.revert = None;
+                        if d.edited && d.revert.is_none() {
+                            self.disp_apply();
+                            self.st.disp.revert = None;
+                        } else {
+                            d.revert = None;
+                        }
                         // «авто»-шрифт подстраивается под новый экран
                         if self.st.set.font_size == 0 {
                             self.apply_fonts();
@@ -377,7 +397,13 @@ impl App {
                         let d = &mut self.st.disp;
                         d.reload_at = Some(Instant::now() + Duration::from_millis(600));
                     }
-                    "revert" => self.disp_revert(),
+                    "revert" => {
+                        if d.revert.is_some() {
+                            self.disp_revert();
+                        } else {
+                            self.disp_open();
+                        }
+                    }
                     "reset" => self.disp_open(),
                     "bar" => self.disp_bar(i),
                     _ => {}
@@ -386,6 +412,10 @@ impl App {
             _ => {}
         }
         self.dirty(&SKind::Modal);
+        if self.st.popup_is("bright") {
+            self.resize_popup();
+            self.dirty(&SKind::Popup);
+        }
     }
 
     /// тащим экран по схеме: шаг экрана — dx/k, края липнут к соседям
@@ -419,12 +449,20 @@ impl App {
         d.outs[i].y = ny;
         d.edited = true;
         self.dirty(&SKind::Modal);
+        if self.st.popup_is("bright") {
+            self.resize_popup();
+            self.dirty(&SKind::Popup);
+        }
     }
 
     pub fn disp_drag_end(&mut self) {
         self.st.disp.drag = None;
         self.disp_unoverlap();
         self.dirty(&SKind::Modal);
+        if self.st.popup_is("bright") {
+            self.resize_popup();
+            self.dirty(&SKind::Popup);
+        }
     }
 
     /// сменился размер — соседи справа/снизу не должны наезжать
@@ -459,11 +497,27 @@ impl App {
 
     fn disp_apply(&mut self) {
         let p = path();
-        let prev = std::fs::read_to_string(&p).ok();
+        let prev = match self.st.disp.revert.take() {
+            Some((old, _)) => old,
+            None => std::fs::read_to_string(&p).ok(),
+        };
         let _ = crate::config::write_atomic(&p, &kdl(&self.st.disp.outs));
         crate::login::publish(&self.st.set);
         self.st.disp.edited = false;
         self.st.disp.revert = Some((prev, Instant::now() + Duration::from_secs(REVERT_S)));
+    }
+
+    pub fn disp_scale(&mut self, scale: f64) {
+        if self.st.disp.outs.is_empty() {
+            self.st.disp.outs = load();
+        }
+        let target = self.st.popup.as_ref().map(|p| p.at.0.clone());
+        if apply_scale(&mut self.st.disp.outs, target.as_deref(), self.st.disp.sel, scale) {
+            self.st.disp.edited = true;
+            self.disp_unoverlap();
+            self.resize_popup();
+            self.dirty(&SKind::Popup);
+        }
     }
 
     fn disp_revert(&mut self) {
@@ -483,16 +537,26 @@ impl App {
 
     /// раз в тик: отсчёт отката и перечитывание после применения
     pub fn disp_tick(&mut self) {
+        let bright = self.st.popup_is("bright");
         if let Some((_, at)) = &self.st.disp.revert {
             if Instant::now() >= *at {
                 self.disp_revert();
+                if bright {
+                    self.resize_popup();
+                }
             }
             self.dirty(&SKind::Modal);
+            if bright {
+                self.dirty(&SKind::Popup);
+            }
         }
         if self.st.disp.reload_at.map(|t| Instant::now() >= t).unwrap_or(false) {
             self.st.disp.reload_at = None;
             self.disp_open();
             self.dirty(&SKind::Modal);
+            if bright {
+                self.dirty(&SKind::Popup);
+            }
         }
     }
 }
@@ -522,5 +586,14 @@ mod tests {
         assert_eq!(bar_toggle(&all, &v(&["DP-1"]), "HDMI-A-1"), Some(vec![]));
         // в списке только чужой экран (ноутбук без монитора): считается «все»
         assert_eq!(bar_toggle(&all, &v(&["eDP-1"]), "DP-1"), Some(v(&["HDMI-A-1"])));
+    }
+
+    #[test]
+    fn scale_preset_applies_to_target_and_generates_kdl() {
+        let mut outs = super::mock();
+        assert!(super::apply_scale(&mut outs, Some("HDMI-A-1"), 0, 1.5));
+        assert!((outs[1].scale - 1.5).abs() < 0.001);
+        assert!(!super::apply_scale(&mut outs, Some("HDMI-A-1"), 0, 1.5));
+        assert!(super::kdl(&outs).contains("scale 1.5"));
     }
 }

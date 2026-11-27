@@ -255,6 +255,9 @@ impl App {
             Act::CtlBright => {
                 self.st.bright = Some(frac.max(0.01));
                 crate::bright::set(frac);
+                if self.st.set.on_bar("bright") {
+                    self.dirty(&SKind::Bar);
+                }
             }
             _ => return,
         }

@@ -498,6 +498,16 @@ fn module(ui: &mut Ui, st: &State, out: &str, m: &str, x: i32, measure: bool) ->
             }
             w
         }
+        "bright" => {
+            if !measure {
+                let r = R::new(x - 2, 0, 18, H - 1);
+                let hov = ui.hover(r);
+                let off = st.bright.is_none();
+                ui.cv.icon("screen", x, cy - 7, 2, if off { t.text_faint } else if hov { t.text_hi } else { t.text });
+                ui.zone(r, Act::Popup("bright"), Cur::Pointer);
+            }
+            14
+        }
         "media" => {
             let me = &st.media;
             if me.title.is_empty() {
@@ -1003,6 +1013,12 @@ fn vmodule(ui: &mut Ui, st: &State, out: &str, m: &str, y: i32, measure: bool) -
             let hov = !measure && ui.hover(R::new(x0, y - 2, W, 34));
             let ic = if a.muted { t.text_faint } else if hov { t.text_hi } else { t.text };
             vstack(ui, st, y, if a.muted { "mute" } else { "speaker" }, ic, &s, if a.muted { t.text_faint } else { t.text }, Act::Popup("sound"), measure)
+        }
+        "bright" => {
+            let off = st.bright.is_none();
+            let hov = !measure && ui.hover(R::new(x0, y - 2, W, 18));
+            let ic = if off { t.text_faint } else if hov { t.text_hi } else { t.text };
+            vstack(ui, st, y, "screen", ic, "", ic, Act::Popup("bright"), measure)
         }
         "media" => {
             let me = &st.media;

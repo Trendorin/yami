@@ -129,6 +129,7 @@ fn help_msg(y: &Sty) {
         ("walls", "выбор обоев: картинки папки обоев", "wallpaper picker: the wallpaper folder's pictures"),
         ("media play-pause|next|previous|player", "плееру, что в баре; player — другой плеер", "to the player shown in the bar; player switches to another one"),
         ("profile", "следующий профиль питания", "next power profile"),
+        ("bright +5|-5|N%", "яркость экрана и мониторов", "screen and monitor brightness"),
         ("night", "ночной свет вкл-выкл", "night light on-off"),
         ("reload | restart | quit", "перечитать настройки / перезапуск / выход", "reload settings / restart / quit"),
         ("ping", "жив ли шелл: ответит pong", "is the shell alive: answers pong"),
@@ -177,6 +178,7 @@ pub fn msg_ok(cmd: &str) -> bool {
         "popup" => w.next().is_some_and(|k| crate::popups::KINDS.contains(&k)) && one(&mut w),
         "screenshot" => w.next().is_none_or(|m| matches!(m, "area" | "window" | "screen")) && w.next().is_none_or(|d| d.parse::<u32>().is_ok()) && one(&mut w),
         "curtain" => w.next().is_none_or(|a| matches!(a, "on" | "off" | "toggle")) && one(&mut w),
+        "bright" => w.next().is_some_and(|a| matches!(a, "up" | "down") || a.trim_end_matches('%').parse::<f32>().is_ok()) && one(&mut w),
         "media" => w.next().is_some_and(|a| matches!(a, "play-pause" | "play" | "pause" | "stop" | "next" | "previous" | "player")) && one(&mut w),
         // путь к картинке (с пробелами) или пусто — пиксельные из палитры
         "wallpaper" => true,
