@@ -158,6 +158,9 @@ impl Notif {
                 if let Some(Value::Str(p)) = hints.get(k).map(|v| &**v) {
                     let p = p.as_str().trim_start_matches("file://");
                     image = crate::icons::load_file(std::path::Path::new(p), 48);
+                    if image.is_some() {
+                        break;
+                    }
                 }
             }
         }
