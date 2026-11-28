@@ -23,10 +23,22 @@ pub enum Act {
     Popup(&'static str),
     // лаунчер
     LRun(usize),
-    LTab(bool),
+    LTab(crate::launcher::LTab),
     LPin(usize),
     LDel(usize),
+    LQr(usize),
+    LQrClose,
     LWipe,
+    ShareToggle,
+    ShareCopy,
+    SharePick,
+    ShareRemove(usize),
+    ShareClear,
+    ShareOpenDir,
+    ShareScroll,
+    SharePortFocus,
+    SharePortApply,
+    ShareClearHistory,
     // питание
     PowerDo(usize),
     // настройки

@@ -137,10 +137,44 @@ impl App {
                     self.launcher_run(i);
                 }
             }
-            Act::LTab(clip) => self.toggle_modal(Modal::Launcher, clip),
+            Act::LTab(tab) => self.open_launcher(tab),
             Act::LPin(i) => self.launcher_pin(i),
             Act::LDel(i) => self.launcher_del(i),
+            Act::LQr(i) => self.launcher_qr(i),
+            Act::LQrClose => {
+                self.st.launcher.clip_qr = None;
+                self.dirty(&SKind::Modal);
+            }
             Act::LWipe => self.launcher_wipe(),
+            Act::ShareToggle => self.share_toggle(),
+            Act::ShareCopy => self.share_copy(),
+            Act::SharePick => self.share_pick(),
+            Act::ShareRemove(i) => {
+                self.st.share.remove_file(i);
+                self.dirty(&SKind::Modal);
+            }
+            Act::ShareClear => {
+                self.st.share.clear_files();
+                self.dirty(&SKind::Modal);
+            }
+            Act::ShareOpenDir => {
+                let dir = crate::share::downloads_dir();
+                let _ = std::fs::create_dir_all(&dir);
+                App::open_dir(dir.to_string_lossy().to_string());
+            }
+            Act::ShareScroll => {}
+            Act::SharePortFocus => {
+                self.st.field_focus = Some("share_port");
+                self.dirty(&SKind::Modal);
+            }
+            Act::SharePortApply => {
+                self.st.field_focus = None;
+                self.share_apply_port();
+            }
+            Act::ShareClearHistory => {
+                self.st.share.clear_history();
+                self.dirty(&SKind::Modal);
+            }
             Act::PowerDo(i) => self.power_do(i),
             // ── меню ────────────────────────────────────────────────────────
             Act::Menu(i) => self.menu_pick(i),
@@ -346,6 +380,14 @@ impl App {
                     let c = self.st.launcher.cur as i32 + if up { -1 } else { 1 };
                     self.st.launcher.cur = c.clamp(0, n as i32 - 1) as usize;
                     self.st.launcher.keep_visible();
+                    self.dirty(&SKind::Modal);
+                }
+            }
+            Act::ShareScroll => {
+                let n = self.st.share.files.len();
+                if n > 4 {
+                    let s = self.st.share.scroll as i32 + if up { -1 } else { 1 };
+                    self.st.share.scroll = s.clamp(0, (n - 4) as i32) as usize;
                     self.dirty(&SKind::Modal);
                 }
             }

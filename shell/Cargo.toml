@@ -31,6 +31,7 @@ zbus = { version = "5", default-features = false, features = ["blocking-api", "a
 # blocking 1.7 keeps idle pool threads forever, each waking twice a second (zbus closes sockets
 # and reads peer credentials there); 1.6 lets them exit after 500 ms idle
 blocking = "=1.6.2"
+crc32fast = "1"
 libc = "0.2"
 
 [workspace]

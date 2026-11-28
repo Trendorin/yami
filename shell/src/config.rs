@@ -415,6 +415,7 @@ pub struct Settings {
     pub audio_names: std::collections::BTreeMap<String, String>,
     /// портал: диалог файлов yami-files (иначе GTK)
     pub portal_files: bool,
+    pub share_port: u16,
 
     // обновления (update.rs)
     /// проверять сама раз в updateEvery часов (0 — только по кнопке)
@@ -695,6 +696,7 @@ impl Default for Settings {
             media_view: "cover".into(),
             audio_names: Default::default(),
             portal_files: true,
+            share_port: 45837,
             update_check: true,
             update_every: 6,
             update_channel: "release".into(),
@@ -810,6 +812,9 @@ impl Settings {
         }
         if !crate::wall::SCHEMES.iter().any(|x| x.0 == self.wall_scheme) {
             self.wall_scheme = "tonal".into();
+        }
+        if self.share_port < 1024 {
+            self.share_port = 45837;
         }
         // анимации: только известные группы и узоры, длительность в разумных пределах
         self.anims.retain(|k, _| ANIM_GROUPS.iter().any(|g| g.0 == k));

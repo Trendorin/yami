@@ -86,6 +86,7 @@ impl crate::app::App {
             c if c.starts_with("launcher ") => self.launcher_with(c["launcher ".len()..].trim()),
             "night" => self.night_toggle(),
             "clipboard" => self.toggle_modal(Modal::Launcher, true),
+            "share" => self.open_launcher(crate::launcher::LTab::Share),
             "power" => self.toggle_modal(Modal::Power, false),
             "settings" => self.toggle_modal(Modal::Settings, false),
             "walls" => self.walls_open(false),

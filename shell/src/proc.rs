@@ -54,6 +54,20 @@ pub fn files_pick(mode: &str, folder: &std::path::Path, args: &[&str]) -> Option
     owned(&mut c).output().ok().filter(|o| o.status.success()).and_then(|o| String::from_utf8_lossy(&o.stdout).lines().next().map(str::to_string))
 }
 
+pub fn files_pick_many(folder: &std::path::Path, title: &str) -> Vec<std::path::PathBuf> {
+    let mut c = std::process::Command::new("yami-files");
+    c.args(["--pick", "open", "--multiple", "--null", "--title", title]).arg("--folder").arg(folder);
+    let Ok(out) = owned(&mut c).output() else { return vec![] };
+    if !out.status.success() {
+        return vec![];
+    }
+    out.stdout
+        .split(|&b| b == 0)
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| std::str::from_utf8(s).ok().map(std::path::PathBuf::from))
+        .collect()
+}
+
 /// дети, доставшиеся от образа до перезапуска: их Child остались в старых нитях, ждать их некому.
 /// Список берётся до первого запуска чего-либо (все дети на этот момент — чужие) и
 /// подбирается в tick, иначе каждый перезапуск оставлял зомби
