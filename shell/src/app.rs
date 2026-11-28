@@ -205,6 +205,9 @@ pub enum Msg {
     SkwdLayers(Vec<String>),
     /// проверка обновлений (update.rs)
     Update(crate::update::Info),
+    ShareUpdate(crate::share::Transfer),
+    SharePicked(Vec<std::path::PathBuf>),
+    ShareFw(Result<String, String>),
 }
 
 pub struct Res {
@@ -233,6 +236,7 @@ pub struct State {
     pub menu: Option<menu::MenuState>,
     pub bar_hidden: bool,
     pub launcher: launcher::LState,
+    pub share: crate::share::ShareState,
     pub power_cur: usize,
     pub stab: &'static str,
     /// прокрутка содержимого настроек: сдвиг и вкладка, к которой он относится
@@ -473,6 +477,7 @@ impl State {
             menu: None,
             bar_hidden: false,
             launcher: launcher::LState::default(),
+            share: crate::share::ShareState::default(),
             power_cur: 0,
             stab: "color",
             sscroll: (0, ""),

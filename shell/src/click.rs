@@ -69,6 +69,7 @@ impl App {
             Act::Launcher => self.toggle_modal(Modal::Launcher, button == RMB),
             Act::Plug(cmd) => App::sh(&cmd),
             Act::NightToggle => self.night_toggle(),
+            Act::NightManual => self.night_manual_toggle(),
             Act::ReplySend => self.reply_send(),
             Act::Power => self.toggle_modal(Modal::Power, false),
             Act::Settings => self.toggle_modal(Modal::Settings, false),
@@ -136,10 +137,44 @@ impl App {
                     self.launcher_run(i);
                 }
             }
-            Act::LTab(clip) => self.toggle_modal(Modal::Launcher, clip),
+            Act::LTab(tab) => self.open_launcher(tab),
             Act::LPin(i) => self.launcher_pin(i),
             Act::LDel(i) => self.launcher_del(i),
+            Act::LQr(i) => self.launcher_qr(i),
+            Act::LQrClose => {
+                self.st.launcher.clip_qr = None;
+                self.dirty(&SKind::Modal);
+            }
             Act::LWipe => self.launcher_wipe(),
+            Act::ShareToggle => self.share_toggle(),
+            Act::ShareCopy => self.share_copy(),
+            Act::SharePick => self.share_pick(),
+            Act::ShareRemove(i) => {
+                self.st.share.remove_file(i);
+                self.dirty(&SKind::Modal);
+            }
+            Act::ShareClear => {
+                self.st.share.clear_files();
+                self.dirty(&SKind::Modal);
+            }
+            Act::ShareOpenDir => {
+                let dir = crate::share::downloads_dir();
+                let _ = std::fs::create_dir_all(&dir);
+                App::open_dir(dir.to_string_lossy().to_string());
+            }
+            Act::ShareScroll => {}
+            Act::SharePortFocus => {
+                self.st.field_focus = Some("share_port");
+                self.dirty(&SKind::Modal);
+            }
+            Act::SharePortApply => {
+                self.st.field_focus = None;
+                self.share_apply_port();
+            }
+            Act::ShareClearHistory => {
+                self.st.share.clear_history();
+                self.dirty(&SKind::Modal);
+            }
             Act::PowerDo(i) => self.power_do(i),
             // ── меню ────────────────────────────────────────────────────────
             Act::Menu(i) => self.menu_pick(i),
@@ -148,7 +183,7 @@ impl App {
             Act::CalMonth(d) => {
                 self.st.cal_month = if d == 0 { 0 } else { self.st.cal_month + d };
             }
-            Act::VolSlider | Act::MicSlider | Act::AppVol(_) | Act::CtlVol | Act::CtlBright => {}
+            Act::VolSlider | Act::MicSlider | Act::AppVol(_) | Act::CtlVol | Act::CtlBright | Act::BrightSlider => {}
             Act::BarBg => match button {
                 RMB => {
                     // у бокового бара панель встаёт напротив щелчка, а не у начала бара
@@ -290,6 +325,7 @@ impl App {
             Act::LockField => {}
             Act::Prof(p) => self.prof_set(p),
             Act::Disp(_) | Act::DispSel(_) | Act::DispDrag(_) => self.disp_click(&a),
+            Act::DispScale(s) => self.disp_scale(s),
             _ => {}
         }
         self.dirty_all();
@@ -305,6 +341,17 @@ impl App {
             Act::CtlBright => {
                 if let Some(v) = self.st.bright {
                     self.control_drag(&Act::CtlBright, (v + if up { 0.05 } else { -0.05 }).clamp(0.0, 1.0));
+                }
+            }
+            Act::BrightSlider | Act::Popup("bright") => {
+                if let Some(v) = self.st.bright {
+                    let v = (v + if up { 0.05 } else { -0.05 }).clamp(0.01, 1.0);
+                    self.st.bright = Some(v);
+                    crate::bright::set(v);
+                    self.dirty(&SKind::Popup);
+                    if self.st.set.on_bar("bright") {
+                        self.dirty(&SKind::Bar);
+                    }
                 }
             }
             Act::MicSlider | Act::MicMute => {
@@ -333,6 +380,14 @@ impl App {
                     let c = self.st.launcher.cur as i32 + if up { -1 } else { 1 };
                     self.st.launcher.cur = c.clamp(0, n as i32 - 1) as usize;
                     self.st.launcher.keep_visible();
+                    self.dirty(&SKind::Modal);
+                }
+            }
+            Act::ShareScroll => {
+                let n = self.st.share.files.len();
+                if n > 4 {
+                    let s = self.st.share.scroll as i32 + if up { -1 } else { 1 };
+                    self.st.share.scroll = s.clamp(0, (n - 4) as i32) as usize;
                     self.dirty(&SKind::Modal);
                 }
             }

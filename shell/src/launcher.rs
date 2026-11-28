@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-pub const SIZE: (i32, i32) = (648, 478);
+pub const SIZE: (i32, i32) = (720, 478);
 const ROW: i32 = 30;
 pub const ROWS: usize = 11;
 /// миниатюра картинки из буфера в строке списка
@@ -65,12 +65,21 @@ pub struct Pin {
     pub ts: i64,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LTab {
+    #[default]
+    Apps,
+    Clip,
+    Share,
+}
+
 #[derive(Default)]
 pub struct LState {
     pub field: Field,
+    pub port_field: Field,
     pub cur: usize,
     pub scroll: usize,
-    pub clip: bool,
+    pub tab: LTab,
     pub clip_lines: Vec<String>,
     pub pins: Vec<Pin>,
     pub confirm_wipe: Option<Instant>,
@@ -85,6 +94,7 @@ pub struct LState {
     pub thumbs: HashMap<String, Option<Img>>,
     /// номер нити миниатюр: закрыли лаунчер — старая нить бросает работу
     pub tgen: Arc<AtomicU64>,
+    pub clip_qr: Option<Result<crate::share::QrCode, &'static str>>,
 }
 
 /// откуда взять картинку для миниатюры
@@ -172,21 +182,23 @@ fn score(hay: &str, q: &str) -> i32 {
 }
 
 impl LState {
-    pub fn open(&mut self, clip: bool, apps: &[DApp], wins: &[Win]) {
+    pub fn open(&mut self, tab: LTab, apps: &[DApp], wins: &[Win]) {
         self.field.clear();
         self.cur = 0;
         self.scroll = 0;
-        self.clip = clip;
+        self.tab = tab;
         self.confirm_wipe = None;
         self.counts = std::fs::read_to_string(config::state_dir().join("launch.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
         self.load_pins();
         self.files = (String::new(), vec![]);
+        self.clip_qr = None;
         self.refresh(apps, wins);
     }
-    pub fn set_mode(&mut self, clip: bool, apps: &[DApp], wins: &[Win]) {
-        self.clip = clip;
+    pub fn set_tab(&mut self, tab: LTab, apps: &[DApp], wins: &[Win]) {
+        self.tab = tab;
         self.cur = 0;
         self.scroll = 0;
+        self.clip_qr = None;
         self.refresh(apps, wins);
     }
     /// выбранная строка всегда в видимой части списка
@@ -247,16 +259,21 @@ impl LState {
     }
 
     pub fn refresh(&mut self, apps: &[DApp], wins: &[Win]) {
+        if self.tab == LTab::Share {
+            self.items.clear();
+            self.cur = 0;
+            return;
+        }
         let q = self.field.text.trim().to_lowercase();
         let mut out: Vec<Item> = vec![];
-        if !self.clip {
+        if self.tab == LTab::Apps {
             if let Some(items) = self.prefixed(&q) {
                 self.items = items;
                 self.cur = self.cur.min(self.items.len().saturating_sub(1));
                 return;
             }
         }
-        if self.clip {
+        if self.tab == LTab::Clip {
             for p in &self.pins {
                 if q.is_empty() || p.name.to_lowercase().contains(&q) {
                     out.push(Item { kind: Kind::Pin(p.id.clone()), name: p.name.clone(), sub: if p.image { "картинка".into() } else { String::new() }, icon: "pin".into() });
@@ -625,11 +642,148 @@ impl App {
         }
     }
 
+    pub fn launcher_qr(&mut self, i: usize) {
+        let Some(it) = self.st.launcher.items.get(i).cloned() else { return };
+        match it.kind {
+            Kind::Pin(id) => {
+                let Some(p) = self.st.launcher.pins.iter().find(|p| p.id == id).cloned() else { return };
+                let path = clip_dir().join(&p.file);
+                if p.image {
+                    if path.is_file() {
+                        self.st.share.add_files(vec![path]);
+                        if !self.st.share.active {
+                            self.st.share.start(self.st.set.share_port, &self.st.t, self.tx.clone());
+                        }
+                        self.open_launcher(LTab::Share);
+                    }
+                } else if let Ok(data) = std::fs::read(&path) {
+                    self.st.launcher.clip_qr = Some(clip_text_qr(&data));
+                    self.dirty(&SKind::Modal);
+                }
+            }
+            Kind::Clip(line) => {
+                let data = cliphist(&["decode"], &line);
+                if data.is_empty() {
+                    return;
+                }
+                let (_, ext) = mime_of(&data);
+                if ext != "txt" {
+                    let dir = std::env::temp_dir().join("yami-share-clip");
+                    if attach_clip_bytes_to_share(&mut self.st.share, &dir, &data, ext) {
+                        if !self.st.share.active {
+                            self.st.share.start(self.st.set.share_port, &self.st.t, self.tx.clone());
+                        }
+                        self.open_launcher(LTab::Share);
+                    }
+                } else {
+                    self.st.launcher.clip_qr = Some(clip_text_qr(&data));
+                    self.dirty(&SKind::Modal);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn parse_share_port(&mut self) -> Option<u16> {
+        match self.st.launcher.port_field.text.trim().parse::<u16>() {
+            Ok(p) if p >= 1024 => Some(p),
+            _ => {
+                self.st.share.error = crate::i18n::tr("порт: 1024–65535").to_string();
+                self.dirty(&SKind::Modal);
+                None
+            }
+        }
+    }
+
+    fn apply_share_port(&mut self, port: u16) {
+        self.st.set.share_port = port;
+        self.save_now();
+        self.st.share.fw_error.clear();
+        self.st.share.fw_note.clear();
+        if crate::proc::have("ufw") && crate::proc::have("pkexec") {
+            self.close_modal();
+        }
+        self.st.share.fw_busy = true;
+        crate::share::apply_ufw_rule(port, self.tx.clone());
+    }
+
+    pub fn share_toggle(&mut self) {
+        if self.st.share.active {
+            self.st.share.stop();
+        } else {
+            let Some(port) = self.parse_share_port() else { return };
+            if port != self.st.set.share_port {
+                self.apply_share_port(port);
+            }
+            self.st.share.start(port, &self.st.t, self.tx.clone());
+        }
+        if self.st.modal.is_some() {
+            self.dirty(&SKind::Modal);
+        }
+    }
+
+    pub fn share_apply_port(&mut self) {
+        let Some(port) = self.parse_share_port() else { return };
+        self.st.share.error.clear();
+        self.apply_share_port(port);
+        if self.st.modal.is_some() {
+            self.dirty(&SKind::Modal);
+        }
+    }
+
+    pub fn share_copy(&self) {
+        if !self.st.share.url.is_empty() {
+            let u = self.st.share.url.clone();
+            std::thread::spawn(move || wl_copy(u.into_bytes(), "text/plain;charset=utf-8"));
+        }
+    }
+
+    pub fn share_pick(&mut self) {
+        self.close_modal();
+        let tx = self.tx.clone();
+        let from = yami_px::paths::home();
+        let title = crate::i18n::tr("выбрать файлы").to_string();
+        std::thread::spawn(move || {
+            let paths = crate::proc::files_pick_many(&from, &title);
+            let _ = tx.send(Msg::SharePicked(paths));
+        });
+    }
+
     pub fn launcher_key(&mut self, e: &KeyEvent) {
+        if self.st.launcher.tab == LTab::Share && self.st.field_focus == Some("share_port") {
+            match e.keysym {
+                Keysym::Escape => self.st.field_focus = None,
+                Keysym::Return | Keysym::KP_Enter => {
+                    self.st.field_focus = None;
+                    self.share_apply_port();
+                    return;
+                }
+                _ => {
+                    let mods = self.mods;
+                    if App::edit_field(&mut self.st.launcher.port_field, e, &mods) {
+                        self.st.launcher.port_field.text.retain(|c| c.is_ascii_digit());
+                        self.st.launcher.port_field.text.truncate(5);
+                        let len = self.st.launcher.port_field.text.len();
+                        self.st.launcher.port_field.cur = self.st.launcher.port_field.cur.min(len);
+                    }
+                }
+            }
+            self.dirty(&SKind::Modal);
+            return;
+        }
         let l = &mut self.st.launcher;
+        if l.tab == LTab::Clip && l.clip_qr.is_some() && e.keysym == Keysym::Escape {
+            l.clip_qr = None;
+            self.dirty(&SKind::Modal);
+            return;
+        }
         let n = l.items.len();
         match e.keysym {
             Keysym::Escape => self.close_modal(),
+            Keysym::Return | Keysym::KP_Enter if l.tab == LTab::Share => {
+                self.share_toggle();
+                return;
+            }
             Keysym::Return | Keysym::KP_Enter => {
                 let c = l.cur;
                 self.launcher_run(c);
@@ -639,18 +793,23 @@ impl App {
             Keysym::Page_Down => l.cur = (l.cur + 10).min(n.saturating_sub(1)),
             Keysym::Page_Up => l.cur = l.cur.saturating_sub(10),
             Keysym::Tab | Keysym::ISO_Left_Tab => {
-                let c = !l.clip;
-                l.set_mode(c, &self.st.apps, &self.st.niri.wins);
-                if c {
+                let back = e.keysym == Keysym::ISO_Left_Tab || self.mods.shift;
+                let next = match (l.tab, back) {
+                    (LTab::Apps, false) | (LTab::Share, true) => LTab::Clip,
+                    (LTab::Clip, false) | (LTab::Apps, true) => LTab::Share,
+                    (LTab::Share, false) | (LTab::Clip, true) => LTab::Apps,
+                };
+                l.set_tab(next, &self.st.apps, &self.st.niri.wins);
+                if next == LTab::Clip {
                     load_clip(self.tx.clone());
                 }
             }
-            Keysym::Delete if l.clip && l.field.cur == l.field.text.chars().count() => {
+            Keysym::Delete if l.tab == LTab::Clip && l.field.cur == l.field.text.chars().count() => {
                 let c = l.cur;
                 self.launcher_del(c);
             }
             // Ctrl+P и Ctrl+C — в любой раскладке (keys::latin_letter)
-            _ if self.mods.ctrl && l.clip && crate::keys::latin_letter(e) == Some('P') => {
+            _ if self.mods.ctrl && l.tab == LTab::Clip && crate::keys::latin_letter(e) == Some('P') => {
                 let c = l.cur;
                 self.launcher_pin(c);
             }
@@ -664,12 +823,13 @@ impl App {
                     std::thread::spawn(move || wl_copy(t.into_bytes(), "text/plain;charset=utf-8"));
                 }
             }
-            _ => {
+            _ if l.tab != LTab::Share => {
                 let mods = self.mods;
                 if App::edit_field(&mut self.st.launcher.field, e, &mods) {
                     self.launcher_typed();
                 }
             }
+            _ => {}
         }
         self.st.launcher.keep_visible();
         self.dirty(&SKind::Modal);
@@ -681,7 +841,7 @@ impl App {
         l.cur = 0;
         l.scroll = 0;
         let q = l.field.text.trim();
-        if !l.clip && q.starts_with('/') {
+        if l.tab == LTab::Apps && q.starts_with('/') {
             let rest = q[1..].trim().to_lowercase();
             if rest != l.files.0 {
                 find_files(self.tx.clone(), l.fgen.clone(), rest);
@@ -708,7 +868,16 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     ui.frame(fr, true);
     // шапка
     let head = R::new(1, 1, fr.w - 2, 30);
-    ui.header(head, "", if l.clip { "буфер обмена" } else { "программы" }, &l.items.len().to_string());
+    let title = match l.tab {
+        LTab::Apps => "программы",
+        LTab::Clip => "буфер обмена",
+        LTab::Share => "обмен",
+    };
+    let count = match l.tab {
+        LTab::Share => if st.share.active { st.share.files.len().to_string() } else { String::new() },
+        _ => l.items.len().to_string(),
+    };
+    ui.header(head, "", title, &count);
     let mut bx = head.right() - 6;
     let mut btn = |ui: &mut Ui, label: &str, icon: &str, tone: Tone, sel: bool, act: Act| {
         let bw = if label.is_empty() { 22 } else { ui.w(PX, label) + 12 + if icon.is_empty() { 0 } else { 18 } };
@@ -717,17 +886,22 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
         bx -= 6;
     };
     btn(ui, "", "close", Tone::Danger, false, Act::CloseModal);
-    btn(ui, "БУФЕР", "", Tone::Plain, l.clip, Act::LTab(true));
-    btn(ui, "ПРОГРАММЫ", "", Tone::Plain, !l.clip, Act::LTab(false));
-    if l.clip {
+    btn(ui, "ОБМЕН", "", Tone::Plain, l.tab == LTab::Share, Act::LTab(LTab::Share));
+    btn(ui, "БУФЕР", "", Tone::Plain, l.tab == LTab::Clip, Act::LTab(LTab::Clip));
+    btn(ui, "ПРОГРАММЫ", "", Tone::Plain, l.tab == LTab::Apps, Act::LTab(LTab::Apps));
+    if l.tab == LTab::Clip {
         let wiping = l.confirm_wipe.map(|t| t.elapsed().as_secs() < 3).unwrap_or(false);
         btn(ui, if wiping { "точно? ещё раз" } else { "очистить" }, "trash", Tone::Danger, false, Act::LWipe);
+    }
+    if l.tab == LTab::Share {
+        draw_share(ui, st, fr, head);
+        return;
     }
 
     // поиск
     let fx = 14;
     let field = R::new(fx, head.bottom() + 13, fr.w - 28, 32);
-    ui.field(field, &l.field, if l.clip { "ищи в буфере… Enter — скопировать" } else { "напиши… Enter — запустить" }, true, false, Act::Block);
+    ui.field(field, &l.field, if l.tab == LTab::Clip { "ищи в буфере… Enter — скопировать" } else { "напиши… Enter — запустить" }, true, false, Act::Block);
 
     // список
     let list = R::new(fx, field.bottom() + 8, fr.w - 28, fr.h - field.bottom() - 8 - 34);
@@ -763,7 +937,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
             Kind::Clip(_) => {}
         }
         // картинка из буфера: миниатюра (пока не готова или не декодируется — значок)
-        let thumb = l.clip.then(|| thumb_key(l, &it.kind)).flatten();
+        let thumb = (l.tab == LTab::Clip).then(|| thumb_key(l, &it.kind)).flatten();
         if let Some(k) = &thumb {
             let b = R::new(x, cy - TH / 2 - 1, TW + 2, TH + 2);
             ui.cv.fill(b, t.border);
@@ -778,7 +952,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
         }
         let label = thumb.as_ref().and_then(|_| binary_label(&it.name));
         let name = label.as_deref().unwrap_or(&it.name);
-        let maxw = if l.clip { list.w - (x - r.x) - 70 } else { list.w - 230 };
+        let maxw = if l.tab == LTab::Clip { list.w - (x - r.x) - 96 } else { list.w - 230 };
         // имена программ, окон, файлов и команды — как есть, без перевода интерфейса
         let raw = !matches!(it.kind, Kind::Sys(_));
         let nw = if raw { ui.f.width(PX, name) } else { ui.w(PX, name) }.min(maxw);
@@ -798,9 +972,10 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
                 ui.text_in(PX, sr, &it.sub, sc);
             }
         }
-        // в буфере: закрепить и удалить на выбранной строке
-        if l.clip && (cur || hov) {
+        // in clipboard: qr/share, pin and delete on the selected row
+        if l.tab == LTab::Clip && (cur || hov) {
             let pinned = matches!(it.kind, Kind::Pin(_));
+            ui.button(R::new(r.right() - 80, r.y + 3, 24, 22), "", "qr", Tone::Ghost, false, true, Act::LQr(vi));
             ui.button(R::new(r.right() - 54, r.y + 3, 24, 22), "", "pin", Tone::Ghost, pinned, true, Act::LPin(vi));
             ui.button(R::new(r.right() - 28, r.y + 3, 24, 22), "", "trash", Tone::Ghost, false, true, Act::LDel(vi));
         }
@@ -808,7 +983,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     ui.cv.pop_clip();
     if l.items.is_empty() {
         let q = l.field.text.trim();
-        let msg = if l.clip {
+        let msg = if l.tab == LTab::Clip {
             "буфер пуст"
         } else if q.starts_with('/') && q.len() > 1 && l.files.0 != q[1..].trim().to_lowercase() {
             "ищу файлы…"
@@ -823,6 +998,258 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     }
 
     // строка подсказок внизу
-    let hint = if l.clip { "Enter — скопировать · Ctrl+P — закрепить · Del — удалить · Tab — программы" } else { "Enter — запустить · = считать · > команда · / файлы · ? настройки · Tab — буфер" };
+    let hint = if l.tab == LTab::Clip { "Enter — скопировать · Ctrl+P — закрепить · Del — удалить · Tab — обмен" } else { "Enter — запустить · = считать · > команда · / файлы · ? настройки · Tab — буфер" };
     ui.text_in(PX, R::new(fx, fr.h - 30, fr.w - 28, 20), hint, t.text_faint);
+
+    if l.tab == LTab::Clip {
+        if let Some(res) = &l.clip_qr {
+            ui.zone(fr, Act::LQrClose, Cur::Default);
+            let _card = match res {
+                Ok(qr) => {
+                    let cell = (220 / (qr.size as i32 + 4)).max(3);
+                    let qpx = (qr.size as i32 + 4) * cell;
+                    let cw = qpx + 28;
+                    let ch = qpx + 28;
+                    let card = R::new(fr.x + (fr.w - cw) / 2, fr.y + (fr.h - ch) / 2, cw, ch);
+                    ui.cv.pxbox(card, &BoxStyle::new(t.panel, t.border));
+                    ui.zone(card, Act::Block, Cur::Default);
+                    draw_qr_box(ui, qr, card.x + (card.w - qpx) / 2, card.y + 14, cell);
+                    card
+                }
+                Err(msg) => {
+                    let cw = (ui.w(PX, msg) + 32).max(240);
+                    let card = R::new(fr.x + (fr.w - cw) / 2, fr.y + (fr.h - 68) / 2, cw, 68);
+                    ui.cv.pxbox(card, &BoxStyle::new(t.panel, t.border));
+                    ui.zone(card, Act::Block, Cur::Default);
+                    ui.text_center(PX, R::new(card.x + 12, card.y + 24, card.w - 24, 20), msg, t.red);
+                    card
+                }
+            };
+        }
+    }
+}
+
+fn draw_qr_box(ui: &mut Ui, qr: &crate::share::QrCode, qx: i32, qy: i32, cell: i32) -> i32 {
+    let qpx = (qr.size as i32 + 4) * cell;
+    ui.cv.fill(R::new(qx, qy, qpx, qpx), yami_px::gfx::C(0xffffffff));
+    for y in 0..qr.size {
+        for x in 0..qr.size {
+            if qr.modules[y * qr.size + x] {
+                ui.cv.fill(R::new(qx + (x as i32 + 2) * cell, qy + (y as i32 + 2) * cell, cell, cell), yami_px::gfx::C(0xff000000));
+            }
+        }
+    }
+    qpx
+}
+
+fn draw_share(ui: &mut Ui, st: &State, fr: R, head: R) {
+    let t = ui.t;
+    let sh = &st.share;
+    let fx = 14;
+    let body = R::new(fx, head.bottom() + 12, fr.w - 28, fr.h - head.bottom() - 44);
+
+    if !sh.active {
+        let card = R::new(body.x, body.y + 14, body.w, 274);
+        ui.cv.pxbox(card, &BoxStyle::new(t.surface, t.border));
+        ui.cv.icon("qr", card.x + (card.w - 28) / 2, card.y + 20, 4, t.red);
+        ui.text_center(PX, R::new(card.x + 12, card.y + 62, card.w - 24, 22), "обмен выключен", t.text_hi);
+        ui.text_center(PX, R::new(card.x + 12, card.y + 86, card.w - 24, 20), "сканируй телефоном в одной Wi-Fi сети", t.text_dim);
+
+        let port_lbl_w = ui.w(PX, "порт") + 10;
+        let apply_w = ui.w(PX, if sh.fw_busy { "…" } else { "применить" }) + 20;
+        let field_w = 88;
+        let row_w = port_lbl_w + field_w + apply_w + 16;
+        let px0 = card.x + (card.w - row_w) / 2;
+        let py0 = card.y + 118;
+        ui.text_in(PX, R::new(px0, py0 + 4, port_lbl_w, 20), "порт", t.text_dim);
+        ui.field(R::new(px0 + port_lbl_w, py0, field_w, 28), &st.launcher.port_field, "45837", st.field_focus == Some("share_port"), false, Act::SharePortFocus);
+        ui.button(R::new(px0 + port_lbl_w + field_w + 8, py0 + 1, apply_w, 26), if sh.fw_busy { "…" } else { "применить" }, "", Tone::Plain, false, !sh.fw_busy, Act::SharePortApply);
+
+        let (msg, col) = if !sh.error.is_empty() {
+            (sh.error.as_str(), t.red)
+        } else if !sh.fw_error.is_empty() {
+            (sh.fw_error.as_str(), t.red)
+        } else if !sh.fw_note.is_empty() {
+            (sh.fw_note.as_str(), t.ok)
+        } else {
+            ("", t.text_dim)
+        };
+        if !msg.is_empty() {
+            let mw = ui.f.width(PX, msg);
+            ui.cv.text_in(ui.f, PX, R::new(card.x + ((card.w - mw) / 2).max(12), card.y + 156, card.w - 24, 20), msg, col);
+        } else if !sh.files.is_empty() {
+            let msg = crate::tf!("выбрано файлов: {}", "selected files: {}", "arquivos selecionados: {}", sh.files.len());
+            let mw = ui.f.width(PX, &msg);
+            ui.cv.text_in(ui.f, PX, R::new(card.x + (card.w - mw) / 2, card.y + 156, card.w - 40, 20), &msg, t.text_dim);
+        }
+        let bw1 = ui.w(PX, "включить обмен") + 28;
+        let bw2 = ui.w(PX, "выбрать файлы") + 28;
+        let bx = card.x + (card.w - bw1 - bw2 - 12) / 2;
+        ui.button(R::new(bx, card.y + 190, bw1, 30), "включить обмен", "wifi", Tone::Plain, true, true, Act::ShareToggle);
+        ui.button(R::new(bx + bw1 + 12, card.y + 190, bw2, 30), "выбрать файлы", "plus", Tone::Plain, false, true, Act::SharePick);
+        ui.text_in(PX, R::new(fx, fr.h - 30, fr.w - 28, 20), "Enter / клик — включить · Tab — программы", t.text_faint);
+        return;
+    }
+
+    // Active status bar
+    let bar = R::new(body.x, body.y, body.w, 30);
+    ui.cv.pxbox(bar, &BoxStyle::new(t.surface, t.border));
+    ui.cv.fill(R::new(bar.x + 10, bar.y + 11, 8, 8), t.ok);
+    let stop_w = ui.w(PX, "остановить") + 26;
+    let copy_w = 24;
+    let url_r = R::new(bar.x + 26, bar.y + 4, bar.w - stop_w - copy_w - 44, 22);
+    ui.cv.text_in(ui.f, PX, url_r, &sh.url, t.text_hi);
+    ui.button(R::new(bar.right() - stop_w - copy_w - 12, bar.y + 4, copy_w, 22), "", "copy", Tone::Ghost, false, true, Act::ShareCopy);
+    ui.button(R::new(bar.right() - stop_w - 6, bar.y + 4, stop_w, 22), "остановить", "stop", Tone::Danger, false, true, Act::ShareToggle);
+
+    // Left column: QR code
+    let qr_box = R::new(body.x, bar.bottom() + 10, 196, body.h - 40);
+    ui.cv.pxbox(qr_box, &BoxStyle::new(t.surface, t.border));
+    if let Some(qr) = &sh.qr {
+        let cell = ((qr_box.w - 20) / (qr.size as i32 + 4)).max(3);
+        let qpx = (qr.size as i32 + 4) * cell;
+        let qx = qr_box.x + (qr_box.w - qpx) / 2;
+        let qy = qr_box.y + 12;
+        draw_qr_box(ui, qr, qx, qy, cell);
+        ui.wrap(PX, R::new(qr_box.x + 8, qy + qpx + 8, qr_box.w - 16, 40), "сканируй телефоном в одной Wi-Fi сети", t.text_dim, 2);
+    }
+
+    // Right column: PC -> mobile files + Transfers
+    let rx = qr_box.right() + 10;
+    let rw = body.right() - rx;
+    let files_box = R::new(rx, bar.bottom() + 10, rw, 174);
+    ui.cv.pxbox(files_box, &BoxStyle::new(t.surface, t.border));
+    let add_w = ui.w(PX, "добавить файлы") + 24;
+    ui.text_in(PX, R::new(files_box.x + 10, files_box.y + 6, files_box.w - add_w - 48, 20), "файлы для отправки", t.text_hi);
+    ui.button(R::new(files_box.right() - add_w - 34, files_box.y + 5, add_w, 22), "добавить файлы", "plus", Tone::Plain, false, true, Act::SharePick);
+    ui.button(R::new(files_box.right() - 28, files_box.y + 5, 22, 22), "", "trash", Tone::Ghost, false, !sh.files.is_empty(), Act::ShareClear);
+
+    let list_r = R::new(files_box.x + 6, files_box.y + 32, files_box.w - 12, files_box.h - 38);
+    ui.zone(list_r, Act::ShareScroll, Cur::Default);
+    ui.cv.push_clip(list_r);
+    if sh.files.is_empty() {
+        ui.text_center(PX, R::new(list_r.x, list_r.y + 44, list_r.w, 20), "выбрать файлы", t.text_faint);
+    } else {
+        let scroll = sh.scroll.min(sh.files.len().saturating_sub(5));
+        for (i, f) in sh.files.iter().enumerate().skip(scroll).take(5) {
+            let row = R::new(list_r.x, list_r.y + (i - scroll) as i32 * 26, list_r.w, 24);
+            let name = f.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            ui.cv.text_in(ui.f, PX, R::new(row.x + 4, row.y + 2, row.w - 30, 20), &name, t.text);
+            ui.button(R::new(row.right() - 24, row.y + 1, 22, 22), "", "close", Tone::Ghost, false, true, Act::ShareRemove(i));
+        }
+    }
+    ui.cv.pop_clip();
+
+    // Transfers box
+    let tr_box = R::new(rx, files_box.bottom() + 8, rw, body.bottom() - files_box.bottom() - 8);
+    ui.cv.pxbox(tr_box, &BoxStyle::new(t.surface, t.border));
+    let open_w = ui.w(PX, "папка загрузок") + 24;
+    let clr_w = ui.w(PX, "история") + 22;
+    ui.text_in(PX, R::new(tr_box.x + 10, tr_box.y + 6, tr_box.w - open_w - clr_w - 28, 20), "передачи", t.text_hi);
+    ui.button(R::new(tr_box.right() - open_w - clr_w - 12, tr_box.y + 5, clr_w, 22), "история", "trash", Tone::Ghost, false, !sh.history.is_empty(), Act::ShareClearHistory);
+    ui.button(R::new(tr_box.right() - open_w - 6, tr_box.y + 5, open_w, 22), "папка загрузок", "folder", Tone::Ghost, false, true, Act::ShareOpenDir);
+
+    let tr_list = R::new(tr_box.x + 6, tr_box.y + 32, tr_box.w - 12, tr_box.h - 38);
+    ui.cv.push_clip(tr_list);
+    if sh.active_transfers.is_empty() && sh.history.is_empty() {
+        ui.text_center(PX, R::new(tr_list.x, tr_list.y + 36, tr_list.w, 20), "нет передач", t.text_faint);
+    } else {
+        for (i, tr) in sh.active_transfers.iter().chain(sh.history.iter()).take(4).enumerate() {
+            let row = R::new(tr_list.x, tr_list.y + i as i32 * 26, tr_list.w, 24);
+            let arrow = if tr.upload { "↑" } else { "↓" };
+            let sz = fmt_size(tr.total);
+            let pct = if tr.total > 0 { ((tr.done * 100) / tr.total).min(100) } else { 100 };
+            let st_txt = match tr.status {
+                crate::share::TransferStatus::Active => format!("{pct}%"),
+                crate::share::TransferStatus::Done => crate::i18n::tr("готово").to_string(),
+                crate::share::TransferStatus::Failed => crate::i18n::tr("ошибка").to_string(),
+                crate::share::TransferStatus::Cancelled => crate::i18n::tr("отменено").to_string(),
+            };
+            let line = format!("{arrow} {} · {sz} · {st_txt}", tr.name);
+            let col = match tr.status {
+                crate::share::TransferStatus::Active => t.text_hi,
+                crate::share::TransferStatus::Done => t.ok,
+                crate::share::TransferStatus::Failed => t.red,
+                crate::share::TransferStatus::Cancelled => t.text_dim,
+            };
+            ui.cv.text_in(ui.f, PX, R::new(row.x + 4, row.y + 2, row.w - 8, 20), &line, col);
+        }
+    }
+    ui.cv.pop_clip();
+
+    ui.text_in(PX, R::new(fx, fr.h - 30, fr.w - 28, 20), "добавить файлы · остановить · Tab — программы", t.text_faint);
+}
+
+fn fmt_size(n: u64) -> String {
+    if n < 1024 {
+        format!("{n} B")
+    } else if n < 1024 * 1024 {
+        format!("{:.1} KB", n as f64 / 1024.0)
+    } else if n < 1024 * 1024 * 1024 {
+        format!("{:.1} MB", n as f64 / 1_048_576.0)
+    } else {
+        format!("{:.2} GB", n as f64 / 1_073_741_824.0)
+    }
+}
+
+pub fn clip_text_qr(data: &[u8]) -> Result<crate::share::QrCode, &'static str> {
+    let text = String::from_utf8_lossy(data);
+    if text.len() > 192 {
+        return Err("текст больше лимита QR");
+    }
+    crate::share::encode_qr(text.as_bytes()).map_err(|()| "не удалось создать QR-код")
+}
+
+pub fn attach_clip_bytes_to_share(share: &mut crate::share::ShareState, dir: &std::path::Path, data: &[u8], ext: &str) -> bool {
+    if data.is_empty() || std::fs::create_dir_all(dir).is_err() {
+        return false;
+    }
+    let path = dir.join(format!("clip-{:016x}.{ext}", yami_px::fnv(yami_px::FNV0, data)));
+    // Reuse existing cached file so repeated shares do not duplicate image data.
+    if !path.is_file() && std::fs::write(&path, data).is_err() {
+        return false;
+    }
+    share.add_files(vec![path]);
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clip_text_qr_encodes_and_rejects_oversize() {
+        let qr = clip_text_qr(b"hello clipboard").unwrap();
+        assert!(qr.size >= 21);
+        assert_eq!(qr.modules.len(), qr.size * qr.size);
+        let too_long = vec![b'a'; 193];
+        assert_eq!(clip_text_qr(&too_long).unwrap_err(), "текст больше лимита QR");
+    }
+
+    #[test]
+    fn clip_image_attaches_to_share_without_duplication_or_autostart() {
+        let dir = std::env::temp_dir().join(format!("yami-clip-share-test-{}", crate::share::gen_token()));
+        let mut share = crate::share::ShareState::default();
+        let png = b"\x89PNG\r\n\x1a\nfake";
+        assert!(attach_clip_bytes_to_share(&mut share, &dir, png, "png"));
+        assert!(attach_clip_bytes_to_share(&mut share, &dir, png, "png"));
+        assert_eq!(share.files.len(), 1);
+        assert!(!share.active);
+        assert!(!attach_clip_bytes_to_share(&mut share, &dir, b"", "png"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn clip_pinned_image_missing_file_is_ignored_and_tab_switches() {
+        let mut l = LState::default();
+        l.open(LTab::Clip, &[], &[]);
+        assert_eq!(l.tab, LTab::Clip);
+        let missing = std::env::temp_dir().join("yami-does-not-exist-12345.png");
+        let mut share = crate::share::ShareState::default();
+        share.add_files(vec![missing]);
+        assert!(share.files.is_empty());
+        l.set_tab(LTab::Share, &[], &[]);
+        assert_eq!(l.tab, LTab::Share);
+        assert!(l.clip_qr.is_none());
+    }
 }

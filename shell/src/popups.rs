@@ -11,7 +11,7 @@ use crate::widgets;
 use smithay_client_toolkit::seat::keyboard::{KeyEvent, Keysym};
 
 /// виды всплывашек: `popup KIND`, `yami open KIND`, shot
-pub const KINDS: &[&str] = &["cal", "sound", "media", "net", "bt", "sys", "profile", "tray", "weather", "privacy", "control"];
+pub const KINDS: &[&str] = &["cal", "sound", "bright", "media", "net", "bt", "sys", "profile", "tray", "weather", "privacy", "control"];
 
 impl State {
     /// открыта всплывашка этого вида
@@ -59,6 +59,15 @@ pub fn size(kind: &str, st: &State) -> (i32, i32) {
             let ports = sink_ports(st).map_or(0, |s| list(s.ports.len()));
             (420, 44 + 56 + list(st.audio.sinks.len()) + ports + 60 + list(st.audio.sources.len()) + if apps > 0 { 30 + apps * 46 } else { 0 } + media + 50)
         }
+        "bright" => {
+            let b_row = if st.bright.is_some() { 50 } else { 0 };
+            let scale = if crate::displays::target_output(&st.disp.outs, st.popup.as_ref().map(|p| p.at.0.as_str()), st.disp.sel).is_some() {
+                16 + 24 + 28 + if st.disp.edited || st.disp.revert.is_some() { 38 } else { 0 }
+            } else {
+                0
+            };
+            (420, 44 + b_row + 50 + scale + 20)
+        }
         "media" => {
             let time = if st.media.length > 0.0 { 24 } else { 0 };
             let card = match media_view(st) {
@@ -104,6 +113,7 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     match p.kind {
         "cal" => cal(ui, st, body),
         "sound" => sound(ui, st, body),
+        "bright" => bright(ui, st, body),
         "media" => media(ui, st, body),
         "net" => net(ui, st, body),
         "bt" => bt(ui, st, body),
@@ -280,6 +290,46 @@ fn sound(ui: &mut Ui, st: &State, b: R) {
         widgets::media_card(ui, st, R::new(b.x, y, b.w, 150), &st.set.media_viz, t.red, true, true);
     }
     ui.button(R::new(b.x, b.bottom() - 28, b.w, 28), "микшер pavucontrol", "speaker", Tone::Plain, false, true, Act::Pavu);
+}
+
+// ── display ─────────────────────────────────────────────────────────────────
+fn bright(ui: &mut Ui, st: &State, b: R) {
+    let t = ui.t;
+    let mut y = head(ui, b, "screen", "экран", "");
+    if let Some(v) = st.bright {
+        ui.cv.icon("sun", b.x + 4, y + 18, 2, t.red);
+        ui.slider(R::new(b.x + 34, y, b.w - 34, 40), "яркость", v, &format!("{}%", (v * 100.0).round()), 20, Act::BrightSlider);
+        y += 50;
+    }
+    let nt = ((st.set.night_temp as f32 - 2500.0) / 3500.0).clamp(0.0, 1.0);
+    ui.button(R::new(b.x, y + 18, 26, 22), "", "moon", Tone::Ghost, st.set.night, true, Act::NightManual);
+    ui.slider(R::new(b.x + 34, y, b.w - 34, 40), "ночной свет", nt, &format!("{} K", st.set.night_temp), 14, Act::SSlider("night_temp", 2500.0, 6000.0, 14));
+    y += 50;
+    if let Some(o) = crate::displays::target_output(&st.disp.outs, st.popup.as_ref().map(|p| p.at.0.as_str()), st.disp.sel) {
+        y += 6;
+        ui.cv.fill(R::new(b.x, y, b.w, 1), t.border);
+        y += 10;
+        ui.text_in(PX, R::new(b.x, y, b.w / 2, 20), "масштаб", t.text_dim);
+        ui.text_right(PX, R::new(b.x, y, b.w, 20), &o.name, t.text_faint);
+        y += 24;
+        let gap = 6;
+        let n = crate::displays::PRESETS.len() as i32;
+        let bw = (b.w - (n - 1) * gap) / n;
+        for (i, &s) in crate::displays::PRESETS.iter().enumerate() {
+            let on = (o.scale - s).abs() < 0.01;
+            let lbl = format!("{s}x");
+            ui.button(R::new(b.x + i as i32 * (bw + gap), y, bw, 28), &lbl, "", Tone::Plain, on, true, Act::DispScale(s));
+        }
+        y += 36;
+        if st.disp.edited || st.disp.revert.is_some() {
+            if let Some((_, at)) = &st.disp.revert {
+                let left = at.saturating_duration_since(std::time::Instant::now()).as_secs();
+                ui.text_in(PX, R::new(b.x, y, b.w - 196, 28), &crate::tf!("оставить? откат через {} с", "keep it? reverting in {} s", "manter? revertendo em {} s", left), t.ember);
+            }
+            ui.button(R::new(b.right() - 190, y, 92, 28), "вернуть", "reboot", Tone::Plain, false, true, Act::Disp("revert"));
+            ui.button(R::new(b.right() - 92, y, 92, 28), "оставить", "check", Tone::Primary, false, true, Act::Disp("keep"));
+        }
+    }
 }
 
 /// выбор устройства (выход или микрофон), когда их больше одного

@@ -86,6 +86,7 @@ impl crate::app::App {
             c if c.starts_with("launcher ") => self.launcher_with(c["launcher ".len()..].trim()),
             "night" => self.night_toggle(),
             "clipboard" => self.toggle_modal(Modal::Launcher, true),
+            "share" => self.open_launcher(crate::launcher::LTab::Share),
             "power" => self.toggle_modal(Modal::Power, false),
             "settings" => self.toggle_modal(Modal::Settings, false),
             "walls" => self.walls_open(false),
@@ -149,6 +150,7 @@ impl crate::app::App {
             }
             // следующий профиль питания (для хоткея)
             "profile" => self.prof_step(1),
+            c if c.starts_with("bright ") => self.bright_cmd(&c["bright ".len()..]),
             c if c.starts_with("popup ") => {
                 let kind = crate::popups::KINDS.iter().copied().find(|k| *k == &c[6..]).unwrap_or("sys");
                 // из терминала или хоткея: у правого (бокового — у нижнего) конца бара

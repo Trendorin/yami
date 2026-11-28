@@ -37,6 +37,7 @@ impl App {
         }
         // тот же разбор, что у модулей: шелл и модули не могут разойтись во внешности
         self.st.t = yami_px::look::Look::from_json(&s.style_value(), Some(s.light)).theme;
+        self.st.share.set_theme(&self.st.t);
         crate::prefs::write_style(s);
         // уход карточек уведомлений (настройки → анимации)
         self.st.notifs.leave_s = crate::notif::leave_s(s);
@@ -148,8 +149,19 @@ impl App {
             self.set_pixel_level(v.round().clamp(0.0, 3.0) as usize);
             return;
         }
+        if key == "night_temp" {
+            if crate::doctor::which("wlsunset") {
+                self.st.set.night = true;
+                self.st.night.manual = true;
+            } else if !self.st.set.night {
+                self.toast_note("ночной свет", "нужен wlsunset: поставь его из своего дистрибутива");
+            }
+        }
         crate::prefs::settings_set_f32(&mut self.st.set, key, v);
         self.settings_changed();
+        if self.st.popup_is("bright") {
+            self.dirty(&SKind::Popup);
+        }
     }
 
     /// пиксельность одним ползунком (настройки → вид): шрифты шелла, файлов, просмотра и программ,
@@ -261,6 +273,7 @@ pub fn settings_set_f32(s: &mut Settings, key: &str, v: f32) {
         "greet_dim" => s.greet_dim = ((v * 20.0).round() / 20.0).clamp(0.2, 0.9),
         "greet_off" => s.greet_off = v.round() as u32,
         "curtain_cell" => s.curtain_cell = ((v / 4.0).round() * 4.0) as i32,
+        "night_temp" => s.night_temp = ((v / 250.0).round() as i32 * 250).clamp(2500, 6000),
         _ => {}
     }
 }
@@ -286,6 +299,7 @@ pub fn settings_get_f32(s: &Settings, key: &str) -> f32 {
         "greet_dim" => s.greet_dim,
         "greet_off" => s.greet_off as f32,
         "curtain_cell" => s.curtain_cell as f32,
+        "night_temp" => s.night_temp as f32,
         _ => 0.0,
     }
 }

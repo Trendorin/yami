@@ -74,7 +74,7 @@ fn help(y: &Sty, me: &str) {
     banner(y);
     println!("\n {}  {me} {} {}", y.dim(&crate::tf!("как", "usage", "uso")), y.acc(&crate::tf!("<команда>", "<command>", "<comando>")), y.dim(&crate::tf!("[аргументы]", "[args]", "[argumentos]")));
     y.section(&crate::tf!("сеанс", "session", "sessão"));
-    y.row("open <panel>", &crate::tf!("launcher clipboard settings[:вкладка] power lock screenshot …", "launcher clipboard settings[:tab] power lock screenshot …", "launcher clipboard settings[:tab] power lock screenshot …"));
+    y.row("open <panel>", &crate::tf!("launcher clipboard share settings[:вкладка] power lock screenshot …", "launcher clipboard share settings[:tab] power lock screenshot …", "launcher clipboard share settings[:tab] power lock screenshot …"));
     y.row("msg <cmd>", &crate::tf!("прямая команда шеллу (yami help msg)", "a raw command to the running shell (yami help msg)", "um comando direto para o shell em execução (yami help msg)"));
     y.row("setup [step]", &crate::tf!("первая настройка заново: язык, вид, бар, клавиши, niri, модули (шаг: modules, niri…)", "the first-run setup again: language, look, bar, keys, niri, modules (step: modules, niri…)", "a configuração inicial de novo: idioma, visual, barra, atalhos, niri, módulos (passo: modules, niri…)"));
     y.row("restart", &crate::tf!("перезапустить шелл (подождёт, если играешь)", "restart the shell (waits while you play)", "reiniciar o shell (aguarda enquanto você joga)"));
@@ -116,7 +116,7 @@ fn help(y: &Sty, me: &str) {
 fn help_msg(y: &Sty) {
     y.section(&crate::tf!("команды шеллу", "shell commands", "comandos do shell"));
     for (c, ru, en) in [
-        ("launcher | clipboard", "программы / буфер обмена", "apps / clipboard history"),
+        ("launcher | clipboard | share", "программы / буфер обмена / обмен", "apps / clipboard / share"),
         ("launcher TEXT", "программы с набранным текстом: ?настройка, /файл, >команда", "apps with the text typed in: ?setting, /file, >command"),
         ("settings [tab]", "настройки (на вкладке)", "settings (on a tab)"),
         ("power | lock", "питание / заблокировать", "power menu / lock"),
@@ -129,6 +129,7 @@ fn help_msg(y: &Sty) {
         ("walls", "выбор обоев: картинки папки обоев", "wallpaper picker: the wallpaper folder's pictures"),
         ("media play-pause|next|previous|player", "плееру, что в баре; player — другой плеер", "to the player shown in the bar; player switches to another one"),
         ("profile", "следующий профиль питания", "next power profile"),
+        ("bright +5|-5|N%", "яркость экрана и мониторов", "screen and monitor brightness"),
         ("night", "ночной свет вкл-выкл", "night light on-off"),
         ("reload | restart | quit", "перечитать настройки / перезапуск / выход", "reload settings / restart / quit"),
         ("ping", "жив ли шелл: ответит pong", "is the shell alive: answers pong"),
@@ -140,7 +141,7 @@ fn help_msg(y: &Sty) {
 
 fn help_open(y: &Sty) {
     y.section(&crate::tf!("что открыть", "what to open", "o que abrir"));
-    y.row("launcher clipboard power walls", "");
+    y.row("launcher clipboard share power walls", "");
     y.row("settings[:tab]", &crate::settings::tabs().map(|t| t.id).collect::<Vec<_>>().join(" "));
     y.row("screenshot[:area|window|screen]", "");
     y.row(&crate::popups::KINDS.join(" "), &crate::tf!("всплывашки бара", "bar popups", "painéis da barra"));
@@ -171,12 +172,13 @@ pub fn msg_ok(cmd: &str) -> bool {
     match head {
         // лаунчер с набранным текстом: любые слова
         "launcher" => true,
-        "clipboard" | "power" | "lock" | "bar" | "stacking" | "minimize" | "restore" | "edit" | "reload" | "quit" | "ping" | "restart" | "profile" | "night" | "walls" | "cast-hide" => one(&mut w),
+        "clipboard" | "share" | "power" | "lock" | "bar" | "stacking" | "minimize" | "restore" | "edit" | "reload" | "quit" | "ping" | "restart" | "profile" | "night" | "walls" | "cast-hide" => one(&mut w),
         "settings" => w.next().is_none_or(|t| crate::settings::find(t).is_some()) && one(&mut w),
         "welcome" => w.next().is_none_or(crate::welcome::has_step) && one(&mut w),
         "popup" => w.next().is_some_and(|k| crate::popups::KINDS.contains(&k)) && one(&mut w),
         "screenshot" => w.next().is_none_or(|m| matches!(m, "area" | "window" | "screen")) && w.next().is_none_or(|d| d.parse::<u32>().is_ok()) && one(&mut w),
         "curtain" => w.next().is_none_or(|a| matches!(a, "on" | "off" | "toggle")) && one(&mut w),
+        "bright" => w.next().is_some_and(|a| matches!(a, "up" | "down") || a.trim_end_matches('%').parse::<f32>().is_ok()) && one(&mut w),
         "media" => w.next().is_some_and(|a| matches!(a, "play-pause" | "play" | "pause" | "stop" | "next" | "previous" | "player")) && one(&mut w),
         // путь к картинке (с пробелами) или пусто — пиксельные из палитры
         "wallpaper" => true,
@@ -196,7 +198,7 @@ fn send(y: &Sty, cmd: &str) -> i32 {
 fn open(y: &Sty, what: &str) -> i32 {
     let (a, b) = what.split_once(':').unwrap_or((what, ""));
     let cmd = match a {
-        "launcher" | "clipboard" | "power" | "lock" | "walls" => a.to_string(),
+        "launcher" | "clipboard" | "share" | "power" | "lock" | "walls" => a.to_string(),
         "settings" if b.is_empty() => "settings".into(),
         "settings" => format!("settings {b}"),
         "screenshot" => format!("screenshot {}", if b.is_empty() { "area" } else { b }).trim().to_string(),

@@ -127,8 +127,11 @@ impl App {
             }
             Msg::Bright(v, show) => {
                 self.st.bright = Some(v);
-                if self.st.popup_is("control") {
+                if self.st.popup_is("control") || self.st.popup_is("bright") {
                     self.dirty(&SKind::Popup);
+                }
+                if self.st.set.on_bar("bright") {
+                    self.dirty(&SKind::Bar);
                 }
                 // в панели управления ползунок и так на виду — OSD поверх лишний
                 if show && self.st.set.osd_bright && !self.st.popup_is("control") {
@@ -170,7 +173,7 @@ impl App {
             Msg::ClipThumb(k, img) => {
                 if self.st.modal == Some(Modal::Launcher) {
                     self.st.launcher.thumbs.insert(k, img);
-                    if self.st.launcher.clip {
+                    if self.st.launcher.tab == crate::launcher::LTab::Clip {
                         self.dirty(&SKind::Modal);
                     }
                 }
@@ -227,6 +230,34 @@ impl App {
                 }
             }
             Msg::SetAdded(r) => self.sets_added(r),
+            Msg::ShareUpdate(ev) => {
+                self.st.share.apply_event(ev);
+                if self.st.modal == Some(Modal::Launcher) && self.st.launcher.tab == crate::launcher::LTab::Share {
+                    self.dirty(&SKind::Modal);
+                }
+            }
+            Msg::SharePicked(paths) => {
+                self.st.share.add_files(paths);
+                self.open_launcher(crate::launcher::LTab::Share);
+            }
+            Msg::ShareFw(res) => {
+                self.st.share.fw_busy = false;
+                match res {
+                    Ok(msg) => {
+                        self.st.share.fw_error.clear();
+                        self.st.share.fw_note = msg;
+                    }
+                    Err(err) => {
+                        self.st.share.fw_note.clear();
+                        self.st.share.fw_error = err;
+                    }
+                }
+                if self.st.modal.is_none() {
+                    self.open_launcher(crate::launcher::LTab::Share);
+                } else if self.st.modal == Some(Modal::Launcher) && self.st.launcher.tab == crate::launcher::LTab::Share {
+                    self.dirty(&SKind::Modal);
+                }
+            }
         }
     }
 

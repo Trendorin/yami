@@ -81,6 +81,7 @@ mod settabs;
 mod skwd;
 mod screenmap;
 mod settings;
+mod share;
 mod shot;
 mod shotcfg;
 mod sys;

@@ -51,6 +51,7 @@ const TARGETS: &[&str] = &[
     "settings:bt",
     "settings:about",
     "launcher",
+    "share",
     "launcher:calc",
     "launcher:find",
     "launcher:win",
@@ -489,9 +490,21 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
             crate::welcome::mock(st, arg);
             crate::settings::SIZE
         }
-        "launcher" | "clipboard" => {
+        "launcher" | "clipboard" | "share" => {
             st.modal = Some(Modal::Launcher);
-            st.launcher.open(kind == "clipboard", &st.apps, &st.niri.wins);
+            let tab = match kind {
+                "clipboard" => crate::launcher::LTab::Clip,
+                "share" => crate::launcher::LTab::Share,
+                _ => crate::launcher::LTab::Apps,
+            };
+            st.launcher.open(tab, &st.apps, &st.niri.wins);
+            if kind == "share" {
+                st.share.active = true;
+                st.share.url = "http://192.168.1.42:43210/?t=0123456789abcdef0123456789abcdef".into();
+                st.share.qr = crate::share::encode_qr(st.share.url.as_bytes()).ok();
+                st.share.files = vec![crate::share::SharedFile { id: 1, path: std::path::PathBuf::from("/home/user/report.pdf") }];
+                st.share.history = vec![crate::share::Transfer { id: 1, name: "photo.jpg".into(), upload: true, done: 100, total: 100, status: crate::share::TransferStatus::Done }];
+            }
             if kind == "clipboard" {
                 // свой буфер, не владельца: текст, картинка с миниатюрой и картинка, что ещё декодируется
                 st.launcher.pins = vec![];
@@ -732,7 +745,7 @@ fn shoot(st: &mut State, res: &mut Res, target: &str, path: &Path) {
                 ui.cv.oy = 0;
             }
             "settings" | "welcome" => crate::settings::draw(&mut ui, st, w, h),
-            "launcher" | "clipboard" => crate::launcher::draw(&mut ui, st, w, h),
+            "launcher" | "clipboard" | "share" => crate::launcher::draw(&mut ui, st, w, h),
             "reply" => crate::reply::draw(&mut ui, st, w, h),
             "power" => crate::power::draw(&mut ui, st, w, h),
             "walls" => crate::walls::draw(&mut ui, st, w, h),

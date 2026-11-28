@@ -23,10 +23,22 @@ pub enum Act {
     Popup(&'static str),
     // лаунчер
     LRun(usize),
-    LTab(bool),
+    LTab(crate::launcher::LTab),
     LPin(usize),
     LDel(usize),
+    LQr(usize),
+    LQrClose,
     LWipe,
+    ShareToggle,
+    ShareCopy,
+    SharePick,
+    ShareRemove(usize),
+    ShareClear,
+    ShareOpenDir,
+    ShareScroll,
+    SharePortFocus,
+    SharePortApply,
+    ShareClearHistory,
     // питание
     PowerDo(usize),
     // настройки
@@ -89,6 +101,7 @@ pub enum Act {
     /// щелчок по модулю-скрипту: его команда
     Plug(String),
     NightToggle,
+    NightManual,
     ReplySend,
     SModDel(usize, usize),
     /// свои темы: применить, удалить (themetab.rs)
@@ -107,6 +120,7 @@ pub enum Act {
     // всплывашки
     CalMonth(i32),
     VolSlider,
+    BrightSlider,
     /// панель управления (control.rs): вертикальные ползунки громкости и яркости
     CtlVol,
     CtlBright,
@@ -181,6 +195,7 @@ pub enum Act {
     LockField,
     Prof(String),
     Disp(&'static str),
+    DispScale(f64),
     DispSel(usize),
     DispDrag(usize),
     // клавиши (keys.rs)
@@ -194,7 +209,7 @@ pub enum Act {
 
 impl Act {
     pub fn is_drag(&self) -> bool {
-        matches!(self, Act::SSlider(..) | Act::VolSlider | Act::CtlVol | Act::CtlBright | Act::MicSlider | Act::AppVol(_) | Act::MediaSeek | Act::TDrag(_) | Act::TSize(_) | Act::MDrag | Act::WDrag(_) | Act::DispDrag(_) | Act::SModDrag(..) | Act::SModNew(_))
+        matches!(self, Act::SSlider(..) | Act::VolSlider | Act::BrightSlider | Act::CtlVol | Act::CtlBright | Act::MicSlider | Act::AppVol(_) | Act::MediaSeek | Act::TDrag(_) | Act::TSize(_) | Act::MDrag | Act::WDrag(_) | Act::DispDrag(_) | Act::SModDrag(..) | Act::SModNew(_))
     }
 }
 

@@ -16,8 +16,8 @@ impl App {
     /// лаунчер с уже набранным запросом (`msg launcher ТЕКСТ`: `?тема`, `/отчёт`, `>htop`); открытый
     /// не закрывается, запрос в нём заменяется
     pub fn launcher_with(&mut self, q: &str) {
-        if self.st.modal != Some(Modal::Launcher) || self.st.launcher.clip {
-            self.toggle_modal(Modal::Launcher, false);
+        if self.st.modal != Some(Modal::Launcher) || self.st.launcher.tab != launcher::LTab::Apps {
+            self.open_launcher(launcher::LTab::Apps);
         }
         if self.st.modal != Some(Modal::Launcher) {
             return;
@@ -27,20 +27,48 @@ impl App {
         self.dirty(&SKind::Modal);
     }
 
-    pub fn toggle_modal(&mut self, m: Modal, clip: bool) {
+    pub fn open_launcher(&mut self, tab: launcher::LTab) {
         if self.st.locked {
             return;
         }
-        let same = self.st.modal == Some(m) && (m != Modal::Launcher || self.st.launcher.clip == clip);
-        if self.st.modal.is_some() && !same && m == Modal::Launcher && self.st.modal == Some(Modal::Launcher) {
-            // переключение программы ↔ буфер без закрытия
-            self.st.launcher.set_mode(clip, &self.st.apps, &self.st.niri.wins);
-            if clip {
+        let same = self.st.modal == Some(Modal::Launcher) && self.st.launcher.tab == tab;
+        if self.st.modal == Some(Modal::Launcher) && !same {
+            self.st.launcher.set_tab(tab, &self.st.apps, &self.st.niri.wins);
+            if tab == launcher::LTab::Share {
+                self.st.launcher.port_field.set(&self.st.set.share_port.to_string());
+            }
+            if tab == launcher::LTab::Clip {
                 launcher::load_clip(self.tx.clone());
             }
             self.dirty(&SKind::Modal);
             return;
         }
+        self.close_all();
+        if same {
+            return;
+        }
+        let out = self.focus_out();
+        let (w, h) = launcher::SIZE;
+        self.st.modal = Some(Modal::Launcher);
+        self.st.apps = icons::load_apps();
+        self.st.launcher.open(tab, &self.st.apps, &self.st.niri.wins);
+        self.st.launcher.port_field.set(&self.st.set.share_port.to_string());
+        if tab == launcher::LTab::Clip {
+            launcher::load_clip(self.tx.clone());
+        }
+        self.mk(SKind::Dim, &out, Layer::Overlay, "yami-dim", Anchor::all(), (0, 0), (0, 0, 0, 0), -1, KeyboardInteractivity::None);
+        self.mk(SKind::Modal, &out, Layer::Overlay, "yami-launcher", Anchor::empty(), (w, h + 12), (0, 0, 0, 0), -1, KeyboardInteractivity::Exclusive);
+    }
+
+    pub fn toggle_modal(&mut self, m: Modal, clip: bool) {
+        if m == Modal::Launcher {
+            self.open_launcher(if clip { launcher::LTab::Clip } else { launcher::LTab::Apps });
+            return;
+        }
+        if self.st.locked {
+            return;
+        }
+        let same = self.st.modal == Some(m);
         // та же клавиша при открытом мастере: спросить, а не закрыть молча
         if same && m == Modal::Settings && self.st.welcome.is_some() {
             self.welcome_ask();
@@ -60,13 +88,7 @@ impl App {
         };
         self.st.modal = Some(m);
         match m {
-            Modal::Launcher => {
-                self.st.apps = icons::load_apps();
-                self.st.launcher.open(clip, &self.st.apps, &self.st.niri.wins);
-                if clip {
-                    launcher::load_clip(self.tx.clone());
-                }
-            }
+            Modal::Launcher => unreachable!(),
             Modal::Power => self.st.power_cur = 0,
             Modal::Reply | Modal::Walls => {}
             Modal::Settings => {
@@ -170,6 +192,7 @@ impl App {
         // модули бара рисуют, открыта ли их всплывашка (стрелка трея, календарь)
         self.dirty(&SKind::Bar);
         match kind {
+            "bright" => self.disp_open(),
             "net" => net::refresh_wifi(self.tx.clone()),
             "bt" => net::refresh_bt(self.tx.clone()),
             "profile" => crate::profile::refresh(None, self.tx.clone()),
