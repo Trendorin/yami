@@ -94,7 +94,7 @@ pub struct LState {
     pub thumbs: HashMap<String, Option<Img>>,
     /// номер нити миниатюр: закрыли лаунчер — старая нить бросает работу
     pub tgen: Arc<AtomicU64>,
-    pub clip_qr: Option<Result<crate::share::QrCode, ()>>,
+    pub clip_qr: Option<Result<crate::share::QrCode, &'static str>>,
 }
 
 /// откуда взять картинку для миниатюры
@@ -651,6 +651,9 @@ impl App {
                 if p.image {
                     if path.is_file() {
                         self.st.share.add_files(vec![path]);
+                        if !self.st.share.active {
+                            self.st.share.start(self.st.set.share_port, &self.st.t, self.tx.clone());
+                        }
                         self.open_launcher(LTab::Share);
                     }
                 } else if let Ok(data) = std::fs::read(&path) {
@@ -667,6 +670,9 @@ impl App {
                 if ext != "txt" {
                     let dir = std::env::temp_dir().join("yami-share-clip");
                     if attach_clip_bytes_to_share(&mut self.st.share, &dir, &data, ext) {
+                        if !self.st.share.active {
+                            self.st.share.start(self.st.set.share_port, &self.st.t, self.tx.clone());
+                        }
                         self.open_launcher(LTab::Share);
                     }
                 } else {
@@ -998,29 +1004,27 @@ pub fn draw(ui: &mut Ui, st: &State, w: i32, h: i32) {
     if l.tab == LTab::Clip {
         if let Some(res) = &l.clip_qr {
             ui.zone(fr, Act::LQrClose, Cur::Default);
-            let card = match res {
+            let _card = match res {
                 Ok(qr) => {
                     let cell = (220 / (qr.size as i32 + 4)).max(3);
                     let qpx = (qr.size as i32 + 4) * cell;
                     let cw = qpx + 28;
-                    let ch = qpx + 52;
+                    let ch = qpx + 28;
                     let card = R::new(fr.x + (fr.w - cw) / 2, fr.y + (fr.h - ch) / 2, cw, ch);
                     ui.cv.pxbox(card, &BoxStyle::new(t.panel, t.border));
                     ui.zone(card, Act::Block, Cur::Default);
-                    ui.button(R::new(card.right() - 28, card.y + 6, 22, 22), "", "close", Tone::Danger, false, true, Act::LQrClose);
-                    draw_qr_box(ui, qr, card.x + (card.w - qpx) / 2, card.y + 34, cell);
+                    draw_qr_box(ui, qr, card.x + (card.w - qpx) / 2, card.y + 14, cell);
                     card
                 }
-                Err(()) => {
-                    let card = R::new(fr.x + (fr.w - 220) / 2, fr.y + (fr.h - 76) / 2, 220, 76);
+                Err(msg) => {
+                    let cw = (ui.w(PX, msg) + 32).max(240);
+                    let card = R::new(fr.x + (fr.w - cw) / 2, fr.y + (fr.h - 68) / 2, cw, 68);
                     ui.cv.pxbox(card, &BoxStyle::new(t.panel, t.border));
                     ui.zone(card, Act::Block, Cur::Default);
-                    ui.button(R::new(card.right() - 28, card.y + 6, 22, 22), "", "close", Tone::Danger, false, true, Act::LQrClose);
-                    ui.text_center(PX, R::new(card.x + 12, card.y + 38, card.w - 24, 20), "ошибка", t.red);
+                    ui.text_center(PX, R::new(card.x + 12, card.y + 24, card.w - 24, 20), msg, t.red);
                     card
                 }
             };
-            let _ = card;
         }
     }
 }
@@ -1188,9 +1192,12 @@ fn fmt_size(n: u64) -> String {
     }
 }
 
-pub fn clip_text_qr(data: &[u8]) -> Result<crate::share::QrCode, ()> {
+pub fn clip_text_qr(data: &[u8]) -> Result<crate::share::QrCode, &'static str> {
     let text = String::from_utf8_lossy(data);
-    crate::share::encode_qr(text.as_bytes())
+    if text.len() > 192 {
+        return Err("текст больше лимита QR");
+    }
+    crate::share::encode_qr(text.as_bytes()).map_err(|()| "не удалось создать QR-код")
 }
 
 pub fn attach_clip_bytes_to_share(share: &mut crate::share::ShareState, dir: &std::path::Path, data: &[u8], ext: &str) -> bool {
@@ -1216,7 +1223,7 @@ mod tests {
         assert!(qr.size >= 21);
         assert_eq!(qr.modules.len(), qr.size * qr.size);
         let too_long = vec![b'a'; 193];
-        assert!(clip_text_qr(&too_long).is_err());
+        assert_eq!(clip_text_qr(&too_long).unwrap_err(), "текст больше лимита QR");
     }
 
     #[test]

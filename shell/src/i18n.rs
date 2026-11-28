@@ -1079,6 +1079,8 @@ const PAIRS: &[(&str, &str)] = &[
     ("порт: 1024–65535", "port: 1024–65535"),
     ("авторизация отменена", "authorization cancelled"),
     ("ошибка ufw", "ufw error"),
+    ("текст больше лимита QR", "Text exceeds QR size limit"),
+    ("не удалось создать QR-код", "Unable to generate QR code"),
     ("ufw выключен", "ufw inactive"),
     ("pkexec не найден", "pkexec not found"),
     ("port {} is in use", "port {} is in use"),

@@ -245,6 +245,7 @@ impl ShareState {
             active_conns,
             sse_conns,
             next_id,
+            dl_groups: Mutex::new(HashMap::new()),
             tx,
         });
 
@@ -324,18 +325,27 @@ impl ShareState {
         if t.status == TransferStatus::Active {
             if let Some(ex) = self.active_transfers.iter_mut().find(|x| x.id == t.id) {
                 *ex = t;
-            } else {
+            } else if !self.history.iter().any(|x| x.id == t.id && x.status == TransferStatus::Done) {
                 self.active_transfers.insert(0, t);
             }
         } else {
             self.active_transfers.retain(|x| x.id != t.id);
             if let Some(ex) = self.history.iter_mut().find(|x| x.id == t.id) {
-                *ex = t;
+                if !(ex.status == TransferStatus::Done && t.status == TransferStatus::Failed) {
+                    *ex = t;
+                }
             } else {
                 self.push_history(t);
             }
         }
     }
+}
+
+struct DlGroup {
+    id: u64,
+    last_seen: Instant,
+    active_reqs: usize,
+    any_done: bool,
 }
 
 struct ServerCtx {
@@ -348,7 +358,52 @@ struct ServerCtx {
     active_conns: Arc<AtomicUsize>,
     sse_conns: Arc<AtomicUsize>,
     next_id: Arc<AtomicU64>,
+    dl_groups: Mutex<HashMap<String, DlGroup>>,
     tx: Sender<Msg>,
+}
+
+impl ServerCtx {
+    fn begin_dl(&self, key: &str, auto_window: bool) -> (u64, bool) {
+        let now = Instant::now();
+        let Ok(mut map) = self.dl_groups.lock() else {
+            return (self.next_id.fetch_add(1, Ordering::Relaxed), true);
+        };
+        map.retain(|_, g| g.active_reqs > 0 || now.duration_since(g.last_seen) < Duration::from_secs(60));
+        let reuse = map.get_mut(key).filter(|g| !auto_window || g.active_reqs > 0 || now.duration_since(g.last_seen) < Duration::from_secs(10));
+        if let Some(g) = reuse {
+            g.active_reqs += 1;
+            g.last_seen = now;
+            return (g.id, !g.any_done);
+        }
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        map.insert(key.to_string(), DlGroup { id, last_seen: now, active_reqs: 1, any_done: false });
+        (id, true)
+    }
+
+    fn finish_dl(&self, key: &str, id: u64, name: &str, done: u64, total: u64, status: TransferStatus) {
+        let should_emit = if let Ok(mut map) = self.dl_groups.lock() {
+            if let Some(g) = map.get_mut(key).filter(|g| g.id == id) {
+                g.active_reqs = g.active_reqs.saturating_sub(1);
+                g.last_seen = Instant::now();
+                match status {
+                    TransferStatus::Done => {
+                        g.any_done = true;
+                        true
+                    }
+                    TransferStatus::Cancelled => true,
+                    TransferStatus::Failed => !g.any_done && g.active_reqs == 0,
+                    TransferStatus::Active => true,
+                }
+            } else {
+                true
+            }
+        } else {
+            true
+        };
+        if should_emit {
+            emit_transfer(&self.tx, id, name, false, done, total, status);
+        }
+    }
 }
 
 fn accept_loop(listener: TcpListener, wake_rd: RawFd, ctx: Arc<ServerCtx>) {
@@ -381,7 +436,7 @@ fn accept_loop(listener: TcpListener, wake_rd: RawFd, ctx: Arc<ServerCtx>) {
                         }
                         let _ = stream.set_nonblocking(false);
                         let _ = stream.set_read_timeout(Some(Duration::from_secs(15)));
-                        let _ = stream.set_write_timeout(Some(Duration::from_secs(15)));
+                        let _ = stream.set_write_timeout(Some(Duration::from_secs(60)));
                         let conn_id = ctx.next_id.fetch_add(1, Ordering::Relaxed);
                         if let (Ok(cloned), Ok(mut map)) = (stream.try_clone(), ctx.streams.lock()) {
                             map.insert(conn_id, cloned);
@@ -464,7 +519,7 @@ fn handle_conn(mut stream: TcpStream, ctx: &ServerCtx) {
             let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".into());
             let _ = send_bytes(&mut stream, "200 OK", "application/json; charset=utf-8", json.as_bytes());
         }
-        ("GET", p) if p.starts_with("/dl/") => {
+        ("GET", p) | ("HEAD", p) if p.starts_with("/dl/") => {
             let id_str = p.strip_prefix("/dl/").unwrap_or("").split('/').next().unwrap_or("");
             let Ok(fid) = id_str.parse::<u64>() else {
                 let _ = send_simple(&mut stream, "404 Not Found", "Not Found");
@@ -475,9 +530,16 @@ fn handle_conn(mut stream: TcpStream, ctx: &ServerCtx) {
                 let _ = send_simple(&mut stream, "404 Not Found", "Not Found");
                 return;
             };
-            serve_file(&mut stream, &path, ctx);
+            let (dl_key, auto_win) = match params.get("dl") {
+                Some(dl) => (format!("dl:{fid}:{dl}"), false),
+                None => {
+                    let ip = stream.peer_addr().map(|a| a.ip().to_string()).unwrap_or_default();
+                    (format!("auto:{fid}:{ip}"), true)
+                }
+            };
+            serve_file(&mut stream, &path, req.method == "HEAD", req.headers.get("range").map(String::as_str), &dl_key, auto_win, ctx);
         }
-        ("GET", "/dl-all") => {
+        ("GET", "/dl-all") | ("HEAD", "/dl-all") => {
             let files = ctx.files.lock().map(|g| g.clone()).unwrap_or_default();
             let selected: Vec<PathBuf> = if let Some(ids) = params.get("ids") {
                 let want: Vec<u64> = ids.split(',').filter_map(|s| s.parse::<u64>().ok()).collect();
@@ -487,6 +549,11 @@ fn handle_conn(mut stream: TcpStream, ctx: &ServerCtx) {
             };
             if selected.is_empty() {
                 let _ = send_simple(&mut stream, "404 Not Found", "No files selected");
+                return;
+            }
+            if req.method == "HEAD" {
+                let head = "HTTP/1.1 200 OK\r\nContent-Type: application/zip\r\nContent-Disposition: attachment; filename=\"yami-share.zip\"\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";
+                let _ = stream.write_all(head.as_bytes());
                 return;
             }
             serve_zip(&mut stream, &selected, ctx);
@@ -554,7 +621,26 @@ fn send_bytes(stream: &mut TcpStream, status: &str, ctype: &str, body: &[u8]) ->
     stream.flush()
 }
 
-fn serve_file(stream: &mut TcpStream, path: &Path, ctx: &ServerCtx) {
+fn parse_range(hdr: &str, total: u64) -> Option<(u64, u64)> {
+    let spec = hdr.trim().strip_prefix("bytes=")?;
+    if spec.contains(',') || total == 0 {
+        return None;
+    }
+    let (a, b) = spec.split_once('-')?;
+    if a.is_empty() {
+        let suffix = b.parse::<u64>().ok().filter(|&n| n > 0)?;
+        let start = total.saturating_sub(suffix);
+        return (start < total).then_some((start, total - 1));
+    }
+    let start = a.parse::<u64>().ok()?;
+    if start >= total {
+        return None;
+    }
+    let end = if b.is_empty() { total - 1 } else { b.parse::<u64>().ok()?.min(total - 1) };
+    (start <= end).then_some((start, end))
+}
+
+fn serve_file(stream: &mut TcpStream, path: &Path, head_only: bool, range_hdr: Option<&str>, dl_key: &str, auto_win: bool, ctx: &ServerCtx) {
     let Ok(mut file) = File::open(path) else {
         let _ = send_simple(stream, "404 Not Found", "Not Found");
         return;
@@ -564,47 +650,88 @@ fn serve_file(stream: &mut TcpStream, path: &Path, ctx: &ServerCtx) {
         return;
     };
     let total = meta.len();
+    let (status, start, len) = match range_hdr.and_then(|h| parse_range(h, total)) {
+        Some((s, e)) => ("206 Partial Content", s, e - s + 1),
+        None => ("200 OK", 0, total),
+    };
+    if start > 0 && io::Seek::seek(&mut file, io::SeekFrom::Start(start)).is_err() {
+        let _ = send_simple(stream, "500 Internal Server Error", "Seek error");
+        return;
+    }
     let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
     let safe_hdr = sanitize_header_filename(&name);
+    let range_line = if status == "206 Partial Content" {
+        format!("Content-Range: bytes {start}-{}/{total}\r\n", start + len - 1)
+    } else {
+        String::new()
+    };
     let head = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {total}\r\nContent-Disposition: attachment; filename=\"{safe_hdr}\"\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
+        "HTTP/1.1 {status}\r\nContent-Type: application/octet-stream\r\nContent-Length: {len}\r\nAccept-Ranges: bytes\r\n{range_line}Content-Disposition: attachment; filename=\"{safe_hdr}\"\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
     );
-    if stream.write_all(head.as_bytes()).is_err() {
+    if stream.write_all(head.as_bytes()).is_err() || head_only {
         return;
     }
 
-    let id = ctx.next_id.fetch_add(1, Ordering::Relaxed);
-    emit_transfer(&ctx.tx, id, &name, false, 0, total, TransferStatus::Active);
+    // Small partial probes (e.g. player/download-manager header probes) should not create history entries.
+    let track = !(status == "206 Partial Content" && len < total && len <= 4096);
+    if len == 0 {
+        if track {
+            let (tid, _) = ctx.begin_dl(dl_key, auto_win);
+            ctx.finish_dl(dl_key, tid, &name, 0, 0, TransferStatus::Done);
+        }
+        return;
+    }
 
+    let mut id: Option<u64> = None;
     let mut buf = vec![0u8; BUF_SIZE];
     let mut done = 0u64;
     let mut last_emit = Instant::now();
-    loop {
+    while done < len {
         if ctx.stop.load(Ordering::Relaxed) {
-            emit_transfer(&ctx.tx, id, &name, false, done, total, TransferStatus::Cancelled);
+            if let Some(tid) = id {
+                ctx.finish_dl(dl_key, tid, &name, done, total, TransferStatus::Cancelled);
+            }
             return;
         }
-        match file.read(&mut buf) {
+        let to_read = ((len - done) as usize).min(BUF_SIZE);
+        match file.read(&mut buf[..to_read]) {
             Ok(0) => break,
             Ok(n) => {
                 if stream.write_all(&buf[..n]).is_err() {
-                    emit_transfer(&ctx.tx, id, &name, false, done, total, TransferStatus::Failed);
+                    if let Some(tid) = id {
+                        ctx.finish_dl(dl_key, tid, &name, done, total, TransferStatus::Failed);
+                    }
                     return;
                 }
                 done += n as u64;
-                if last_emit.elapsed() >= PROGRESS_INTERVAL {
-                    emit_transfer(&ctx.tx, id, &name, false, done, total, TransferStatus::Active);
+                if track && id.is_none() {
+                    let (tid, emit_active) = ctx.begin_dl(dl_key, auto_win);
+                    id = Some(tid);
+                    if emit_active {
+                        emit_transfer(&ctx.tx, tid, &name, false, start + done, total, TransferStatus::Active);
+                    }
                     last_emit = Instant::now();
+                } else if let Some(tid) = id {
+                    if last_emit.elapsed() >= PROGRESS_INTERVAL {
+                        emit_transfer(&ctx.tx, tid, &name, false, start + done, total, TransferStatus::Active);
+                        last_emit = Instant::now();
+                    }
                 }
             }
             Err(_) => {
-                emit_transfer(&ctx.tx, id, &name, false, done, total, TransferStatus::Failed);
+                if track {
+                    let tid = id.unwrap_or_else(|| ctx.begin_dl(dl_key, auto_win).0);
+                    ctx.finish_dl(dl_key, tid, &name, done, total, TransferStatus::Failed);
+                }
                 return;
             }
         }
     }
     let _ = stream.flush();
-    emit_transfer(&ctx.tx, id, &name, false, done, total, TransferStatus::Done);
+    if let Some(tid) = id {
+        let final_done = if status == "206 Partial Content" { total } else { done };
+        ctx.finish_dl(dl_key, tid, &name, final_done, total, TransferStatus::Done);
+    }
 }
 
 struct ChunkedWriter<'a> {
@@ -1606,7 +1733,7 @@ body{margin:0 auto;max-width:560px;padding:max(16px,env(safe-area-inset-top)) ma
     <h2 class="t" id="h-dl">Files from PC <span class="cnt" id="fcnt" hidden>0</span></h2>
     <div class="tools">
       <button type="button" class="btn sec" id="rf" aria-label="Refresh file list">Refresh</button>
-      <a class="btn" id="dlall" href="/dl-all?t=__TOKEN__" hidden>Download all</a>
+      <a class="btn" id="dlall" href="/dl-all?t=__TOKEN__" download="yami-share.zip" hidden>Download all</a>
     </div>
   </div>
   <div id="files" class="meta">Loading…</div>
@@ -1657,7 +1784,7 @@ async function load(){
     cnt.textContent=list.length;cnt.hidden=!list.length;
     if(!list.length){box.innerHTML=empty("No files shared yet","Files you share from your PC will show up here.");all.hidden=true;return;}
     all.hidden=list.length<2;
-    box.innerHTML=list.map(f=>`<div class="row"><div class="info"><div class="name" title="${esc(f.name)}">${esc(f.name)}</div><div class="meta">${fmt(f.size)}</div></div><a class="btn sec dl" href="/dl/${f.id}?t=${encodeURIComponent(T)}" aria-label="Download ${esc(f.name)}">Download</a></div>`).join("");
+    box.innerHTML=list.map(f=>`<div class="row"><div class="info"><div class="name" title="${esc(f.name)}">${esc(f.name)}</div><div class="meta">${fmt(f.size)}</div></div><a class="btn sec dl" href="/dl/${f.id}?t=${encodeURIComponent(T)}" download="${esc(f.name)}" aria-label="Download ${esc(f.name)}">Download</a></div>`).join("");
   }catch(_){
     if(my!==seq)return;
     if(box.querySelector(".row"))say("Refresh failed");
@@ -1673,9 +1800,14 @@ function flash(a,msg){
   a._t=setTimeout(()=>{a.textContent=old;a.classList.remove("ok");a._t=0;},2500);
   say(msg);
 }
+let dlSeq=1;
 document.addEventListener("click",e=>{
   const a=e.target.closest("a.dl,#dlall");
-  if(a)flash(a,a.id==="dlall"?"Downloading all files":"Download started");
+  if(!a)return;
+  const u=new URL(a.getAttribute("href"),location.href);
+  u.searchParams.set("dl",String(dlSeq++));
+  a.setAttribute("href",u.pathname+u.search);
+  flash(a,a.id==="dlall"?"Downloading all files":"Download started");
 });
 $("rf").addEventListener("click",load);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)load();});
@@ -1939,6 +2071,7 @@ mod tests {
             active_conns: Arc::new(AtomicUsize::new(0)),
             sse_conns: Arc::new(AtomicUsize::new(0)),
             next_id: Arc::new(AtomicU64::new(1)),
+            dl_groups: Mutex::new(HashMap::new()),
             tx,
         });
         let handle = std::thread::spawn(move || accept_loop(listener, fds[0], ctx));
@@ -2037,5 +2170,96 @@ mod tests {
         let st = ShareTheme::from_theme(&t);
         assert!(st.accent.starts_with('#') && st.accent.len() == 7);
         assert_eq!(crate::config::Settings::default().share_port, 45837);
+    }
+
+    #[test]
+    fn download_probes_and_large_file_history() {
+        let dir = std::env::temp_dir().join(format!("yami-share-dl-{}", gen_token()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let img_path = dir.join("clip.png");
+        std::fs::write(&img_path, vec![0x89u8; 4096]).unwrap();
+        let mp4_path = dir.join("clip.mp4");
+        std::fs::write(&mp4_path, vec![0x42u8; 300 * 1024]).unwrap();
+
+        let (tx, rx) = calloop::channel::channel();
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        listener.set_nonblocking(true).unwrap();
+
+        let mut fds = [0i32; 2];
+        assert_eq!(unsafe { libc::pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC) }, 0);
+        let token = gen_token();
+        let stop = Arc::new(AtomicBool::new(false));
+        let streams = Arc::new(Mutex::new(HashMap::new()));
+        let theme_bus = Arc::new((Mutex::new((1, ShareTheme::default())), Condvar::new()));
+        let ctx = Arc::new(ServerCtx {
+            token: token.clone(),
+            files: Arc::new(Mutex::new(vec![
+                SharedFile { id: 1, path: img_path },
+                SharedFile { id: 2, path: mp4_path },
+            ])),
+            upload_dir: dir.join("uploads"),
+            stop: stop.clone(),
+            streams: streams.clone(),
+            theme_bus: theme_bus.clone(),
+            active_conns: Arc::new(AtomicUsize::new(0)),
+            sse_conns: Arc::new(AtomicUsize::new(0)),
+            next_id: Arc::new(AtomicU64::new(1)),
+            dl_groups: Mutex::new(HashMap::new()),
+            tx,
+        });
+        let handle = std::thread::spawn(move || accept_loop(listener, fds[0], ctx));
+        let srv = ServerHandle { stop, wake_wr: fds[1], streams, theme_bus, listener_thread: Some(handle) };
+
+        // HEAD and small Range probes must not add history entries or Failed events.
+        let mut s = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+        write!(s, "HEAD /dl/2?t={token} HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
+        let mut head_resp = String::new();
+        s.read_to_string(&mut head_resp).unwrap();
+        assert!(head_resp.starts_with("HTTP/1.1 200 OK"));
+
+        let mut s = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+        write!(s, "GET /dl/2?t={token} HTTP/1.1\r\nHost: x\r\nRange: bytes=0-1\r\n\r\n").unwrap();
+        let mut probe_resp = Vec::new();
+        s.read_to_end(&mut probe_resp).unwrap();
+        assert!(String::from_utf8_lossy(&probe_resp).starts_with("HTTP/1.1 206 Partial Content"));
+
+        // Real downloads of image and large MP4 (with &dl=1 + multi-range/aborted retry) produce 1 Done each.
+        {
+            // Simulated browser hand-off: reads headers + first bytes then drops, followed by Range/full retry with same dl=1.
+            let mut s1 = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+            write!(s1, "GET /dl/2?t={token}&dl=1 HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
+            let mut tmp = [0u8; 256];
+            let _ = s1.read(&mut tmp);
+            drop(s1);
+
+            let mut s2 = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+            write!(s2, "GET /dl/2?t={token}&dl=1 HTTP/1.1\r\nHost: x\r\nRange: bytes=0-150000\r\n\r\n").unwrap();
+            let mut r2 = Vec::new();
+            s2.read_to_end(&mut r2).unwrap();
+
+            let mut s3 = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+            write!(s3, "GET /dl/2?t={token}&dl=1 HTTP/1.1\r\nHost: x\r\nRange: bytes=150001-\r\n\r\n").unwrap();
+            let mut r3 = Vec::new();
+            s3.read_to_end(&mut r3).unwrap();
+        }
+        {
+            let mut s = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+            write!(s, "GET /dl/1?t={token}&dl=2 HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
+            let mut raw = Vec::new();
+            s.read_to_end(&mut raw).unwrap();
+            let hdr_end = raw.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+            assert_eq!(raw.len() - hdr_end, 4096);
+        }
+
+        drop(srv);
+        let mut st = ShareState::default();
+        while let Ok(Msg::ShareUpdate(ev)) = rx.try_recv() {
+            st.apply_event(ev);
+        }
+        assert!(st.active_transfers.is_empty());
+        assert_eq!(st.history.len(), 2);
+        assert!(st.history.iter().all(|h| h.status == TransferStatus::Done));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

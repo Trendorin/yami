@@ -1216,6 +1216,8 @@ const PT_BR: &[(&str, &str)] = &[
     ("port: 1024–65535", "porta: 1024–65535"),
     ("authorization cancelled", "autorização cancelada"),
     ("ufw error", "erro no ufw"),
+    ("Text exceeds QR size limit", "Texto excede o limite do QR"),
+    ("Unable to generate QR code", "Não foi possível gerar o código QR"),
     ("ufw inactive", "ufw inativo"),
     ("pkexec not found", "pkexec não encontrado"),
     ("port {} is in use", "porta {} em uso"),
